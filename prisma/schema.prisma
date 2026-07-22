@@ -12,51 +12,84 @@ enum MetalType {
   SILVER
 }
 
-enum RateUnit {
-  GRAM
-  KILOGRAM
+enum MetalPurity {
+  K24  @map("24K")
+  K22  @map("22K")
+  K18  @map("18K")
+  K14  @map("14K")
+  P999 @map("999")
+  P925 @map("925")
 }
 
-model Location {
-  id        String         @id @default(cuid())
-  state     String
-  city      String
-  slug      String         @unique
-  isActive  Boolean        @default(true)
-  rates     RateSnapshot[]
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-
-  @@unique([state, city])
-  @@index([state])
+enum RateUpdateStatus {
+  SUCCESS
+  FAILED
+  REJECTED
 }
 
-model RateSnapshot {
-  id            String     @id @default(cuid())
-  metal         MetalType
-  purity        Int?
-  unit          RateUnit
-  priceInPaise  BigInt
-  effectiveAt   DateTime
-  sourceLabel   String?
-  locationId    String
-  location      Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  createdAt     DateTime   @default(now())
+model State {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  code      String   @unique
+  isActive  Boolean  @default(true)
+  cities    City[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([locationId, metal, purity, effectiveAt])
-  @@index([effectiveAt])
+  @@index([isActive, name])
 }
 
-model NewsArticle {
-  id          String    @id @default(cuid())
-  title       String
-  slug        String    @unique
-  summary     String
-  body        String
-  category    String
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model City {
+  id               String      @id @default(cuid())
+  name             String
+  slug             String      @unique
+  stateId          String
+  adjustmentAmount Decimal     @default(0) @db.Decimal(12, 2)
+  isActive         Boolean     @default(true)
+  state            State       @relation(fields: [stateId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  metalRates       MetalRate[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
-  @@index([publishedAt])
+  @@unique([stateId, name])
+  @@index([stateId, isActive])
+  @@index([isActive, name])
+}
+
+model MetalRate {
+  id               String      @id @default(cuid())
+  metalType        MetalType
+  purity           MetalPurity
+  pricePerGram     Decimal     @db.Decimal(14, 2)
+  pricePerKilogram Decimal?    @db.Decimal(16, 2)
+  cityId           String?
+  city             City?       @relation(fields: [cityId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  source           String
+  recordedAt       DateTime
+  createdAt        DateTime    @default(now())
+
+  @@index([metalType, purity, recordedAt])
+  @@index([cityId, recordedAt])
+  @@index([source, recordedAt])
+  @@index([recordedAt])
+}
+
+model RateUpdateLog {
+  id        String           @id @default(cuid())
+  source    String
+  status    RateUpdateStatus
+  message   String
+  rawData   Json?
+  createdAt DateTime         @default(now())
+
+  @@index([status, createdAt])
+  @@index([source, createdAt])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }

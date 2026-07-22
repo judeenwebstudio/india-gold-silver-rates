@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MetalType {
+  GOLD
+  SILVER
+}
+
+enum RateUnit {
+  GRAM
+  KILOGRAM
+}
+
+model Location {
+  id        String         @id @default(cuid())
+  state     String
+  city      String
+  slug      String         @unique
+  isActive  Boolean        @default(true)
+  rates     RateSnapshot[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([state, city])
+  @@index([state])
+}
+
+model RateSnapshot {
+  id            String     @id @default(cuid())
+  metal         MetalType
+  purity        Int?
+  unit          RateUnit
+  priceInPaise  BigInt
+  effectiveAt   DateTime
+  sourceLabel   String?
+  locationId    String
+  location      Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+
+  @@index([locationId, metal, purity, effectiveAt])
+  @@index([effectiveAt])
+}
+
+model NewsArticle {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  summary     String
+  body        String
+  category    String
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([publishedAt])
+}

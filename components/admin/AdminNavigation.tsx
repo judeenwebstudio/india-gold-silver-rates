@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 
 const navigationItems = [
   { label: "Dashboard", href: "/admin/dashboard", marker: "OV", available: true },
-  { label: "Gold Rates", href: "/admin/gold-rates", marker: "AU", available: false },
-  { label: "Silver Rates", href: "/admin/silver-rates", marker: "AG", available: false },
+  { label: "Gold Rates", href: "/admin/gold-rates", marker: "AU", available: true },
+  { label: "Silver Rates", href: "/admin/silver-rates", marker: "AG", available: true },
   { label: "States", href: "/admin/states", marker: "ST", available: false },
   { label: "Cities", href: "/admin/cities", marker: "CT", available: false },
   { label: "Rate History", href: "/admin/rate-history", marker: "HI", available: false },

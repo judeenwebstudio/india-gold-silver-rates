@@ -27,6 +27,12 @@ enum RateUpdateStatus {
   REJECTED
 }
 
+enum RateHistoryAction {
+  CREATE
+  UPDATE
+  SOFT_DELETE
+}
+
 model State {
   id        String   @id @default(cuid())
   name      String
@@ -67,12 +73,34 @@ model MetalRate {
   city             City?       @relation(fields: [cityId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   source           String
   recordedAt       DateTime
+  isActive          Boolean     @default(true)
+  deletedAt         DateTime?
   createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @default(now()) @updatedAt
+  rateHistory       RateHistory[]
 
   @@index([metalType, purity, recordedAt])
+  @@index([metalType, isActive, recordedAt])
   @@index([cityId, recordedAt])
   @@index([source, recordedAt])
+  @@index([isActive, recordedAt])
   @@index([recordedAt])
+}
+
+model RateHistory {
+  id           String            @id @default(cuid())
+  metalRateId  String
+  metalType    MetalType
+  action       RateHistoryAction
+  previousData Json?
+  newData      Json?
+  source       String            @default("ADMIN_UI")
+  createdAt    DateTime          @default(now())
+  metalRate    MetalRate         @relation(fields: [metalRateId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([metalRateId, createdAt])
+  @@index([metalType, action, createdAt])
+  @@index([createdAt])
 }
 
 model RateUpdateLog {

@@ -17,7 +17,7 @@ async function getDashboardMetrics() {
     prisma.city.count(),
     prisma.metalRate.count({ where: { metalType: MetalType.GOLD } }),
     prisma.metalRate.count({ where: { metalType: MetalType.SILVER } }),
-    prisma.metalRate.aggregate({ _max: { createdAt: true } }),
+    prisma.metalRate.aggregate({ _max: { updatedAt: true } }),
   ]);
 
   return {
@@ -25,7 +25,7 @@ async function getDashboardMetrics() {
     totalCities,
     goldRateRecords,
     silverRateRecords,
-    lastDatabaseUpdate: latestRate._max.createdAt,
+    lastDatabaseUpdate: latestRate._max.updatedAt,
   };
 }
 

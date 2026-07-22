@@ -7,15 +7,32 @@ const expectedTables = [
   "State",
   "City",
   "MetalRate",
+  "RateHistory",
   "RateUpdateLog",
   "SystemSetting",
 ] as const;
 
 async function verifyDatabase() {
-  const [states, cities, metalRates, tables, sampleState] = await Promise.all([
+  const [
+    states,
+    cities,
+    metalRates,
+    sampleMetalRates,
+    softDeletedRates,
+    rateHistory,
+    tables,
+    sampleState,
+  ] = await Promise.all([
     prisma.state.count(),
     prisma.city.count(),
     prisma.metalRate.count(),
+    prisma.metalRate.count({ where: { source: "SEED_SAMPLE" } }),
+    prisma.metalRate.count({ where: { isActive: false } }),
+    prisma.rateHistory.groupBy({
+      by: ["action"],
+      _count: { _all: true },
+      orderBy: { action: "asc" },
+    }),
     prisma.$queryRaw<Array<{ table_name: string }>>`
       SELECT table_name
       FROM information_schema.tables
@@ -25,6 +42,7 @@ async function verifyDatabase() {
           'State',
           'City',
           'MetalRate',
+          'RateHistory',
           'RateUpdateLog',
           'SystemSetting'
         )
@@ -58,6 +76,11 @@ async function verifyDatabase() {
         states,
         cities,
         metalRates,
+        sampleMetalRates,
+        softDeletedRates,
+        rateHistory: Object.fromEntries(
+          rateHistory.map(({ action, _count }) => [action, _count._all]),
+        ),
         applicationQuerySucceeded,
       },
       null,

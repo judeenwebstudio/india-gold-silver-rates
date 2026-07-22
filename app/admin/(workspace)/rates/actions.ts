@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { auth } from "@/auth";
 import {
   MetalPurity,
   MetalType,
@@ -146,6 +147,7 @@ async function validateRateInput(formData: FormData): Promise<
       id: cityId,
       stateId,
       isActive: true,
+      deletedAt: null,
       state: { isActive: true },
     },
     select: { id: true },
@@ -202,10 +204,25 @@ function mutationErrorState(error: unknown) {
   return errorState("The rate could not be saved. Please try again.");
 }
 
+async function requireAdminSession() {
+  const session = await auth();
+
+  if (!session?.user?.email) {
+    return errorState("Your administrator session has expired. Sign in and try again.");
+  }
+
+  return null;
+}
+
 export async function createRateAction(
   _previousState: RateActionState,
   formData: FormData,
 ): Promise<RateActionState> {
+  const sessionError = await requireAdminSession();
+  if (sessionError) {
+    return sessionError;
+  }
+
   const validation = await validateRateInput(formData);
 
   if (!validation.success) {
@@ -253,6 +270,11 @@ export async function updateRateAction(
   _previousState: RateActionState,
   formData: FormData,
 ): Promise<RateActionState> {
+  const sessionError = await requireAdminSession();
+  if (sessionError) {
+    return sessionError;
+  }
+
   const id = readField(formData, "id");
 
   if (!id) {
@@ -317,6 +339,11 @@ export async function softDeleteRateAction(
   _previousState: RateActionState,
   formData: FormData,
 ): Promise<RateActionState> {
+  const sessionError = await requireAdminSession();
+  if (sessionError) {
+    return sessionError;
+  }
+
   const id = readField(formData, "id");
 
   if (!id) {

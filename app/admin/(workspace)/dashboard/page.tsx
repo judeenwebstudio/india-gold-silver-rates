@@ -74,8 +74,8 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
         <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-500 shadow-sm">
-          <span className="block font-bold text-stone-800">Read-only admin stage</span>
-          CRUD tools and authentication are not enabled.
+          <span className="block font-bold text-stone-800">Secure admin session</span>
+          Rate management is available to authenticated administrators.
         </div>
       </div>
 
@@ -147,8 +147,8 @@ export default async function AdminDashboardPage() {
           <div className="mt-4 flex items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-xs font-black text-amber-800">UI</span>
             <div>
-              <h2 className="font-bold text-stone-950">Authentication pending</h2>
-              <p className="mt-1 text-sm text-stone-500">This stage provides the interface only; no access controls are active yet.</p>
+              <h2 className="font-bold text-stone-950">Administrator protected</h2>
+              <p className="mt-1 text-sm text-stone-500">Auth.js sessions and route protection secure this workspace.</p>
             </div>
           </div>
         </article>

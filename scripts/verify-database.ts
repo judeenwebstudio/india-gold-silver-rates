@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 
 const expectedTables = [
   "_prisma_migrations",
+  "AdminUser",
   "State",
   "City",
   "MetalRate",
@@ -20,6 +21,7 @@ async function verifyDatabase() {
     sampleMetalRates,
     softDeletedRates,
     rateHistory,
+    adminUsers,
     tables,
     sampleState,
   ] = await Promise.all([
@@ -33,12 +35,14 @@ async function verifyDatabase() {
       _count: { _all: true },
       orderBy: { action: "asc" },
     }),
+    prisma.adminUser.count({ where: { isActive: true } }),
     prisma.$queryRaw<Array<{ table_name: string }>>`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
         AND table_name IN (
           '_prisma_migrations',
+          'AdminUser',
           'State',
           'City',
           'MetalRate',
@@ -81,6 +85,7 @@ async function verifyDatabase() {
         rateHistory: Object.fromEntries(
           rateHistory.map(({ action, _count }) => [action, _count._all]),
         ),
+        activeAdminUsers: adminUsers,
         applicationQuerySucceeded,
       },
       null,
@@ -88,7 +93,7 @@ async function verifyDatabase() {
     ),
   );
 
-  if (missingTables.length > 0 || !applicationQuerySucceeded) {
+  if (missingTables.length > 0 || !applicationQuerySucceeded || adminUsers < 1) {
     process.exitCode = 1;
   }
 }

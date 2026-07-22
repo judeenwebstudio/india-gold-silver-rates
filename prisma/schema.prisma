@@ -7,6 +7,19 @@ datasource db {
   provider = "postgresql"
 }
 
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  @@index([isActive, email])
+}
+
 enum MetalType {
   GOLD
   SILVER
@@ -47,37 +60,43 @@ model State {
 }
 
 model City {
-  id               String      @id @default(cuid())
-  name             String
-  slug             String      @unique
-  stateId          String
-  adjustmentAmount Decimal     @default(0) @db.Decimal(12, 2)
-  isActive         Boolean     @default(true)
-  state            State       @relation(fields: [stateId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  metalRates       MetalRate[]
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id                  String      @id @default(cuid())
+  name                String
+  slug                String      @unique
+  stateId             String
+  gold24KAdjustment   Decimal     @default(0) @db.Decimal(12, 4)
+  gold22KAdjustment   Decimal     @default(0) @db.Decimal(12, 4)
+  gold18KAdjustment   Decimal     @default(0) @db.Decimal(12, 4)
+  gold14KAdjustment   Decimal     @default(0) @db.Decimal(12, 4)
+  silver999Adjustment Decimal     @default(0) @db.Decimal(12, 4)
+  isActive            Boolean     @default(true)
+  deletedAt           DateTime?
+  state               State       @relation(fields: [stateId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  metalRates          MetalRate[]
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   @@unique([stateId, name])
   @@index([stateId, isActive])
   @@index([isActive, name])
+  @@index([isActive, deletedAt])
 }
 
 model MetalRate {
-  id               String      @id @default(cuid())
+  id               String        @id @default(cuid())
   metalType        MetalType
   purity           MetalPurity
-  pricePerGram     Decimal     @db.Decimal(14, 2)
-  pricePerKilogram Decimal?    @db.Decimal(16, 2)
+  pricePerGram     Decimal       @db.Decimal(14, 4)
+  pricePerKilogram Decimal?      @db.Decimal(16, 2)
   cityId           String?
-  city             City?       @relation(fields: [cityId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  city             City?         @relation(fields: [cityId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   source           String
   recordedAt       DateTime
-  isActive          Boolean     @default(true)
-  deletedAt         DateTime?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @default(now()) @updatedAt
-  rateHistory       RateHistory[]
+  isActive         Boolean       @default(true)
+  deletedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @default(now()) @updatedAt
+  rateHistory      RateHistory[]
 
   @@index([metalType, purity, recordedAt])
   @@index([metalType, isActive, recordedAt])
@@ -106,6 +125,7 @@ model RateHistory {
 model RateUpdateLog {
   id        String           @id @default(cuid())
   source    String
+  sourceUrl String?
   status    RateUpdateStatus
   message   String
   rawData   Json?
@@ -113,6 +133,7 @@ model RateUpdateLog {
 
   @@index([status, createdAt])
   @@index([source, createdAt])
+  @@index([sourceUrl, createdAt])
 }
 
 model SystemSetting {

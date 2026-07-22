@@ -35,7 +35,7 @@ export function Header() {
         </nav>
 
         <div className="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 sm:flex">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" /> Sample rates active
+          <span className="h-2 w-2 rounded-full bg-emerald-500" /> City rates active
         </div>
 
         <button

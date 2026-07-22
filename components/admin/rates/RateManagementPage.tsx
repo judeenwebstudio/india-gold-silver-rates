@@ -117,7 +117,7 @@ export async function RateManagementPage({
         id: true,
         name: true,
         cities: {
-          where: { isActive: true },
+          where: { isActive: true, deletedAt: null },
           orderBy: { name: "asc" },
           select: { id: true, name: true },
         },

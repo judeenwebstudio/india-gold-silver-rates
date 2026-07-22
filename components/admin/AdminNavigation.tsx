@@ -7,10 +7,10 @@ const navigationItems = [
   { label: "Dashboard", href: "/admin/dashboard", marker: "OV", available: true },
   { label: "Gold Rates", href: "/admin/gold-rates", marker: "AU", available: true },
   { label: "Silver Rates", href: "/admin/silver-rates", marker: "AG", available: true },
-  { label: "States", href: "/admin/states", marker: "ST", available: false },
-  { label: "Cities", href: "/admin/cities", marker: "CT", available: false },
+  { label: "States", href: "/admin/states", marker: "ST", available: true },
+  { label: "Cities", href: "/admin/cities", marker: "CT", available: true },
   { label: "Rate History", href: "/admin/rate-history", marker: "HI", available: false },
-  { label: "API Logs", href: "/admin/api-logs", marker: "LG", available: false },
+  { label: "API Logs", href: "/admin/api-logs", marker: "LG", available: true },
   { label: "Settings", href: "/admin/settings", marker: "SE", available: false },
 ] as const;
 

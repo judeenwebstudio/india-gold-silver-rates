@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: "%s | India Gold & Silver Rates",
     },
     description:
-      "Check today's sample gold and silver rates in India by purity, compare daily movement, and estimate gold purchase costs.",
+      "Check today's indicative gold and silver rates in Indian cities by purity, backed by current national bullion rates.",
     keywords: [
       "gold rate today",
       "silver rate today",

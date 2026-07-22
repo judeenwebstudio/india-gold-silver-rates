@@ -21,7 +21,7 @@ test("server-renders the India Gold & Silver Rates homepage", async () => {
 
   const html = await response.text();
   assert.match(html, /India Gold &amp; Silver Rates/);
-  assert.match(html, /Today(?:&apos;|&#x27;|')s rates at a glance/);
+  assert.match(html, /Indicative city rates/);
   assert.match(html, /Gold price calculator/);
   assert.match(html, /Rates in major cities/);
   assert.match(html, /Know your gold hallmark/);

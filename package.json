@@ -9,22 +9,29 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "pnpm run build && node --test tests/rendered-html.test.mjs",
+    "test": "pnpm run build && node --import dotenv/config --test tests/rendered-html.test.mjs",
+    "test:scraper": "node --import tsx --test tests/scrapers/ibja-parser.test.ts",
+    "test:city-rates": "node --import tsx --test tests/city-rate-calculation.test.ts tests/city-adjustment-validation.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:verify": "node --import tsx scripts/verify-database.ts",
+    "db:verify-city-rates": "node --import tsx scripts/verify-city-rates.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.0.0",
     "@prisma/client": "^7.0.0",
+    "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
     "dotenv": "^17.0.0",
     "next": "16.2.6",
+    "next-auth": "5.0.0-beta.32",
     "pg": "^8.0.0",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",

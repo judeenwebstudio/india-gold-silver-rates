@@ -1,19 +1,32 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
+import { hash } from "bcryptjs";
 import {
-  MetalPurity,
-  MetalType,
-  Prisma,
   PrismaClient,
   RateUpdateStatus,
 } from "../generated/prisma/client";
 
 const connectionString = process.env.DATABASE_URL;
+const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+const adminPassword = process.env.ADMIN_PASSWORD;
 
 if (!connectionString) {
   throw new Error("DATABASE_URL is required to seed the database.");
 }
+
+if (!adminEmail || !adminPassword) {
+  throw new Error(
+    "ADMIN_EMAIL and ADMIN_PASSWORD are required to seed the default administrator.",
+  );
+}
+
+if (adminPassword.length < 12) {
+  throw new Error("ADMIN_PASSWORD must contain at least 12 characters.");
+}
+
+const seededAdminEmail = adminEmail;
+const seededAdminPassword = adminPassword;
 
 const applicationUrl = new URL(connectionString);
 applicationUrl.searchParams.delete("sslmode");
@@ -27,7 +40,6 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 const SAMPLE_SOURCE = "SEED_SAMPLE";
-const SAMPLE_RECORDED_AT = new Date("2026-07-22T05:12:00.000Z");
 
 const states = [
   { name: "Tamil Nadu", slug: "tamil-nadu", code: "TN" },
@@ -39,31 +51,36 @@ const states = [
 ] as const;
 
 const cities = [
-  { name: "Chennai", slug: "chennai", stateSlug: "tamil-nadu", adjustmentAmount: "40.00" },
-  { name: "Coimbatore", slug: "coimbatore", stateSlug: "tamil-nadu", adjustmentAmount: "35.00" },
-  { name: "Madurai", slug: "madurai", stateSlug: "tamil-nadu", adjustmentAmount: "30.00" },
-  { name: "Tiruchirappalli", slug: "tiruchirappalli", stateSlug: "tamil-nadu", adjustmentAmount: "30.00" },
-  { name: "Mumbai", slug: "mumbai", stateSlug: "maharashtra", adjustmentAmount: "0.00" },
-  { name: "Pune", slug: "pune", stateSlug: "maharashtra", adjustmentAmount: "10.00" },
-  { name: "New Delhi", slug: "new-delhi", stateSlug: "delhi", adjustmentAmount: "15.00" },
-  { name: "Bengaluru", slug: "bengaluru", stateSlug: "karnataka", adjustmentAmount: "5.00" },
-  { name: "Kochi", slug: "kochi", stateSlug: "kerala", adjustmentAmount: "20.00" },
-  { name: "Hyderabad", slug: "hyderabad", stateSlug: "telangana", adjustmentAmount: "0.00" },
-] as const;
-
-const goldBaseRates = [
-  { purity: MetalPurity.K24, pricePerGram: 10_470 },
-  { purity: MetalPurity.K22, pricePerGram: 9_598 },
-  { purity: MetalPurity.K18, pricePerGram: 7_853 },
-  { purity: MetalPurity.K14, pricePerGram: 6_108 },
-] as const;
-
-const silverBaseRates = [
-  { purity: MetalPurity.P999, pricePerGram: 122.4 },
-  { purity: MetalPurity.P925, pricePerGram: 113.2 },
+  { name: "Chennai", slug: "chennai", stateSlug: "tamil-nadu", gold24KAdjustment: "40.0000", gold22KAdjustment: "37.0000", gold18KAdjustment: "30.0000", gold14KAdjustment: "24.0000", silver999Adjustment: "1.8000" },
+  { name: "Coimbatore", slug: "coimbatore", stateSlug: "tamil-nadu", gold24KAdjustment: "35.0000", gold22KAdjustment: "32.0000", gold18KAdjustment: "26.0000", gold14KAdjustment: "20.0000", silver999Adjustment: "1.2000" },
+  { name: "Madurai", slug: "madurai", stateSlug: "tamil-nadu", gold24KAdjustment: "30.0000", gold22KAdjustment: "28.0000", gold18KAdjustment: "22.0000", gold14KAdjustment: "17.0000", silver999Adjustment: "1.0000" },
+  { name: "Tiruchirappalli", slug: "tiruchirappalli", stateSlug: "tamil-nadu", gold24KAdjustment: "30.0000", gold22KAdjustment: "28.0000", gold18KAdjustment: "22.0000", gold14KAdjustment: "17.0000", silver999Adjustment: "1.0000" },
+  { name: "Mumbai", slug: "mumbai", stateSlug: "maharashtra", gold24KAdjustment: "0.0000", gold22KAdjustment: "0.0000", gold18KAdjustment: "0.0000", gold14KAdjustment: "0.0000", silver999Adjustment: "0.0000" },
+  { name: "Pune", slug: "pune", stateSlug: "maharashtra", gold24KAdjustment: "10.0000", gold22KAdjustment: "9.0000", gold18KAdjustment: "7.0000", gold14KAdjustment: "5.0000", silver999Adjustment: "0.2000" },
+  { name: "New Delhi", slug: "new-delhi", stateSlug: "delhi", gold24KAdjustment: "15.0000", gold22KAdjustment: "14.0000", gold18KAdjustment: "11.0000", gold14KAdjustment: "8.0000", silver999Adjustment: "0.3000" },
+  { name: "Bengaluru", slug: "bengaluru", stateSlug: "karnataka", gold24KAdjustment: "5.0000", gold22KAdjustment: "5.0000", gold18KAdjustment: "4.0000", gold14KAdjustment: "3.0000", silver999Adjustment: "0.5000" },
+  { name: "Kochi", slug: "kochi", stateSlug: "kerala", gold24KAdjustment: "20.0000", gold22KAdjustment: "18.0000", gold18KAdjustment: "14.0000", gold14KAdjustment: "11.0000", silver999Adjustment: "0.8000" },
+  { name: "Hyderabad", slug: "hyderabad", stateSlug: "telangana", gold24KAdjustment: "0.0000", gold22KAdjustment: "0.0000", gold18KAdjustment: "0.0000", gold14KAdjustment: "0.0000", silver999Adjustment: "0.6000" },
 ] as const;
 
 async function main() {
+  const passwordHash = await hash(seededAdminPassword, 12);
+
+  await prisma.adminUser.upsert({
+    where: { email: seededAdminEmail },
+    update: {
+      name: "Default Administrator",
+      passwordHash,
+      isActive: true,
+    },
+    create: {
+      email: seededAdminEmail,
+      name: "Default Administrator",
+      passwordHash,
+      isActive: true,
+    },
+  });
+
   const stateIds = new Map<string, string>();
 
   for (const stateData of states) {
@@ -97,14 +114,23 @@ async function main() {
       update: {
         name: cityData.name,
         stateId,
-        adjustmentAmount: cityData.adjustmentAmount,
+        gold24KAdjustment: cityData.gold24KAdjustment,
+        gold22KAdjustment: cityData.gold22KAdjustment,
+        gold18KAdjustment: cityData.gold18KAdjustment,
+        gold14KAdjustment: cityData.gold14KAdjustment,
+        silver999Adjustment: cityData.silver999Adjustment,
         isActive: true,
+        deletedAt: null,
       },
       create: {
         name: cityData.name,
         slug: cityData.slug,
         stateId,
-        adjustmentAmount: cityData.adjustmentAmount,
+        gold24KAdjustment: cityData.gold24KAdjustment,
+        gold22KAdjustment: cityData.gold22KAdjustment,
+        gold18KAdjustment: cityData.gold18KAdjustment,
+        gold14KAdjustment: cityData.gold14KAdjustment,
+        silver999Adjustment: cityData.silver999Adjustment,
         isActive: true,
       },
     });
@@ -116,61 +142,27 @@ async function main() {
     where: { source: SAMPLE_SOURCE },
   });
 
-  const rateRows: Prisma.MetalRateCreateManyInput[] = [];
-
-  for (const city of seededCities) {
-    const cityAdjustment = Number(city.adjustmentAmount);
-
-    for (const rate of goldBaseRates) {
-      rateRows.push({
-        metalType: MetalType.GOLD,
-        purity: rate.purity,
-        pricePerGram: (rate.pricePerGram + cityAdjustment).toFixed(2),
-        pricePerKilogram: null,
-        cityId: city.id,
-        source: SAMPLE_SOURCE,
-        recordedAt: SAMPLE_RECORDED_AT,
-      });
-    }
-
-    for (const rate of silverBaseRates) {
-      const pricePerGram = rate.pricePerGram + cityAdjustment / 100;
-
-      rateRows.push({
-        metalType: MetalType.SILVER,
-        purity: rate.purity,
-        pricePerGram: pricePerGram.toFixed(2),
-        pricePerKilogram: (pricePerGram * 1_000).toFixed(2),
-        cityId: city.id,
-        source: SAMPLE_SOURCE,
-        recordedAt: SAMPLE_RECORDED_AT,
-      });
-    }
-  }
-
-  await prisma.metalRate.createMany({ data: rateRows });
-
   await prisma.systemSetting.upsert({
     where: { key: "rates.sampleDataEnabled" },
-    update: { value: "true" },
-    create: { key: "rates.sampleDataEnabled", value: "true" },
+    update: { value: "false" },
+    create: { key: "rates.sampleDataEnabled", value: "false" },
   });
 
   await prisma.rateUpdateLog.create({
     data: {
       source: SAMPLE_SOURCE,
       status: RateUpdateStatus.SUCCESS,
-      message: `Seeded ${rateRows.length} sample rates for ${seededCities.length} cities.`,
+      message: `Seeded purity-wise adjustments for ${seededCities.length} cities without duplicating national rates.`,
       rawData: {
         stateCount: states.length,
         cityCount: seededCities.length,
-        rateCount: rateRows.length,
+        cityRateRowsCreated: 0,
       },
     },
   });
 
   console.info(
-    `Database seeded with ${states.length} states, ${seededCities.length} cities, and ${rateRows.length} sample rates.`,
+    `Database seeded with one administrator, ${states.length} states, ${seededCities.length} cities, and no duplicated city rates.`,
   );
 }
 

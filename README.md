@@ -79,7 +79,21 @@ Open [http://localhost:3000](http://localhost:3000). The homepage loads active s
    pnpm db:verify-city-rates
    ```
 
-8. Optionally inspect the database:
+8. Import the complete India location directory into an existing database:
+
+   ```bash
+   pnpm db:import-locations
+   ```
+
+   This production-safe importer uses Prisma upserts only. It adds all 28
+   states, all 8 union territories, capitals, major cities, and district
+   headquarters without deleting or resetting existing records. Existing city
+   activity, soft-delete state, and purity-wise adjustments are preserved.
+   Newly created cities are active with all adjustment values set to zero. The
+   command is safe to rerun and prints inserted, updated, duplicate, and error
+   totals.
+
+9. Optionally inspect the database:
 
    ```bash
    pnpm db:studio
@@ -92,6 +106,17 @@ with Supabase, configure `DATABASE_URL` with the transaction-pooler connection
 migration environment. The seed is idempotent for states and cities. It removes
 obsolete `SEED_SAMPLE` city-rate rows but never replaces national IBJA records,
 administrator-created records, or Rate History.
+
+For production location imports, set `DATABASE_URL` to the Supabase production
+transaction-pooler URL in the local ignored `.env` file, then run:
+
+```bash
+pnpm db:import-locations
+```
+
+The location importer does not run the general seed and does not access admin
+users, metal rates, rate history, scraper logs, scheduler locks, or system
+settings.
 
 ## Admin authentication
 

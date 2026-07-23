@@ -21,6 +21,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
+    "db:import-locations": "tsx prisma/import-locations.ts",
     "db:verify": "node --import tsx scripts/verify-database.ts",
     "db:verify-city-rates": "node --import tsx scripts/verify-city-rates.ts",
     "postinstall": "prisma generate",

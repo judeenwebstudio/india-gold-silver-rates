@@ -28,7 +28,7 @@ export function Header() {
           />
           <span className="leading-tight">
             <span className="block font-display text-lg font-bold tracking-tight text-stone-900">RateStack</span>
-            <span className="block text-[0.62rem] font-bold uppercase tracking-[0.2em] text-amber-700">Gold &amp; silver rates</span>
+            <span className="block text-[0.62rem] font-bold uppercase tracking-[0.2em] text-amber-700">Gold &amp; silver</span>
           </span>
         </a>
 

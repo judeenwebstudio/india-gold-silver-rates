@@ -22,6 +22,7 @@
     "db:seed": "prisma db seed",
     "db:verify": "node --import tsx scripts/verify-database.ts",
     "db:verify-city-rates": "node --import tsx scripts/verify-city-rates.ts",
+    "postinstall": "prisma generate",
     "db:studio": "prisma studio"
   },
   "dependencies": {

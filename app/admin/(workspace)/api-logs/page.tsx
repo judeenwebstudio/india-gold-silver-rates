@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
+import { SchedulerStatus } from "@/components/admin/scraper/SchedulerStatus";
 import { ScraperControls } from "@/components/admin/scraper/ScraperControls";
+import { getSchedulerStatus } from "@/lib/scheduler/status";
 import { getScraperConfig } from "@/lib/scrapers/config";
 import { prisma } from "@/lib/prisma";
 
@@ -41,14 +43,18 @@ const statusClasses = {
   SUCCESS: "bg-emerald-50 text-emerald-800",
   FAILED: "bg-red-50 text-red-800",
   REJECTED: "bg-amber-50 text-amber-900",
+  NO_CHANGE: "bg-blue-50 text-blue-800",
 } as const;
 
 export default async function ApiLogsPage() {
   const configuration = getConfigSummary();
-  const logs = await prisma.rateUpdateLog.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
+  const [logs, scheduler] = await Promise.all([
+    prisma.rateUpdateLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    getSchedulerStatus(),
+  ]);
 
   return (
     <div className="mx-auto max-w-[96rem]">
@@ -66,8 +72,8 @@ export default async function ApiLogsPage() {
           </p>
         </div>
         <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-500 shadow-sm">
-          <span className="block font-bold text-stone-800">Manual execution only</span>
-          Scheduling is intentionally not enabled in this stage.
+          <span className="block font-bold text-stone-800">Daily production schedule</span>
+          1:00 PM UTC · 6:30 PM IST
         </div>
       </div>
 
@@ -102,6 +108,8 @@ export default async function ApiLogsPage() {
         </article>
       </section>
 
+      <SchedulerStatus {...scheduler} />
+
       <ScraperControls enabled={Boolean(configuration.valid && configuration.config.enabled)} />
 
       <section className="mt-8" aria-labelledby="attempt-log-title">
@@ -122,8 +130,10 @@ export default async function ApiLogsPage() {
                 <thead className="bg-stone-50 text-[0.65rem] font-black uppercase tracking-[0.12em] text-stone-500">
                   <tr>
                     <th className="px-5 py-3">Attempted</th>
+                    <th className="px-5 py-3">Execution</th>
                     <th className="px-5 py-3">Source</th>
                     <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3">Changed</th>
                     <th className="px-5 py-3">Message</th>
                     <th className="px-5 py-3">Details</th>
                   </tr>
@@ -132,6 +142,9 @@ export default async function ApiLogsPage() {
                   {logs.map((log) => (
                     <tr key={log.id} className="align-top text-stone-700">
                       <td className="whitespace-nowrap px-5 py-4 text-xs font-semibold">{formatDateTime(log.createdAt)}</td>
+                      <td className="whitespace-nowrap px-5 py-4 text-xs font-black text-stone-600">
+                        {log.executionType.replaceAll("_", " ")}
+                      </td>
                       <td className="max-w-52 px-5 py-4">
                         <span className="block font-bold text-stone-950">{log.source}</span>
                         <span className="mt-1 block truncate text-xs text-stone-400" title={log.sourceUrl ?? undefined}>{log.sourceUrl ?? "No source URL"}</span>
@@ -139,6 +152,7 @@ export default async function ApiLogsPage() {
                       <td className="px-5 py-4">
                         <span className={`rounded-full px-2.5 py-1 text-[0.65rem] font-black ${statusClasses[log.status]}`}>{log.status}</span>
                       </td>
+                      <td className="px-5 py-4 font-black text-stone-950">{log.changedRates}</td>
                       <td className="min-w-72 px-5 py-4 leading-6">{log.message}</td>
                       <td className="px-5 py-4">
                         {log.rawData ? (

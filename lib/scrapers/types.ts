@@ -48,6 +48,8 @@ export type ScraperProviderConfig = {
   enabled: boolean;
   maxChangePercent: number;
   userAgent: string;
+  requestTimeoutMs: number;
+  maxRetries: number;
 };
 
 export interface RateScraperProvider {

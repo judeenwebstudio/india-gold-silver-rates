@@ -2,7 +2,6 @@ import { ScraperFetchError, ScraperRejectedError } from "@/lib/scrapers/errors";
 
 const HTML_CACHE_TTL_MS = 60_000;
 const ROBOTS_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
-const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_HTML_BYTES = 2_000_000;
 
 type CachedHtml = {
@@ -20,14 +19,18 @@ type CachedRobots = {
 const htmlCache = new Map<string, CachedHtml>();
 const robotsCache = new Map<string, CachedRobots>();
 
-function createAbortSignal() {
+function createAbortSignal(timeoutMs: number) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   return { signal: controller.signal, clear: () => clearTimeout(timeout) };
 }
 
-async function fetchWithTimeout(url: string, userAgent: string) {
-  const abort = createAbortSignal();
+async function fetchWithTimeout(
+  url: string,
+  userAgent: string,
+  requestTimeoutMs: number,
+) {
+  const abort = createAbortSignal(requestTimeoutMs);
 
   try {
     return await fetch(url, {
@@ -99,13 +102,17 @@ function robotsAllows(robotsText: string, userAgent: string, pathname: string) {
   return matchingRules[0]?.allow ?? true;
 }
 
-async function assertRobotsAllowed(sourceUrl: URL, userAgent: string) {
+async function assertRobotsAllowed(
+  sourceUrl: URL,
+  userAgent: string,
+  requestTimeoutMs: number,
+) {
   const robotsUrl = new URL("/robots.txt", sourceUrl.origin).toString();
   const cached = robotsCache.get(robotsUrl);
   let robots = cached && cached.expiresAt > Date.now() ? cached : null;
 
   if (!robots) {
-    const response = await fetchWithTimeout(robotsUrl, userAgent);
+    const response = await fetchWithTimeout(robotsUrl, userAgent, requestTimeoutMs);
     const body = await response.text();
     robots = {
       status: response.status,
@@ -138,7 +145,11 @@ function looksLikeAccessChallenge(html: string) {
   ].some((pattern) => pattern.test(html));
 }
 
-export async function fetchPublicHtml(url: string, userAgent: string) {
+export async function fetchPublicHtml(
+  url: string,
+  userAgent: string,
+  requestTimeoutMs: number,
+) {
   const sourceUrl = new URL(url);
   const cached = htmlCache.get(sourceUrl.toString());
 
@@ -146,8 +157,12 @@ export async function fetchPublicHtml(url: string, userAgent: string) {
     return { html: cached.html, fetchedAt: cached.fetchedAt, fromCache: true };
   }
 
-  await assertRobotsAllowed(sourceUrl, userAgent);
-  const response = await fetchWithTimeout(sourceUrl.toString(), userAgent);
+  await assertRobotsAllowed(sourceUrl, userAgent, requestTimeoutMs);
+  const response = await fetchWithTimeout(
+    sourceUrl.toString(),
+    userAgent,
+    requestTimeoutMs,
+  );
 
   if (response.status === 401 || response.status === 403 || response.status === 429) {
     throw new ScraperFetchError(

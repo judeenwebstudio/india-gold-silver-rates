@@ -38,6 +38,13 @@ enum RateUpdateStatus {
   SUCCESS
   FAILED
   REJECTED
+  NO_CHANGE
+}
+
+enum RateSyncExecutionType {
+  MANUAL_TEST
+  MANUAL_SYNC
+  AUTOMATIC_CRON
 }
 
 enum RateHistoryAction {
@@ -123,17 +130,34 @@ model RateHistory {
 }
 
 model RateUpdateLog {
-  id        String           @id @default(cuid())
-  source    String
-  sourceUrl String?
-  status    RateUpdateStatus
-  message   String
-  rawData   Json?
-  createdAt DateTime         @default(now())
+  id               String                @id @default(cuid())
+  source           String
+  sourceUrl        String?
+  status           RateUpdateStatus
+  executionType    RateSyncExecutionType @default(MANUAL_SYNC)
+  message          String
+  changedRates     Int                   @default(0)
+  attemptCount     Int                   @default(1)
+  durationMs       Int?
+  sourceRecordedAt DateTime?
+  rawData          Json?
+  createdAt        DateTime              @default(now())
 
   @@index([status, createdAt])
   @@index([source, createdAt])
   @@index([sourceUrl, createdAt])
+  @@index([executionType, createdAt])
+  @@index([executionType, status, createdAt])
+}
+
+model RateSyncLock {
+  key         String   @id
+  ownerToken  String
+  acquiredAt  DateTime
+  lockedUntil DateTime
+  updatedAt   DateTime @updatedAt
+
+  @@index([lockedUntil])
 }
 
 model SystemSetting {

@@ -81,7 +81,13 @@ Open [http://localhost:3000](http://localhost:3000). The homepage loads active s
    pnpm db:studio
    ```
 
-Prisma uses `DATABASE_URL` from `.env` through `prisma.config.ts`. The seed is idempotent for states and cities. It removes obsolete `SEED_SAMPLE` city-rate rows but never replaces national IBJA records, administrator-created records, or Rate History.
+The application uses `DATABASE_URL` at runtime. Prisma migration commands use
+`DIRECT_URL` when present and otherwise fall back to `DATABASE_URL`. For Vercel
+with Supabase, configure `DATABASE_URL` with the transaction-pooler connection
+(port 6543) and use a direct or session-pooler `DIRECT_URL` only from a trusted
+migration environment. The seed is idempotent for states and cities. It removes
+obsolete `SEED_SAMPLE` city-rate rows but never replaces national IBJA records,
+administrator-created records, or Rate History.
 
 ## Admin authentication
 
@@ -106,6 +112,8 @@ RATE_SOURCE_URL="https://www.ibjarates.com/"
 RATE_SOURCE_ENABLED="true"
 SCRAPER_MAX_CHANGE_PERCENT="20"
 SCRAPER_USER_AGENT="IndiaGoldSilverRates/1.0 (+http://localhost:3000/admin/api-logs)"
+SCRAPER_REQUEST_TIMEOUT_MS="15000"
+SCRAPER_MAX_RETRIES="2"
 ```
 
 Run deterministic parser tests with the saved fixture:
@@ -114,7 +122,52 @@ Run deterministic parser tests with the saved fixture:
 pnpm test:scraper
 ```
 
-No scheduler is enabled. Live synchronization is administrator-triggered only.
+Manual Test Scraper and Sync Rates Now actions remain available after automatic
+scheduling is enabled.
+
+## Automatic daily rate synchronization
+
+Vercel Cron calls `GET /api/cron/rate-sync` every day at `0 13 * * *`, which is
+1:00 PM UTC and 6:30 PM IST. The endpoint requires
+`Authorization: Bearer <CRON_SECRET>` and returns HTTP 401 before doing any work
+when the header or configured secret is missing or invalid.
+
+Add these settings to the local `.env` and to the Vercel project environment:
+
+```dotenv
+CRON_SECRET="replace-with-a-long-random-secret"
+RATE_SYNC_TIMEZONE="Asia/Kolkata"
+SCRAPER_REQUEST_TIMEOUT_MS="15000"
+SCRAPER_MAX_RETRIES="2"
+```
+
+`SCRAPER_MAX_RETRIES=2` means one initial attempt plus at most two retries, for
+a hard maximum of three source attempts. Retry delays use exponential backoff.
+Validation rejections are never retried. Each source request has a configurable
+timeout, and all mutating syncs share a recoverable PostgreSQL execution lease.
+
+For a safe local endpoint test, start the app and run:
+
+```bash
+pnpm dev
+pnpm cron:local
+```
+
+The helper reads `CRON_SECRET` from `.env`, sends it only in the authorization
+header, and never prints it. It makes one request and does not start a local
+scheduler.
+
+The scheduler status section on the protected
+[API Logs & Scraper page](http://localhost:3000/admin/api-logs) shows the latest
+automatic attempt, last successful and failed runs, result, source, changed-rate
+count, and consecutive failures. Audit rows distinguish `MANUAL_TEST`,
+`MANUAL_SYNC`, and `AUTOMATIC_CRON`.
+
+Run the deterministic scheduler tests with:
+
+```bash
+pnpm test:scheduler
+```
 
 ## City-based display rates
 
@@ -142,6 +195,7 @@ Responses include the national base, city adjustment, calculated display rate, s
 - `City`: state relation, soft-delete state, and five purity-specific price adjustments
 - `MetalRate`: timestamped gold or silver rates by purity and optional city
 - `RateUpdateLog`: audit records for future update jobs
+- `RateSyncLock`: expiring database lease that prevents overlapping sync jobs
 - `SystemSetting`: key/value application configuration
 
 Money values use PostgreSQL `Decimal` columns to avoid floating-point storage errors. The reusable client in `lib/prisma.ts` uses a development singleton to avoid duplicate connection pools during hot reloads.
@@ -152,7 +206,10 @@ Money values use PostgreSQL `Decimal` columns to avoid floating-point storage er
 pnpm lint
 pnpm exec tsc --noEmit
 pnpm test:scraper
+pnpm test:scheduler
+pnpm test:scheduler:db
 pnpm test:city-rates
+pnpm test:production-routes
 pnpm build
 pnpm test
 ```
@@ -163,7 +220,7 @@ pnpm test
 app/              App Router pages, protected admin workspace, and public JSON routes
 components/       Reusable public and admin components
 generated/prisma/ Generated Prisma client (ignored by Git)
-lib/              City-rate calculation/data services, scraper providers, auth, and Prisma client
+lib/              City-rate, scraper, scheduler, authentication, and Prisma services
 prisma/           PostgreSQL schema, migrations, and seed script
 public/           Static public assets
 tests/            Parser, city calculation, and rendered-page tests
@@ -174,9 +231,12 @@ tests/            Parser, city calculation, and rendered-page tests
 - National rates remain source-owned records with `cityId = null`
 - City display rates are calculated at read time without duplicated city-rate rows
 - Admin authentication, manual Gold/Silver CRUD, Rate History, IBJA scraper, and API logs are preserved
+- Daily Vercel Cron sync uses bearer authentication, database locking, retry/backoff, and no-change detection
 - Homepage state/city selectors use active PostgreSQL locations
-- Making charges, GST calculation, and automatic scheduling are outside the current scope
+- Making charges and GST calculation are outside the current scope
 
 ## Recommended next stage
 
-Add a signed scheduled sync job with locking, retry/backoff, freshness monitoring, and administrator notifications. Before using source rates for commercial valuation or pricing, evaluate migration to IBJA's official subscribed API.
+Add production freshness alerts and administrator notifications for repeated
+automatic failures. Before using source rates for commercial valuation or
+pricing, evaluate migration to IBJA's official subscribed API.

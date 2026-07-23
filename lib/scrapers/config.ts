@@ -22,6 +22,8 @@ const configSchema = z.object({
     .refine((value) => !/[\r\n]/.test(value), {
       message: "The scraper user agent cannot contain line breaks.",
     }),
+  requestTimeoutMs: z.coerce.number().int().min(1_000).max(30_000),
+  maxRetries: z.coerce.number().int().min(0).max(2),
 });
 
 export function getScraperConfig(): ScraperProviderConfig {
@@ -31,6 +33,8 @@ export function getScraperConfig(): ScraperProviderConfig {
     enabled: process.env.RATE_SOURCE_ENABLED,
     maxChangePercent: process.env.SCRAPER_MAX_CHANGE_PERCENT,
     userAgent: process.env.SCRAPER_USER_AGENT,
+    requestTimeoutMs: process.env.SCRAPER_REQUEST_TIMEOUT_MS ?? "15000",
+    maxRetries: process.env.SCRAPER_MAX_RETRIES ?? "2",
   });
 
   if (!result.success) {

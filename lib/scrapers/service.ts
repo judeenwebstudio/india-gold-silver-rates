@@ -3,11 +3,25 @@ import {
   MetalType,
   Prisma,
   RateHistoryAction,
+  RateSyncExecutionType,
   RateUpdateStatus,
 } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  RetryExecutionError,
+  runLockedRetryPipeline,
+} from "@/lib/scheduler/execution";
+import {
+  acquireRateSyncLease,
+  releaseRateSyncLease,
+} from "@/lib/scheduler/lock";
+import { rateValuesAreEqual } from "@/lib/scheduler/rate-values";
 import { getScraperConfig } from "@/lib/scrapers/config";
-import { ScraperError, ScraperRejectedError } from "@/lib/scrapers/errors";
+import {
+  RateSyncLockUnavailableError,
+  ScraperError,
+  ScraperRejectedError,
+} from "@/lib/scrapers/errors";
 import { createRateScraperProvider } from "@/lib/scrapers/registry";
 import type {
   NormalizedSessionRate,
@@ -18,7 +32,10 @@ import type {
   ScraperProviderConfig,
 } from "@/lib/scrapers/types";
 
-export type ScraperMode = "TEST" | "SYNC";
+export type ScraperMode =
+  | "MANUAL_TEST"
+  | "MANUAL_SYNC"
+  | "AUTOMATIC_CRON";
 
 export type ScraperDatabaseSummary = {
   created: number;
@@ -29,11 +46,13 @@ export type ScraperDatabaseSummary = {
 
 export type ScraperExecutionResult = {
   ok: boolean;
-  outcome: "SUCCESS" | "FAILED" | "REJECTED";
+  outcome: "SUCCESS" | "NO_CHANGE" | "FAILED" | "REJECTED";
   message: string;
   logId?: string;
   parsed?: ScrapedRateResult;
   database?: ScraperDatabaseSummary;
+  attemptCount?: number;
+  locked?: boolean;
 };
 
 type SelectedMappedRate = {
@@ -164,10 +183,13 @@ async function writeSynchronizedRates(
   config: ScraperProviderConfig,
   parsed: ScrapedRateResult,
   attemptedAt: string,
+  executionType: ScraperMode,
+  attemptCount: number,
+  startedAtMs: number,
 ) {
   const rates = selectedMappedRates(parsed);
   const recordedAt = new Date(parsed.recordedAt);
-  const historySource = `SCRAPER:${config.name}`;
+  const historySource = `SCRAPER:${config.name}:${executionType}`;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -196,9 +218,10 @@ async function writeSynchronizedRates(
             const pricePerKilogram = selected.pricePerKilogram;
             const valuesUnchanged =
               existing &&
-              Number(existing.pricePerGram) === Number(selected.pricePerGram) &&
-              Number(existing.pricePerKilogram ?? 0) === Number(pricePerKilogram ?? 0) &&
-              existing.recordedAt.getTime() === recordedAt.getTime();
+              rateValuesAreEqual(existing, {
+                pricePerGram: selected.pricePerGram,
+                pricePerKilogram,
+              });
 
             if (valuesUnchanged) {
               summary.unchanged += 1;
@@ -261,14 +284,27 @@ async function writeSynchronizedRates(
             create: { key: "rates.lastScraperSyncAt", value: attemptedAt },
           });
 
+          const changedRates = summary.created + summary.updated;
+          const status =
+            changedRates === 0
+              ? RateUpdateStatus.NO_CHANGE
+              : RateUpdateStatus.SUCCESS;
           const log = await transaction.rateUpdateLog.create({
             data: {
               source: config.name,
               sourceUrl: config.url,
-              status: RateUpdateStatus.SUCCESS,
-              message: `Synchronized ${summary.created + summary.updated} rates using the ${parsed.preferredSession} source session.`,
+              status,
+              executionType: executionType as RateSyncExecutionType,
+              message:
+                changedRates === 0
+                  ? `The ${parsed.preferredSession} source values matched the stored national rates; no records were changed.`
+                  : `Synchronized ${changedRates} changed rates using the ${parsed.preferredSession} source session.`,
+              changedRates,
+              attemptCount,
+              durationMs: Date.now() - startedAtMs,
+              sourceRecordedAt: recordedAt,
               rawData: {
-                mode: "SYNC",
+                executionType,
                 attemptedAt,
                 parsed,
                 database: summary,
@@ -276,7 +312,7 @@ async function writeSynchronizedRates(
             },
           });
 
-          return { summary, logId: log.id };
+          return { summary, logId: log.id, status };
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
@@ -298,8 +334,10 @@ function errorMessage(error: unknown) {
 async function recordUnsuccessfulAttempt(
   status: "FAILED" | "REJECTED",
   message: string,
-  mode: ScraperMode,
+  executionType: ScraperMode,
   attemptedAt: string,
+  attemptCount: number,
+  durationMs: number,
   config: ScraperProviderConfig | null,
   error: unknown,
   parsed?: ScrapedRateResult,
@@ -313,9 +351,13 @@ async function recordUnsuccessfulAttempt(
       source,
       sourceUrl,
       status,
+      executionType: executionType as RateSyncExecutionType,
       message,
+      attemptCount,
+      durationMs,
+      sourceRecordedAt: parsed ? new Date(parsed.recordedAt) : null,
       rawData: {
-        mode,
+        executionType,
         attemptedAt,
         ...(parsed ? { parsed } : {}),
         ...(details ? { errorDetails: details } : {}),
@@ -326,29 +368,38 @@ async function recordUnsuccessfulAttempt(
 }
 
 export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutionResult> {
+  const startedAtMs = Date.now();
   const attemptedAt = new Date().toISOString();
   let config: ScraperProviderConfig | null = null;
   let parsed: ScrapedRateResult | undefined;
+  let attemptCount = 1;
 
   try {
-    config = getScraperConfig();
-    if (!config.enabled) {
+    const scraperConfig = getScraperConfig();
+    config = scraperConfig;
+    if (!scraperConfig.enabled) {
       throw new ScraperRejectedError("The configured rate source is disabled.");
     }
 
-    const provider = createRateScraperProvider(config);
-    parsed = await provider.scrape();
-    await validateChangeThreshold(config, parsed);
+    const provider = createRateScraperProvider(scraperConfig);
 
-    if (mode === "TEST") {
+    if (mode === "MANUAL_TEST") {
+      parsed = await provider.scrape();
+      await validateChangeThreshold(scraperConfig, parsed);
+
       const log = await prisma.rateUpdateLog.create({
         data: {
-          source: config.name,
-          sourceUrl: config.url,
+          source: scraperConfig.name,
+          sourceUrl: scraperConfig.url,
           status: RateUpdateStatus.SUCCESS,
+          executionType: RateSyncExecutionType.MANUAL_TEST,
           message: `Test scrape parsed ${parsed.quotes.length} source rates; no metal rates were changed.`,
+          changedRates: 0,
+          attemptCount,
+          durationMs: Date.now() - startedAtMs,
+          sourceRecordedAt: new Date(parsed.recordedAt),
           rawData: {
-            mode,
+            executionType: mode,
             attemptedAt,
             parsed,
           } as Prisma.InputJsonObject,
@@ -362,24 +413,78 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
         message: "Live source data parsed successfully. Test mode did not update any rates.",
         logId: log.id,
         parsed,
+        attemptCount,
       };
     }
 
-    const synchronized = await writeSynchronizedRates(config, parsed, attemptedAt);
+    const execution = await runLockedRetryPipeline({
+      leaseManager: {
+        acquire: () => acquireRateSyncLease(),
+        release: async (lease) => {
+          try {
+            await releaseRateSyncLease(lease);
+          } catch (error) {
+            console.error(
+              "The rate-sync lease could not be released and will expire automatically.",
+              error,
+            );
+          }
+        },
+      },
+      prepare: async () => {
+        parsed = await provider.scrape();
+        await validateChangeThreshold(scraperConfig, parsed);
+        return parsed;
+      },
+      commit: (prepared, attempts) =>
+        writeSynchronizedRates(
+          scraperConfig,
+          prepared,
+          attemptedAt,
+          mode,
+          attempts,
+          startedAtMs,
+        ),
+      maxAttempts:
+        mode === "AUTOMATIC_CRON" ? scraperConfig.maxRetries + 1 : 1,
+      isRetryable: (error) => !(error instanceof ScraperRejectedError),
+    });
+
+    if (!execution.acquired) {
+      throw new RateSyncLockUnavailableError(
+        "Another rate synchronization is already running. This attempt was safely skipped.",
+      );
+    }
+
+    attemptCount = execution.attempts;
+    const synchronized = execution.result;
+    const noChange = synchronized.status === RateUpdateStatus.NO_CHANGE;
+    if (!parsed) {
+      throw new Error("The synchronization completed without parsed source data.");
+    }
     return {
       ok: true,
-      outcome: "SUCCESS",
-      message: `Rate synchronization completed using ${parsed.preferredSession} values.`,
+      outcome: noChange ? "NO_CHANGE" : "SUCCESS",
+      message: noChange
+        ? `The latest ${parsed.preferredSession} values are already stored; no rates or history records were added.`
+        : `Rate synchronization completed using ${parsed.preferredSession} values.`,
       logId: synchronized.logId,
       parsed,
       database: synchronized.summary,
+      attemptCount,
     };
   } catch (error) {
+    const underlyingError =
+      error instanceof RetryExecutionError ? error.originalError : error;
+    if (error instanceof RetryExecutionError) {
+      attemptCount = error.attempts;
+    }
     const status =
-      error instanceof ScraperRejectedError
+      underlyingError instanceof ScraperRejectedError
         ? RateUpdateStatus.REJECTED
         : RateUpdateStatus.FAILED;
-    const message = errorMessage(error);
+    const message = errorMessage(underlyingError);
+    const locked = underlyingError instanceof RateSyncLockUnavailableError;
 
     try {
       const log = await recordUnsuccessfulAttempt(
@@ -387,8 +492,10 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
         message,
         mode,
         attemptedAt,
+        attemptCount,
+        Date.now() - startedAtMs,
         config,
-        error,
+        underlyingError,
         parsed,
       );
 
@@ -398,6 +505,8 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
         message,
         logId: log.id,
         parsed,
+        attemptCount,
+        locked,
       };
     } catch (logError) {
       console.error("The scraper attempt could not be recorded.", logError);
@@ -406,6 +515,8 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
         outcome: status,
         message: `${message} The attempt could not be saved to the API log.`,
         parsed,
+        attemptCount,
+        locked,
       };
     }
   }

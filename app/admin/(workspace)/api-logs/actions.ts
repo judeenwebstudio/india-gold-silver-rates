@@ -11,7 +11,7 @@ import type { ScrapedRateResult } from "@/lib/scrapers/types";
 
 export type ScraperActionState = {
   status: "idle" | "success" | "error";
-  outcome?: "SUCCESS" | "FAILED" | "REJECTED";
+  outcome?: "SUCCESS" | "NO_CHANGE" | "FAILED" | "REJECTED";
   message: string;
   parsed?: ScrapedRateResult;
   database?: ScraperDatabaseSummary;
@@ -52,7 +52,7 @@ export async function testScraperAction(
   const sessionError = await requireAdministrator();
   if (sessionError) return sessionError;
 
-  const result = await executeScraper("TEST");
+  const result = await executeScraper("MANUAL_TEST");
   revalidatePath("/admin/api-logs");
   return toActionState(result);
 }
@@ -66,7 +66,7 @@ export async function syncRatesAction(
   const sessionError = await requireAdministrator();
   if (sessionError) return sessionError;
 
-  const result = await executeScraper("SYNC");
+  const result = await executeScraper("MANUAL_SYNC");
   revalidatePath("/admin/api-logs");
 
   if (result.ok) {

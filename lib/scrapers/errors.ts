@@ -13,3 +13,5 @@ export class ScraperRejectedError extends ScraperError {}
 export class ScraperFetchError extends ScraperError {}
 
 export class ScraperConfigurationError extends ScraperRejectedError {}
+
+export class RateSyncLockUnavailableError extends ScraperRejectedError {}

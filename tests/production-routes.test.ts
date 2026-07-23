@@ -104,8 +104,26 @@ test("admin dashboard remains protected by the existing login route", async () =
   await assertRedirectsToAdminLogin("/admin/dashboard");
 });
 
+test("admin Analytics page remains protected by the existing login route", async () => {
+  await assertRedirectsToAdminLogin("/admin/analytics");
+});
+
+test("admin AdSense page remains protected by the existing login route", async () => {
+  await assertRedirectsToAdminLogin("/admin/adsense");
+});
+
 test("admin API Logs page remains protected by the existing login route", async () => {
   await assertRedirectsToAdminLogin("/admin/api-logs");
+});
+
+test("analytics ingestion rejects requests without a same-origin header", async () => {
+  const response = await fetch(`${BASE_URL}/api/analytics/track`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+
+  assert.equal(response.status, 403);
 });
 
 test("production cron route rejects missing authorization", async () => {

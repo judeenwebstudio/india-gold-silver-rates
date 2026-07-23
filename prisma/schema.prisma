@@ -53,6 +53,11 @@ enum RateHistoryAction {
   SOFT_DELETE
 }
 
+enum AnalyticsEventType {
+  PAGE_VIEW
+  CITY_VIEW
+}
+
 model State {
   id        String   @id @default(cuid())
   name      String
@@ -165,4 +170,55 @@ model SystemSetting {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model AnalyticsVisitor {
+  id          String             @id @default(cuid())
+  visitorKey  String             @unique
+  firstSeenAt DateTime           @default(now())
+  lastSeenAt  DateTime           @default(now())
+  sessions    AnalyticsSession[]
+  events      AnalyticsEvent[]
+
+  @@index([firstSeenAt])
+  @@index([lastSeenAt])
+}
+
+model AnalyticsSession {
+  id          String           @id @default(cuid())
+  sessionKey  String           @unique
+  visitorId   String
+  visitor     AnalyticsVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  startedAt   DateTime         @default(now())
+  lastSeenAt  DateTime         @default(now())
+  isReturning Boolean          @default(false)
+  events      AnalyticsEvent[]
+
+  @@index([visitorId, startedAt])
+  @@index([startedAt])
+  @@index([isReturning, startedAt])
+}
+
+model AnalyticsEvent {
+  id         String             @id @default(cuid())
+  eventKey   String             @unique
+  eventType  AnalyticsEventType @default(PAGE_VIEW)
+  visitorId  String
+  visitor    AnalyticsVisitor   @relation(fields: [visitorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sessionId  String
+  session    AnalyticsSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  path       String
+  pageTitle  String?
+  citySlug   String?
+  cityName   String?
+  stateSlug  String?
+  stateName  String?
+  recordedAt DateTime           @default(now())
+  createdAt  DateTime           @default(now())
+
+  @@index([eventType, recordedAt])
+  @@index([visitorId, recordedAt])
+  @@index([sessionId, recordedAt])
+  @@index([path, eventType, recordedAt])
+  @@index([citySlug, recordedAt])
 }

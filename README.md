@@ -218,6 +218,64 @@ Public JSON routes:
 
 Responses include the national base, city adjustment, calculated display rate, source timestamp, and last-updated timestamp. Display prices exclude making charges and GST.
 
+## Analytics and Google Analytics 4
+
+The protected [Analytics page](http://localhost:3000/admin/analytics) reports:
+
+- all-time visitors
+- unique visitors, page views, sessions, and returning visitors for the latest 30 days
+- most visited public pages
+- most viewed city rates
+
+First-party reporting uses anonymous random visitor and 30-minute session
+cookies. It stores visitor, session, page-view, and city-view records in
+PostgreSQL without storing IP addresses. Browser Do Not Track requests and
+common automated crawlers are excluded.
+
+To send the same public page views to Google Analytics 4, create a GA4 web data
+stream and add its Measurement ID to local and Vercel environments:
+
+```dotenv
+NEXT_PUBLIC_GA_MEASUREMENT_ID="G-YOURMEASUREMENTID"
+```
+
+The value must use the GA4 `G-...` format. When it is empty or invalid, GA4 is
+disabled while local analytics continues working. Tracking components are
+mounted only by the public route group and are never rendered in the protected
+admin workspace.
+
+Apply the analytics database migration before enabling production tracking:
+
+```bash
+pnpm exec prisma migrate deploy
+```
+
+## Google AdSense Auto Ads
+
+The protected [AdSense page](http://localhost:3000/admin/adsense) shows the
+configured publisher, Auto Ads, `ads.txt`, and site verification status. It
+links to the official Google AdSense dashboard and does not attempt to retrieve
+earnings, clicks, or impressions.
+
+After Google approves the site, add the real AdSense client value to local and
+Vercel environments:
+
+```dotenv
+NEXT_PUBLIC_GOOGLE_ADSENSE_CLIENT=""
+```
+
+Set this to the real `ca-pub-` value from AdSense. Leaving the
+variable empty keeps Auto Ads disabled and returns HTTP 404 from `/ads.txt`.
+When configured, the application publishes the matching `ads.txt` entry,
+includes the site verification metadata, and loads the Auto Ads script on
+public pages only. Admin and API routes never render the AdSense script.
+
+Run the deterministic configuration tests with:
+
+```bash
+pnpm test:analytics
+```
+
 ## Database model
 
 - `State`: active Indian states and union territories
@@ -226,6 +284,9 @@ Responses include the national base, city adjustment, calculated display rate, s
 - `RateUpdateLog`: audit records for future update jobs
 - `RateSyncLock`: expiring database lease that prevents overlapping sync jobs
 - `SystemSetting`: key/value application configuration
+- `AnalyticsVisitor`: anonymous first-party visitor profile
+- `AnalyticsSession`: 30-minute public browsing session
+- `AnalyticsEvent`: idempotent public page and city view
 
 Money values use PostgreSQL `Decimal` columns to avoid floating-point storage errors. The reusable client in `lib/prisma.ts` uses a development singleton to avoid duplicate connection pools during hot reloads.
 
@@ -239,6 +300,7 @@ pnpm test:scheduler
 pnpm test:scheduler:db
 pnpm test:city-rates
 pnpm test:production-routes
+pnpm test:analytics
 pnpm build
 pnpm test
 ```

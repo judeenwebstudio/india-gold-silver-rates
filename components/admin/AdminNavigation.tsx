@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 
 const navigationItems = [
   { label: "Dashboard", href: "/admin/dashboard", marker: "OV", available: true },
+  { label: "Analytics", href: "/admin/analytics", marker: "AN", available: true },
+  { label: "AdSense", href: "/admin/adsense", marker: "AD", available: true },
   { label: "Gold Rates", href: "/admin/gold-rates", marker: "AU", available: true },
   { label: "Silver Rates", href: "/admin/silver-rates", marker: "AG", available: true },
   { label: "States", href: "/admin/states", marker: "ST", available: true },

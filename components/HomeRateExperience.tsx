@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { GoldCalculator } from "@/components/GoldCalculator";
 import { LocationSelector } from "@/components/LocationSelector";
@@ -17,8 +17,32 @@ export function HomeRateExperience({ states, initialSnapshot }: { states: Public
   const [selectedCitySlug, setSelectedCitySlug] = useState(initialSnapshot.location.citySlug ?? states[0]?.cities[0]?.slug ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const initialLocation = useRef(true);
   const gold24k = snapshot.rates.find((rate) => rate.id === "gold-24k") ?? snapshot.rates[0];
   const silverGram = snapshot.rates.find((rate) => rate.id === "silver-gram") ?? snapshot.rates[0];
+
+  useEffect(() => {
+    if (initialLocation.current) {
+      initialLocation.current = false;
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("analytics:city-view", {
+        detail: {
+          citySlug: snapshot.location.citySlug,
+          cityName: snapshot.location.cityName,
+          stateSlug: snapshot.location.stateSlug,
+          stateName: snapshot.location.stateName,
+        },
+      }),
+    );
+  }, [
+    snapshot.location.cityName,
+    snapshot.location.citySlug,
+    snapshot.location.stateName,
+    snapshot.location.stateSlug,
+  ]);
 
   async function selectCity(slug: string, stateId = selectedStateId) {
     if (!slug) return;
@@ -46,7 +70,14 @@ export function HomeRateExperience({ states, initialSnapshot }: { states: Public
 
   return (
     <>
-      <section className="relative overflow-hidden bg-[#171411] text-white">
+      <section
+        className="relative overflow-hidden bg-[#171411] text-white"
+        data-analytics-location
+        data-city-slug={snapshot.location.citySlug ?? undefined}
+        data-city-name={snapshot.location.cityName}
+        data-state-slug={snapshot.location.stateSlug ?? undefined}
+        data-state-name={snapshot.location.stateName}
+      >
         <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_20%_20%,#d99b2b_0,transparent_28%),radial-gradient(circle_at_85%_70%,#6b562d_0,transparent_30%)]" />
         <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
           <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">

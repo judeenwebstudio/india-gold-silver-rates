@@ -64,7 +64,7 @@ test("production homepage regression", async () => {
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-  assert.match(html, /India Gold &amp; Silver Rates/);
+  assert.match(html, /RateStack/);
   assert.match(html, /Indicative city rates/);
   assert.match(html, /Gold price calculator/);
   assert.match(html, /Rates in major cities/);
@@ -124,6 +124,93 @@ test("analytics ingestion rejects requests without a same-origin header", async 
   });
 
   assert.equal(response.status, 403);
+});
+
+test("v1 home API returns current metal rates and featured cities", async () => {
+  const response = await fetch(`${BASE_URL}/api/v1/home`);
+  const body = await response.json() as {
+    success: boolean;
+    data: {
+      latestGoldRates: Array<{ purity: string; pricePerGram: number }>;
+      latestSilverRate: { pricePerGram: number; pricePerKilogram: number };
+      lastUpdated: string;
+      featuredCities: Array<{ name: string; slug: string }>;
+    };
+  };
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^application\/json\b/i);
+  assert.equal(body.success, true);
+  assert.deepEqual(
+    body.data.latestGoldRates.map((rate) => rate.purity),
+    ["24K", "22K", "18K"],
+  );
+  assert.ok(body.data.latestGoldRates.every((rate) => rate.pricePerGram > 0));
+  assert.ok(body.data.latestSilverRate.pricePerGram > 0);
+  assert.ok(body.data.latestSilverRate.pricePerKilogram > 0);
+  assert.match(body.data.lastUpdated, /^\d{4}-\d{2}-\d{2}T/);
+  assert.ok(body.data.featuredCities.length > 0);
+});
+
+test("v1 states and cities APIs return every active database record", async () => {
+  const [statesResponse, citiesResponse] = await Promise.all([
+    fetch(`${BASE_URL}/api/v1/states`),
+    fetch(`${BASE_URL}/api/v1/cities`),
+  ]);
+  const statesBody = await statesResponse.json() as {
+    success: boolean;
+    data: { states: unknown[]; total: number };
+  };
+  const citiesBody = await citiesResponse.json() as {
+    success: boolean;
+    data: { cities: unknown[]; total: number };
+  };
+
+  assert.equal(statesResponse.status, 200);
+  assert.equal(citiesResponse.status, 200);
+  assert.equal(statesBody.success, true);
+  assert.equal(citiesBody.success, true);
+  assert.equal(statesBody.data.states.length, statesBody.data.total);
+  assert.equal(citiesBody.data.cities.length, citiesBody.data.total);
+  assert.ok(statesBody.data.total > 0);
+  assert.ok(citiesBody.data.total > 0);
+});
+
+test("v1 city rates API validates the state and city combination", async () => {
+  const response = await fetch(
+    `${BASE_URL}/api/v1/rates/tamil-nadu/chennai`,
+  );
+  const body = await response.json() as {
+    success: boolean;
+    data: {
+      state: { slug: string };
+      city: { slug: string };
+      goldRates: Array<{ purity: string; pricePerGram: number }>;
+      silverRate: { pricePerGram: number };
+      lastUpdated: string;
+    };
+  };
+
+  assert.equal(response.status, 200);
+  assert.equal(body.success, true);
+  assert.equal(body.data.state.slug, "tamil-nadu");
+  assert.equal(body.data.city.slug, "chennai");
+  assert.deepEqual(
+    body.data.goldRates.map((rate) => rate.purity),
+    ["24K", "22K", "18K"],
+  );
+  assert.ok(body.data.silverRate.pricePerGram > 0);
+  assert.match(body.data.lastUpdated, /^\d{4}-\d{2}-\d{2}T/);
+
+  const invalid = await fetch(
+    `${BASE_URL}/api/v1/rates/Tamil-Nadu/chennai`,
+  );
+  const mismatch = await fetch(
+    `${BASE_URL}/api/v1/rates/maharashtra/chennai`,
+  );
+
+  assert.equal(invalid.status, 400);
+  assert.equal(mismatch.status, 404);
 });
 
 test("production cron route rejects missing authorization", async () => {

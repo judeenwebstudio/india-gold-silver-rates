@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -7,7 +8,7 @@ import { LoginForm } from "@/components/admin/LoginForm";
 
 export const metadata: Metadata = {
   title: "Admin Login",
-  description: "Secure administrator login for India Gold & Silver Rates.",
+  description: "Secure administrator login for RateStack.",
   robots: { index: false, follow: false },
 };
 
@@ -40,11 +41,16 @@ export default async function AdminLoginPage({
         <div className="pointer-events-none absolute -right-8 top-10 h-64 w-64 rounded-full border border-amber-300/15" />
 
         <Link href="/" className="relative flex items-center gap-3" aria-label="Return to public homepage">
-          <span className="grid h-12 w-12 place-items-center rounded-xl border border-amber-300/25 bg-amber-300/10 font-display text-base font-bold text-amber-300">
-            Au
-          </span>
+          <Image
+            src="/ratestack-logo.png"
+            alt=""
+            width={80}
+            height={48}
+            priority
+            className="h-12 w-20 rounded-lg border border-white/15 bg-white object-cover"
+          />
           <span className="leading-tight">
-            <span className="block font-display text-xl font-bold">India Gold &amp; Silver</span>
+            <span className="block font-display text-xl font-bold">RateStack</span>
             <span className="mt-1 block text-[0.62rem] font-bold uppercase tracking-[0.24em] text-amber-300">
               Administration
             </span>
@@ -67,10 +73,15 @@ export default async function AdminLoginPage({
       <section className="flex min-h-screen items-center justify-center px-4 py-10 sm:px-8 lg:px-12">
         <div className="w-full max-w-md">
           <Link href="/" className="mb-10 flex items-center gap-3 lg:hidden" aria-label="Return to public homepage">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-stone-900 font-display text-sm font-bold text-amber-300">
-              Au
-            </span>
-            <span className="font-display text-lg font-bold text-stone-950">Rates Admin</span>
+            <Image
+              src="/ratestack-logo.png"
+              alt=""
+              width={72}
+              height={40}
+              priority
+              className="h-10 w-18 rounded-lg border border-stone-200 bg-white object-cover"
+            />
+            <span className="font-display text-lg font-bold text-stone-950">RateStack Admin</span>
           </Link>
 
           <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">Admin access</p>

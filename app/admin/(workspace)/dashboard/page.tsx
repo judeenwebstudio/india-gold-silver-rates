@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Dashboard",
-  description: "Database overview for the India Gold & Silver Rates administration workspace.",
+  description: "Database overview for the RateStack administration workspace.",
 };
 
 export const dynamic = "force-dynamic";

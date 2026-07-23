@@ -14,13 +14,13 @@ async function render() {
   );
 }
 
-test("server-renders the India Gold & Silver Rates homepage", async () => {
+test("server-renders the RateStack homepage", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /India Gold &amp; Silver Rates/);
+  assert.match(html, /RateStack/);
   assert.match(html, /Indicative city rates/);
   assert.match(html, /Gold price calculator/);
   assert.match(html, /Rates in major cities/);

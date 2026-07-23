@@ -48,7 +48,7 @@ test("local analytics accepts public events and excludes admin or API paths", ()
     eventKey: "b8519c7c-7f55-4df3-8ca7-1d43757ad416",
     eventType: "PAGE_VIEW",
     path: "/",
-    pageTitle: "India Gold & Silver Rates",
+    pageTitle: "RateStack",
     citySlug: "chennai",
     cityName: "Chennai",
     stateSlug: "tamil-nadu",

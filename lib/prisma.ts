@@ -12,6 +12,8 @@ function createPrismaClient() {
       process.env.DATABASE_URL,
     ),
     connectionTimeoutMillis: 5_000,
+    max: 3,
+    idleTimeoutMillis: 10_000,
     // Supabase connections remain encrypted while accommodating certificate
     // chains that are not trusted by the local Node.js certificate store.
     ssl: { rejectUnauthorized: false },

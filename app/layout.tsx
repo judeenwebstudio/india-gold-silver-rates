@@ -10,14 +10,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   const baseUrl = new URL(`${protocol}://${host}`);
-  const socialImage = new URL("/og.png", baseUrl).toString();
+  const socialImage = new URL("/ratestack-logo.png", baseUrl).toString();
   const adsense = getAdSenseConfiguration();
 
   return {
     metadataBase: baseUrl,
     title: {
-      default: "India Gold & Silver Rates | Today's Prices",
-      template: "%s | India Gold & Silver Rates",
+      default: "RateStack | Today's Gold & Silver Rates",
+      template: "%s | RateStack",
     },
     description:
       "Check today's indicative gold and silver rates in Indian cities by purity, backed by current national bullion rates.",
@@ -29,20 +29,20 @@ export async function generateMetadata(): Promise<Metadata> {
       "22K gold rate",
       "gold calculator",
     ],
-    authors: [{ name: "India Gold & Silver Rates" }],
-    creator: "India Gold & Silver Rates",
+    authors: [{ name: "RateStack" }],
+    creator: "RateStack",
     openGraph: {
       type: "website",
       locale: "en_IN",
       url: baseUrl,
-      siteName: "India Gold & Silver Rates",
-      title: "India Gold & Silver Rates",
+      siteName: "RateStack",
+      title: "RateStack | India Gold & Silver Rates",
       description: "Clear daily bullion rates, city comparisons, and a simple purchase calculator.",
-      images: [{ url: socialImage, width: 1200, height: 630, alt: "India Gold & Silver Rates" }],
+      images: [{ url: socialImage, width: 1466, height: 720, alt: "RateStack logo" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "India Gold & Silver Rates",
+      title: "RateStack | India Gold & Silver Rates",
       description: "Clear daily bullion rates, city comparisons, and a simple purchase calculator.",
       images: [socialImage],
     },

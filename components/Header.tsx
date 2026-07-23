@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 const navigation = [
   { label: "Today’s rates", href: "#rates" },
@@ -16,13 +17,18 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-[#fbfaf7]/95 backdrop-blur-xl">
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <a href="#" className="flex items-center gap-3" aria-label="India Gold and Silver Rates home">
-          <span className="grid h-10 w-10 place-items-center rounded-full border border-amber-700/25 bg-amber-100 font-display text-sm font-bold text-amber-800 shadow-sm">
-            Au
-          </span>
+        <a href="#" className="flex items-center gap-3" aria-label="RateStack home">
+          <Image
+            src="/ratestack-logo.png"
+            alt=""
+            width={80}
+            height={40}
+            priority
+            className="h-10 w-20 rounded-lg border border-stone-200 bg-white object-cover shadow-sm"
+          />
           <span className="leading-tight">
-            <span className="block font-display text-lg font-bold tracking-tight text-stone-900">India Gold &amp; Silver</span>
-            <span className="block text-[0.62rem] font-bold uppercase tracking-[0.24em] text-amber-700">Daily rates</span>
+            <span className="block font-display text-lg font-bold tracking-tight text-stone-900">RateStack</span>
+            <span className="block text-[0.62rem] font-bold uppercase tracking-[0.2em] text-amber-700">Gold &amp; silver rates</span>
           </span>
         </a>
 

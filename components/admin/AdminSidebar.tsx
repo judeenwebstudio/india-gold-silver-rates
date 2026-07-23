@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import { AdminNavigation } from "@/components/admin/AdminNavigation";
 
@@ -7,13 +8,17 @@ export function AdminSidebar() {
     <aside className="sticky top-0 hidden h-screen w-72 flex-col overflow-y-auto bg-[#171411] text-white lg:flex">
       <div className="border-b border-white/10 px-6 py-6">
         <Link href="/admin/dashboard" className="flex items-center gap-3" aria-label="Admin dashboard home">
-          <span className="grid h-11 w-11 place-items-center rounded-xl border border-amber-300/25 bg-amber-300/10 font-display text-sm font-bold text-amber-300">
-            Au
-          </span>
+          <Image
+            src="/ratestack-logo.png"
+            alt=""
+            width={64}
+            height={40}
+            className="h-10 w-16 rounded-lg border border-white/15 bg-white object-cover"
+          />
           <span className="leading-tight">
-            <span className="block font-display text-lg font-bold tracking-tight">Rates Admin</span>
+            <span className="block font-display text-lg font-bold tracking-tight">RateStack</span>
             <span className="mt-1 block text-[0.6rem] font-bold uppercase tracking-[0.22em] text-stone-400">
-              India metals desk
+              Admin workspace
             </span>
           </span>
         </Link>

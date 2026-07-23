@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import { AdminNavigation } from "@/components/admin/AdminNavigation";
 import { LogoutButton } from "@/components/admin/LogoutButton";
@@ -22,12 +23,18 @@ export function AdminHeader({ userEmail, userName }: AdminHeaderProps) {
     <header className="sticky top-0 z-40 border-b border-stone-200/90 bg-[#fbfaf7]/95 backdrop-blur-xl">
       <div className="flex min-h-18 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/admin/dashboard" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-stone-900 font-display text-xs font-bold text-amber-300 lg:hidden">
-            Au
+          <Link href="/admin/dashboard" className="shrink-0 lg:hidden" aria-label="RateStack admin dashboard">
+            <Image
+              src="/ratestack-logo.png"
+              alt=""
+              width={52}
+              height={32}
+              className="h-8 w-13 rounded-md border border-stone-200 bg-white object-cover"
+            />
           </Link>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-stone-900">Admin workspace</p>
-            <p className="truncate text-xs text-stone-500">India Gold &amp; Silver Rates</p>
+            <p className="truncate text-xs text-stone-500">RateStack</p>
           </div>
         </div>
 

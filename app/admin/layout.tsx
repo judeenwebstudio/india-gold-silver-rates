@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: {
-    default: "Admin",
-    template: "%s | Rates Admin",
+    default: "RateStack Admin",
+    template: "%s | RateStack Admin",
   },
   robots: {
     index: false,

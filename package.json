@@ -1,5 +1,5 @@
 {
-  "name": "india-gold-silver-rates",
+  "name": "ratestack",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -17,6 +17,7 @@
     "test:production-routes": "node --import tsx --test tests/production-routes.test.ts",
     "test:deployment": "node --import tsx --test tests/deployment-configuration.test.ts",
     "test:analytics": "node --import tsx --test tests/analytics-configuration.test.ts",
+    "test:api": "node --import tsx --test tests/api-v1-serialization.test.ts",
     "cron:local": "node --import tsx scripts/invoke-cron.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "prisma generate",

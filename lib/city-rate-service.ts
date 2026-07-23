@@ -223,14 +223,20 @@ export async function getLatestNationalBaseRates(): Promise<PublicRateSnapshot> 
   );
 }
 
-export async function getCityDisplayRates(citySlug: string): Promise<PublicRateSnapshot> {
+async function getCityDisplayRatesForSlugs(
+  citySlug: string,
+  stateSlug?: string,
+): Promise<PublicRateSnapshot> {
   const [city, baseRates] = await Promise.all([
     prisma.city.findFirst({
       where: {
         slug: citySlug,
         isActive: true,
         deletedAt: null,
-        state: { isActive: true },
+        state: {
+          isActive: true,
+          ...(stateSlug ? { slug: stateSlug } : {}),
+        },
       },
       include: { state: true },
     }),
@@ -252,6 +258,19 @@ export async function getCityDisplayRates(citySlug: string): Promise<PublicRateS
     },
     city,
   );
+}
+
+export async function getCityDisplayRates(
+  citySlug: string,
+): Promise<PublicRateSnapshot> {
+  return getCityDisplayRatesForSlugs(citySlug);
+}
+
+export async function getCityDisplayRatesByLocation(
+  stateSlug: string,
+  citySlug: string,
+): Promise<PublicRateSnapshot> {
+  return getCityDisplayRatesForSlugs(citySlug, stateSlug);
 }
 
 export async function getMajorCityDisplayRates(limit = 6): Promise<MajorCityRate[]> {

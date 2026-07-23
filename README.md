@@ -1,6 +1,6 @@
-# India Gold & Silver Rates
+# RateStack
 
-A production-oriented full-stack foundation for an India-focused precious metals rate website. The public homepage reads current national bullion records from PostgreSQL and calculates indicative city prices from purity-wise city adjustments at request time.
+A production-oriented full-stack platform for India-focused precious metals rates. The public homepage reads current national bullion records from PostgreSQL and calculates indicative city prices from purity-wise city adjustments at request time.
 
 ## Technology
 
@@ -218,6 +218,39 @@ Public JSON routes:
 
 Responses include the national base, city adjustment, calculated display rate, source timestamp, and last-updated timestamp. Display prices exclude making charges and GST.
 
+## Public REST API v1
+
+The read-only REST API is versioned under `/api/v1` and returns JSON with a
+consistent `success`, `data`, and `meta.apiVersion` envelope. Errors use a
+stable code and message. Public GET responses include cross-origin and cache
+headers suitable for web and mobile clients.
+
+Available endpoints:
+
+- `GET /api/v1/home` — latest Gold 24K, 22K, and 18K rates, Silver 999 per gram
+  and kilogram, source timestamps, and six featured active cities
+- `GET /api/v1/states` — all active states and union territories with active
+  city counts
+- `GET /api/v1/cities` — all active, non-deleted cities with their state and
+  canonical rates URL
+- `GET /api/v1/rates/{state}/{city}` — current indicative Gold 24K, 22K, 18K,
+  and Silver 999 rates for a validated state/city slug combination
+
+Examples:
+
+```text
+http://localhost:3000/api/v1/home
+http://localhost:3000/api/v1/states
+http://localhost:3000/api/v1/cities
+http://localhost:3000/api/v1/rates/tamil-nadu/chennai
+```
+
+Run the deterministic response and validation tests with:
+
+```bash
+pnpm test:api
+```
+
 ## Analytics and Google Analytics 4
 
 The protected [Analytics page](http://localhost:3000/admin/analytics) reports:
@@ -301,6 +334,7 @@ pnpm test:scheduler:db
 pnpm test:city-rates
 pnpm test:production-routes
 pnpm test:analytics
+pnpm test:api
 pnpm build
 pnpm test
 ```

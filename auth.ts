@@ -9,7 +9,6 @@ import { prisma } from "@/lib/prisma";
 export const { auth, handlers, signIn, signOut } = NextAuth({
   ...authConfig,
   secret: process.env.AUTH_SECRET,
-  useSecureCookies: process.env.NODE_ENV === "production",
   session: {
     strategy: "jwt",
     maxAge: 8 * 60 * 60,

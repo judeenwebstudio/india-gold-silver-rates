@@ -11,6 +11,9 @@ function getSafeAdminDestination(requestUrl: URL) {
 }
 
 export const authConfig = {
+  // Next.js supplies the canonical request host. Auth.js requires this flag
+  // when running outside a platform that sets AUTH_TRUST_HOST automatically.
+  trustHost: true,
   pages: {
     signIn: "/admin/login",
   },

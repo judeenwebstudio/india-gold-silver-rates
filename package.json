@@ -15,6 +15,7 @@
     "test:scheduler:db": "node --import dotenv/config --import tsx --test tests/integration/scheduler-database.test.ts",
     "test:city-rates": "node --import tsx --test tests/city-rate-calculation.test.ts tests/city-adjustment-validation.test.ts",
     "test:production-routes": "node --import tsx --test tests/production-routes.test.ts",
+    "test:deployment": "node --import tsx --test tests/deployment-configuration.test.ts",
     "cron:local": "node --import tsx scripts/invoke-cron.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "prisma generate",

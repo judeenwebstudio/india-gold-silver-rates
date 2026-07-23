@@ -1,5 +1,9 @@
 import type { NextAuthConfig } from "next-auth";
 
+import { sanitizeAuthUrlEnvironment } from "@/lib/auth-environment";
+
+sanitizeAuthUrlEnvironment();
+
 function getSafeAdminDestination(requestUrl: URL) {
   const callbackUrl = requestUrl.searchParams.get("callbackUrl");
 

@@ -37,6 +37,7 @@ before(async () => {
       env: {
         ...process.env,
         CRON_SECRET,
+        AUTH_URL: "not-a-valid-auth-url",
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
@@ -68,6 +69,13 @@ test("production homepage regression", async () => {
   assert.match(html, /Gold price calculator/);
   assert.match(html, /Rates in major cities/);
   assert.match(html, /Know your gold hallmark/);
+});
+
+test("Auth.js session route tolerates an invalid optional URL override", async () => {
+  const response = await fetch(`${BASE_URL}/api/auth/session`);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), null);
 });
 
 test("production cron route rejects missing authorization", async () => {

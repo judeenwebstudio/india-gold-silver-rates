@@ -45,6 +45,10 @@ Open [http://localhost:3000](http://localhost:3000). The homepage loads active s
 
 2. Open `.env` and replace every placeholder. `AUTH_SECRET` must be a long random value; `ADMIN_PASSWORD` must contain at least 12 characters. The completed `.env` is ignored by Git and must never be committed.
 
+   On Vercel, do not configure `AUTH_URL` or `NEXTAUTH_URL`. Auth.js v5 uses
+   Vercel's trusted request host automatically. Configure `AUTH_SECRET` as a
+   strong random value with no wrapping quotes.
+
 3. Generate the Prisma client:
 
    ```bash

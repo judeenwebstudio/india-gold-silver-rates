@@ -4,11 +4,9 @@ import Credentials from "next-auth/providers/credentials";
 
 import { authConfig } from "@/auth.config";
 import { adminCredentialsSchema } from "@/lib/auth-validation";
-import { prisma } from "@/lib/prisma";
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   ...authConfig,
-  secret: process.env.AUTH_SECRET,
   session: {
     strategy: "jwt",
     maxAge: 8 * 60 * 60,
@@ -28,6 +26,9 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // Keep database initialization out of Next.js route collection.
+        // Credentials authorization is the first point that needs PostgreSQL.
+        const { prisma } = await import("@/lib/prisma");
         const admin = await prisma.adminUser.findUnique({
           where: { email: result.data.email },
           select: {

@@ -78,6 +78,36 @@ test("Auth.js session route tolerates an invalid optional URL override", async (
   assert.deepEqual(await response.json(), null);
 });
 
+async function assertRedirectsToAdminLogin(pathname: string) {
+  const response = await fetch(`${BASE_URL}${pathname}`, { redirect: "manual" });
+  const location = response.headers.get("location");
+
+  assert.ok([302, 303, 307, 308].includes(response.status));
+  assert.ok(location);
+  assert.equal(new URL(location, BASE_URL).pathname, "/admin/login");
+}
+
+test("admin root redirects unauthenticated requests to the existing login", async () => {
+  await assertRedirectsToAdminLogin("/admin");
+});
+
+test("admin login route renders successfully", async () => {
+  const response = await fetch(`${BASE_URL}/admin/login`);
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.match(html, /Welcome back/);
+});
+
+test("admin dashboard remains protected by the existing login route", async () => {
+  await assertRedirectsToAdminLogin("/admin/dashboard");
+});
+
+test("admin API Logs page remains protected by the existing login route", async () => {
+  await assertRedirectsToAdminLogin("/admin/api-logs");
+});
+
 test("production cron route rejects missing authorization", async () => {
   const response = await fetch(`${BASE_URL}/api/cron/rate-sync`);
   assert.equal(response.status, 401);

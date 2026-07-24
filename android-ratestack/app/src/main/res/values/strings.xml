@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RateStack</string>
+    <string name="ratestack_logo">RateStack logo</string>
+    <string name="share_current_page">Share current page</string>
+    <string name="share_app">Share app</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="rate_app">Rate RateStack</string>
+    <string name="app_version">App version</string>
+    <string name="retry">Retry</string>
+    <string name="offline_title">You’re offline</string>
+    <string name="offline_message">Connect to the internet, then tap Retry to load the latest rates.</string>
+    <string name="page_unavailable_title">Page unavailable</string>
+    <string name="page_unavailable_message">RateStack could not load this page. Please try again.</string>
+    <string name="still_offline">No internet connection yet.</string>
+    <string name="admin_pages_unavailable">Admin pages are not available in the RateStack app.</string>
+    <string name="unsafe_page_blocked">A potentially unsafe page was blocked.</string>
+    <string name="unsafe_link_blocked">This type of link is not supported for your safety.</string>
+    <string name="no_file_picker">No file picker is available on this device.</string>
+    <string name="download_blocked">Downloads are allowed only from RateStack.</string>
+    <string name="download_started">Download started.</string>
+    <string name="download_failed">The file could not be downloaded.</string>
+    <string name="share_page_text">View this RateStack page: %1$s</string>
+    <string name="share_app_text">Check current gold and silver rates with RateStack: %1$s</string>
+    <string name="share_with">Share with</string>
+    <string name="privacy_url_invalid">The privacy policy URL is not configured correctly.</string>
+    <string name="version_message">Version %1$s\n\nCurrent gold and silver rates, powered by RateStack.</string>
+    <string name="no_app_for_link">No compatible app is installed for this link.</string>
+</resources>

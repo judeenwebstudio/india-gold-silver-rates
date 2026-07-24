@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.RateStack" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/gold_primary</item>
+        <item name="colorOnPrimary">@color/gold_on_primary</item>
+        <item name="colorSecondary">@color/blue_primary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="android:colorAccent">@color/gold_primary</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/surface</item>
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+
+    <style name="Theme.RateStack.Starting" parent="Theme.RateStack">
+        <item name="android:windowBackground">@drawable/splash_screen</item>
+        <item name="android:windowDisablePreview">false</item>
+    </style>
+</resources>

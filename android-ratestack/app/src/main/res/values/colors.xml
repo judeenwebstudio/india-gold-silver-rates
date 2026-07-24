@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="navy">#111B2E</color>
+    <color name="gold_primary">#C99522</color>
+    <color name="gold_on_primary">#FFFFFF</color>
+    <color name="blue_primary">#274C9B</color>
+    <color name="surface">#FFFBF5</color>
+    <color name="surface_container">#FFFFFF</color>
+    <color name="on_surface">#1E1B16</color>
+    <color name="on_surface_variant">#51473A</color>
+    <color name="outline">#D7C5AA</color>
+    <color name="white">#FFFFFF</color>
+    <color name="launcher_background">#F8F3E9</color>
+    <color name="transparent">#00000000</color>
+</resources>

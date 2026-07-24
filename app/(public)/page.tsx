@@ -4,7 +4,6 @@ import { Header } from "@/components/Header";
 import { HistoricalChart } from "@/components/HistoricalChart";
 import { HomeRateExperience } from "@/components/HomeRateExperience";
 import { MajorCityRates } from "@/components/MajorCityRates";
-import { NewsSection } from "@/components/NewsSection";
 import {
   getCityDisplayRates,
   getMajorCityDisplayRates,
@@ -40,7 +39,6 @@ export default async function Home() {
         />
         <HistoricalChart />
         <MajorCityRates cities={majorCities} />
-        <NewsSection />
         <HallmarkSection />
       </main>
       <Footer />

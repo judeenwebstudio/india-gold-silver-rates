@@ -327,7 +327,7 @@ private fun AppTopBar(
                 Image(
                     painter = painterResource(R.drawable.ratestack_logo),
                     contentDescription = "RateStack Logo",
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(36.dp),
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
@@ -442,12 +442,12 @@ private fun HomeScreen(
                     onChooseCity = { navController.navigate(Routes.STATES) },
                     onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
                     onShare = {
-                        val goldPrice = when (rates) {
-                            is LoadState.Ready -> rates.data.goldRates.firstOrNull { it.purity == "24K" }?.pricePerGram
-                            else -> (home as? LoadState.Ready)?.data?.latestGoldRates?.firstOrNull { it.purity == "24K" }?.pricePerGram
+                        val goldRate = when (rates) {
+                            is LoadState.Ready -> rates.data.goldRates.firstOrNull { it.purity == "22K" } ?: rates.data.goldRates.firstOrNull { it.purity == "24K" }
+                            else -> (home as? LoadState.Ready)?.data?.latestGoldRates?.firstOrNull { it.purity == "22K" } ?: (home as? LoadState.Ready)?.data?.latestGoldRates?.firstOrNull { it.purity == "24K" }
                         }
-                        val shareText = if (goldPrice != null) {
-                            "RateStack Today's 24K Gold Rate: ${formatInr(goldPrice)}/g. Check latest rates on RateStack!"
+                        val shareText = if (goldRate != null) {
+                            "RateStack Today's ${goldRate.purity} Gold Rate: ${formatInr(goldRate.pricePerGram)}/g. Check latest rates on RateStack!"
                         } else {
                             "Check live Gold & Silver rates on RateStack: ${BuildConfig.WEBSITE_URL}"
                         }
@@ -889,8 +889,8 @@ private fun RateDetailsScreen(
                                     )
                                 }
                                 IconButton(onClick = {
-                                    val price = details.goldRates.firstOrNull { it.purity == "24K" }?.pricePerGram
-                                    val text = "${details.city.name} Rates - 24K Gold: ${price?.let { formatInr(it) } ?: "-"} /g, Silver: ${formatInr(details.silverRate.pricePerGram)} /g. RateStack app: ${BuildConfig.WEBSITE_URL}"
+                                    val goldRate = details.goldRates.firstOrNull { it.purity == "22K" } ?: details.goldRates.firstOrNull { it.purity == "24K" }
+                                    val text = "${details.city.name} Rates - ${goldRate?.purity ?: "Gold"}: ${goldRate?.pricePerGram?.let { formatInr(it) } ?: "-"} /g, Silver: ${formatInr(details.silverRate.pricePerGram)} /g. RateStack app: ${BuildConfig.WEBSITE_URL}"
                                     onShare(text)
                                 }) {
                                     Icon(Icons.Default.Share, contentDescription = "Share rates")
@@ -912,7 +912,13 @@ private fun RateDetailsScreen(
                     )
                 }
 
-                items(details.goldRates) { rate ->
+                val purityOrder = listOf("22K", "24K", "18K")
+                val sortedGoldRates = details.goldRates.sortedBy { rate ->
+                    val idx = purityOrder.indexOf(rate.purity.uppercase())
+                    if (idx >= 0) idx else 99
+                }
+
+                items(sortedGoldRates) { rate ->
                     OutlinedCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),

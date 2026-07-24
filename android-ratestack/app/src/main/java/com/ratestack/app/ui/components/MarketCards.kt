@@ -52,11 +52,17 @@ import com.ratestack.app.ui.theme.SilverPrimary
 fun ProminentGoldHeroCard(
     goldRates: List<GoldRate>,
     modifier: Modifier = Modifier,
-    initialPurity: String = "24K",
+    initialPurity: String = "22K",
 ) {
     var selectedPurity by remember { mutableStateOf(initialPurity) }
     val currentRate = goldRates.firstOrNull { it.purity.equals(selectedPurity, ignoreCase = true) }
         ?: goldRates.firstOrNull()
+
+    val purityOrder = listOf("22K", "24K", "18K")
+    val sortedPurities = goldRates.map { it.purity }.sortedBy { purity ->
+        val idx = purityOrder.indexOf(purity.uppercase())
+        if (idx >= 0) idx else 99
+    }
 
     val isDark = isSystemInDarkTheme()
     val cardBgColor = if (isDark) GoldContainerDark else GoldContainerLight
@@ -109,7 +115,7 @@ fun ProminentGoldHeroCard(
             PuritySelector(
                 selectedPurity = selectedPurity,
                 onPuritySelected = { selectedPurity = it },
-                purities = goldRates.map { it.purity },
+                purities = sortedPurities.ifEmpty { listOf("22K", "24K", "18K") },
             )
 
             Spacer(modifier = Modifier.height(20.dp))

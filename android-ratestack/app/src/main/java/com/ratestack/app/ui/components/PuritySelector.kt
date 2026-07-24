@@ -30,7 +30,7 @@ fun PuritySelector(
     selectedPurity: String,
     onPuritySelected: (String) -> Unit,
     modifier: Modifier = Modifier,
-    purities: List<String> = listOf("24K", "22K", "18K"),
+    purities: List<String> = listOf("22K", "24K", "18K"),
 ) {
     Surface(
         modifier = modifier

@@ -35,14 +35,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         incomingUrl = resolveIncomingUrl(intent)
         setContent {
-            RateStackTheme {
-                RateStackApp(
-                    initialUrl = incomingUrl,
-                    onOpenExternal = { openExternalUri(it.toUri()) },
-                    onShare = ::shareText,
-                    onRateApp = ::openStoreListing,
-                )
-            }
+            RateStackApp(
+                initialUrl = incomingUrl,
+                onOpenExternal = { openExternalUri(it.toUri()) },
+                onShare = ::shareText,
+                onRateApp = ::openStoreListing,
+            )
         }
         playUpdateCoordinator = PlayUpdateCoordinator(this, findViewById(android.R.id.content))
         playUpdateCoordinator.start()

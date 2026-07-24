@@ -1,31 +1,53 @@
 package com.ratestack.app
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,29 +60,37 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallTopAppBar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.Image
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,22 +101,29 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
-import androidx.compose.material.ExperimentalMaterialApi
 import com.ratestack.app.data.ApiProvider
+import com.ratestack.app.data.AppThemeMode
 import com.ratestack.app.data.CityOption
 import com.ratestack.app.data.FavoriteCity
+import com.ratestack.app.data.GoldRate
+import com.ratestack.app.data.HomeData
 import com.ratestack.app.data.PreferencesRepository
 import com.ratestack.app.data.PreferencesStore
 import com.ratestack.app.data.RateDetails
 import com.ratestack.app.data.RateRepository
 import com.ratestack.app.data.StateOption
-import java.text.NumberFormat
-import java.text.SimpleDateFormat
-import java.util.TimeZone
-import java.util.Locale
+import com.ratestack.app.ui.components.EmptyPanel
+import com.ratestack.app.ui.components.ErrorPanel
+import com.ratestack.app.ui.components.LastUpdatedBadge
+import com.ratestack.app.ui.components.PriceDeltaBadge
+import com.ratestack.app.ui.components.ProminentGoldHeroCard
+import com.ratestack.app.ui.components.QuickActionsBar
+import com.ratestack.app.ui.components.SilverRateCard
+import com.ratestack.app.ui.components.SkeletonListCard
+import com.ratestack.app.ui.components.SkeletonMarketCard
+import com.ratestack.app.ui.components.formatInr
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private object Routes {
     const val HOME = "home"
@@ -113,85 +150,94 @@ fun RateStackApp(
     val navController = rememberNavController()
     var splashVisible by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) { kotlinx.coroutines.delay(700); splashVisible = false }
+    val themeMode by viewModel.themeMode.collectAsState()
+
+    LaunchedEffect(Unit) {
+        delay(700)
+        splashVisible = false
+    }
+
     val citiesForLink by viewModel.cities.collectAsState()
     LaunchedEffect(initialUrl, citiesForLink) {
         if (!initialUrl.isNullOrBlank()) navigateLink(navController, initialUrl, citiesForLink, viewModel)
     }
 
-    if (splashVisible) {
-        SplashScreen()
-        return
-    }
+    RateStackTheme(themeMode = themeMode) {
+        if (splashVisible) {
+            SplashScreen()
+            return@RateStackTheme
+        }
 
-    val selection by viewModel.selection.collectAsState()
-    LaunchedEffect(selection) {
-        val (state, city) = selection
-        if (!state.isNullOrBlank() && !city.isNullOrBlank()) viewModel.loadRates(state, city)
-    }
+        val selection by viewModel.selection.collectAsState()
+        LaunchedEffect(selection) {
+            val (state, city) = selection
+            if (!state.isNullOrBlank() && !city.isNullOrBlank()) viewModel.loadRates(state, city)
+        }
 
-    val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
-    Scaffold(
-        topBar = { AppTopBar(currentRoute, navController) },
-        bottomBar = {
-            NavigationBar {
-                BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
-                BottomItem(Routes.FAVORITES, "Favorites", Icons.Default.Favorite, currentRoute, navController)
-                BottomItem(Routes.SETTINGS, "Settings", Icons.Default.Settings, currentRoute, navController)
-            }
-        },
-    ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = Routes.HOME,
-            modifier = Modifier.padding(padding),
-        ) {
-            composable(Routes.HOME) {
-                val home by viewModel.home.collectAsState()
-                val rates by viewModel.rates.collectAsState()
-                HomeScreen(home, rates, selection, viewModel, navController, onShare)
-            }
-            composable(Routes.STATES) {
-                val states by viewModel.states.collectAsState()
-                LaunchedEffect(Unit) { viewModel.loadLocations() }
-                StateSelectionScreen(states) { state ->
-                    navController.navigate("cities/${state.slug}")
+        val backStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = backStackEntry?.destination?.route
+
+        Scaffold(
+            topBar = { AppTopBar(currentRoute, selection, navController) },
+            bottomBar = {
+                NavigationBar {
+                    BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
+                    BottomItem(Routes.FAVORITES, "Favorites", Icons.Default.Favorite, currentRoute, navController)
+                    BottomItem(Routes.SETTINGS, "Settings", Icons.Default.Settings, currentRoute, navController)
                 }
-            }
-            composable(
-                Routes.CITIES,
-                arguments = listOf(navArgument("state") { type = NavType.StringType }),
-            ) { entry ->
-                val stateSlug = entry.arguments?.getString("state").orEmpty()
-                val cities by viewModel.cities.collectAsState()
-                val states by viewModel.states.collectAsState()
-                LaunchedEffect(Unit) { viewModel.loadLocations() }
-                CitySelectionScreen(stateSlug, states, cities) { city ->
-                    viewModel.select(city.state.slug, city.slug)
-                    navController.navigate("rates/${city.state.slug}/${city.slug}")
+            },
+        ) { padding ->
+            NavHost(
+                navController = navController,
+                startDestination = Routes.HOME,
+                modifier = Modifier.padding(padding),
+            ) {
+                composable(Routes.HOME) {
+                    val home by viewModel.home.collectAsState()
+                    val rates by viewModel.rates.collectAsState()
+                    HomeScreen(home, rates, selection, viewModel, navController, onShare)
                 }
-            }
-            composable(
-                Routes.RATES,
-                arguments = listOf(
-                    navArgument("state") { type = NavType.StringType },
-                    navArgument("city") { type = NavType.StringType },
-                ),
-            ) { entry ->
-                val state = entry.arguments?.getString("state").orEmpty()
-                val city = entry.arguments?.getString("city").orEmpty()
-                LaunchedEffect(state, city) { viewModel.loadRates(state, city) }
-                val rates by viewModel.rates.collectAsState()
-                val favorites by viewModel.favorites.collectAsState()
-                RateDetailsScreen(rates, favorites, viewModel, onShare)
-            }
-            composable(Routes.FAVORITES) {
-                val favorites by viewModel.favorites.collectAsState()
-                FavoritesScreen(favorites, viewModel, navController)
-            }
-            composable(Routes.SETTINGS) {
-                SettingsScreen(viewModel, onOpenExternal, onShare, onRateApp)
+                composable(Routes.STATES) {
+                    val states by viewModel.states.collectAsState()
+                    LaunchedEffect(Unit) { viewModel.loadLocations() }
+                    StateSelectionScreen(states) { state ->
+                        navController.navigate("cities/${state.slug}")
+                    }
+                }
+                composable(
+                    Routes.CITIES,
+                    arguments = listOf(navArgument("state") { type = NavType.StringType }),
+                ) { entry ->
+                    val stateSlug = entry.arguments?.getString("state").orEmpty()
+                    val cities by viewModel.cities.collectAsState()
+                    val states by viewModel.states.collectAsState()
+                    LaunchedEffect(Unit) { viewModel.loadLocations() }
+                    CitySelectionScreen(stateSlug, states, cities) { city ->
+                        viewModel.select(city.state.slug, city.slug)
+                        navController.navigate("rates/${city.state.slug}/${city.slug}")
+                    }
+                }
+                composable(
+                    Routes.RATES,
+                    arguments = listOf(
+                        navArgument("state") { type = NavType.StringType },
+                        navArgument("city") { type = NavType.StringType },
+                    ),
+                ) { entry ->
+                    val state = entry.arguments?.getString("state").orEmpty()
+                    val city = entry.arguments?.getString("city").orEmpty()
+                    LaunchedEffect(state, city) { viewModel.loadRates(state, city) }
+                    val rates by viewModel.rates.collectAsState()
+                    val favorites by viewModel.favorites.collectAsState()
+                    RateDetailsScreen(rates, favorites, viewModel, onShare)
+                }
+                composable(Routes.FAVORITES) {
+                    val favorites by viewModel.favorites.collectAsState()
+                    FavoritesScreen(favorites, viewModel, navController)
+                }
+                composable(Routes.SETTINGS) {
+                    SettingsScreen(viewModel, onOpenExternal, onShare, onRateApp)
+                }
             }
         }
     }
@@ -199,37 +245,129 @@ fun RateStackApp(
 
 @Composable
 private fun SplashScreen() {
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.fillMaxSize(), Arrangement.Center, Alignment.CenterHorizontally) {
-            Image(painterResource(R.drawable.ratestack_logo), "RateStack logo", Modifier.size(120.dp))
-            Text("RateStack", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Gold & Silver Rates", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(24.dp))
-            CircularProgressIndicator(modifier = Modifier.size(28.dp))
+    val scale = remember { Animatable(0.85f) }
+    val alpha = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        launch { scale.animateTo(1.0f, animationSpec = tween(500)) }
+        launch { alpha.animateTo(1.0f, animationSpec = tween(500)) }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .scale(scale.value)
+                    .alpha(alpha.value),
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(110.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Image(
+                            painter = painterResource(R.drawable.ratestack_logo),
+                            contentDescription = "RateStack Logo",
+                            modifier = Modifier.size(80.dp),
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "RateStack",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+
+                Text(
+                    text = "Live Gold & Silver Prices",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.5.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AppTopBar(route: String?, navController: NavHostController) {
+private fun AppTopBar(
+    route: String?,
+    selection: Pair<String?, String?>,
+    navController: NavHostController,
+) {
     val isRoot = route == Routes.HOME || route == Routes.FAVORITES || route == Routes.SETTINGS
     SmallTopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(painterResource(R.drawable.ratestack_logo), "RateStack logo", Modifier.size(32.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (route == Routes.HOME) "RateStack" else routeTitle(route))
+                Image(
+                    painter = painterResource(R.drawable.ratestack_logo),
+                    contentDescription = "RateStack Logo",
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = if (route == Routes.HOME) "RateStack" else routeTitle(route),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
+                    if (route == Routes.HOME && selection.second != null) {
+                        Text(
+                            text = "${selection.second}, ${selection.first}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
             }
         },
         navigationIcon = {
-            if (!isRoot) IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.Default.ArrowBack, "Back")
-            } else {
-                Icon(Icons.Default.Menu, contentDescription = "RateStack menu")
+            if (!isRoot) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
             }
         },
-        colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+        actions = {
+            if (route == Routes.HOME) {
+                IconButton(onClick = { navController.navigate(Routes.STATES) }) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Choose Location",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.smallTopAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
         scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState()),
     )
 }
@@ -238,101 +376,365 @@ private fun AppTopBar(route: String?, navController: NavHostController) {
 private fun RowScope.BottomItem(
     route: String,
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     currentRoute: String?,
     navController: NavHostController,
 ) {
     NavigationBarItem(
         selected = currentRoute == route,
-        onClick = { navController.navigate(route) { popUpTo(Routes.HOME); launchSingleTop = true } },
+        onClick = {
+            navController.navigate(route) {
+                popUpTo(Routes.HOME) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        },
         icon = { Icon(icon, contentDescription = label) },
-        label = { Text(label) },
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
     )
 }
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 private fun HomeScreen(
-    home: LoadState<com.ratestack.app.data.HomeData>,
+    home: LoadState<HomeData>,
     rates: LoadState<RateDetails>?,
     selection: Pair<String?, String?>,
     viewModel: RateStackViewModel,
     navController: NavHostController,
     onShare: (String) -> Unit,
 ) {
-    val isRefreshing = home is LoadState.Loading
+    val isRefreshing = home is LoadState.Loading || rates is LoadState.Loading
     val refreshState = rememberPullRefreshState(isRefreshing, viewModel::refreshHome)
-    Box(Modifier.fillMaxSize().pullRefresh(refreshState)) {
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pullRefresh(refreshState),
+    ) {
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                Text("Today's rates", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Indicative prices in INR", style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text(
+                            text = "Today's Rates",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        Text(
+                            text = "Indicative market prices in INR",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
+
+            item {
+                QuickActionsBar(
+                    onChooseCity = { navController.navigate(Routes.STATES) },
+                    onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
+                    onShare = {
+                        val goldPrice = when (rates) {
+                            is LoadState.Ready -> rates.data.goldRates.firstOrNull { it.purity == "24K" }?.pricePerGram
+                            else -> (home as? LoadState.Ready)?.data?.latestGoldRates?.firstOrNull { it.purity == "24K" }?.pricePerGram
+                        }
+                        val shareText = if (goldPrice != null) {
+                            "RateStack Today's 24K Gold Rate: ${formatInr(goldPrice)}/g. Check latest rates on RateStack!"
+                        } else {
+                            "Check live Gold & Silver rates on RateStack: ${BuildConfig.WEBSITE_URL}"
+                        }
+                        onShare(shareText)
+                    },
+                    onRefresh = { viewModel.refreshHome() },
+                )
+            }
+
             when {
                 rates is LoadState.Ready -> {
-                    item { Text("${rates.data.city.name} · ${rates.data.state.name}", style = MaterialTheme.typography.titleMedium) }
-                    items(rates.data.goldRates) { RateCard(it.purity + " Gold", it.pricePerGram, it.change, it.changePercent) }
-                    item { SilverCard(rates.data.silverRate) }
-                    item { LastUpdated(rates.data.lastUpdated, rates.data.source.name, rates.fromCache) }
+                    val details = rates.data
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "${details.city.name}, ${details.state.name}",
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+                        ProminentGoldHeroCard(goldRates = details.goldRates)
+                    }
+
+                    item {
+                        SilverRateCard(silverRate = details.silverRate)
+                    }
+
+                    item {
+                        LastUpdatedBadge(
+                            updatedTimeIso = details.lastUpdated,
+                            sourceName = details.source.name,
+                            fromCache = rates.fromCache,
+                        )
+                    }
                 }
+
                 home is LoadState.Ready -> {
-                    items(home.data.latestGoldRates) { RateCard(it.purity + " Gold", it.pricePerGram, it.change, it.changePercent) }
-                    item { SilverCard(home.data.latestSilverRate) }
-                    item { LastUpdated(home.data.lastUpdated, home.data.source.name, home.fromCache) }
-                    item { Text("Choose a city for indicative local rates", style = MaterialTheme.typography.bodyMedium) }
+                    val data = home.data
+                    item {
+                        ProminentGoldHeroCard(goldRates = data.latestGoldRates)
+                    }
+
+                    item {
+                        SilverRateCard(silverRate = data.latestSilverRate)
+                    }
+
+                    item {
+                        LastUpdatedBadge(
+                            updatedTimeIso = data.lastUpdated,
+                            sourceName = data.source.name,
+                            fromCache = home.fromCache,
+                        )
+                    }
                 }
-                home is LoadState.Error -> item { ErrorPanel(home.message, home.retryable, viewModel::refreshHome) }
-                else -> item { LoadingPanel() }
+
+                home is LoadState.Error -> {
+                    item {
+                        ErrorPanel(
+                            message = home.message,
+                            retryable = home.retryable,
+                            onRetry = { viewModel.refreshHome() },
+                        )
+                    }
+                }
+
+                else -> {
+                    item { SkeletonMarketCard() }
+                    item { SkeletonListCard() }
+                }
             }
+
             item {
-                LocationCard(selection, navController)
+                LocationCard(selection = selection, navController = navController)
             }
+
             if (home is LoadState.Ready && home.data.featuredCities.isNotEmpty()) {
-                item { Text("Featured cities", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+                item {
+                    Text(
+                        text = "Featured Cities",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+
                 items(home.data.featuredCities) { city ->
-                    OutlinedCard(Modifier.fillMaxWidth().clickable { navController.navigate("rates/${city.state.slug}/${city.slug}") }) {
-                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocationOn, contentDescription = null)
-                            Spacer(Modifier.width(10.dp)); Text("${city.name}, ${city.state.name}")
+                    OutlinedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                navController.navigate("rates/${city.state.slug}/${city.slug}")
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(8.dp),
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = city.name,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = city.state.name,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(
+                                text = "View Rates →",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
                         }
                     }
                 }
             }
-            item { Spacer(Modifier.height(12.dp)) }
+
+            item { Spacer(modifier = Modifier.height(16.dp)) }
         }
-        PullRefreshIndicator(isRefreshing, refreshState, Modifier.align(Alignment.TopCenter))
+
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = refreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 }
 
 @Composable
-private fun LocationCard(selection: Pair<String?, String?>, navController: NavHostController) {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Your location", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(if (selection.first == null) "Select a state and city" else "City selection saved", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = { navController.navigate(Routes.STATES) }) { Text("Choose city") }
+private fun LocationCard(
+    selection: Pair<String?, String?>,
+    navController: NavHostController,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Selected Region",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (selection.first == null) "Select your state & city for local rates" else "${selection.second}, ${selection.first}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Button(
+                onClick = { navController.navigate(Routes.STATES) },
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text(if (selection.first == null) "Choose" else "Change")
+            }
         }
     }
 }
 
 @Composable
-private fun StateSelectionScreen(states: LoadState<List<StateOption>>, onSelect: (StateOption) -> Unit) {
+private fun StateSelectionScreen(
+    states: LoadState<List<StateOption>>,
+    onSelect: (StateOption) -> Unit,
+) {
     var query by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        SearchField(query, "Search states") { query = it }
-        Spacer(Modifier.height(8.dp))
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .imePadding(),
+    ) {
+        Text(
+            text = "Select State",
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        SearchField(
+            query = query,
+            label = "Search state name...",
+            onChange = { query = it },
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         when (states) {
-            is LoadState.Ready -> LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(states.data.filter { it.name.contains(query, true) }) { state ->
-                    ListRow("${state.name} (${state.cityCount})", state.code) { onSelect(state) }
+            is LoadState.Ready -> {
+                val filtered = states.data.filter { it.name.contains(query, ignoreCase = true) }
+                if (filtered.isEmpty()) {
+                    EmptyPanel(
+                        title = "No states found",
+                        message = "No state matches '$query'. Try another search term.",
+                    )
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(filtered) { state ->
+                            OutlinedCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelect(state) },
+                                shape = RoundedCornerShape(12.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = state.name,
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        )
+                                        Text(
+                                            text = "${state.cityCount} cities available",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                    ) {
+                                        Text(
+                                            text = state.code,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            is LoadState.Error -> ErrorPanel(states.message, states.retryable, null)
-            else -> LoadingPanel()
+
+            is LoadState.Error -> ErrorPanel(
+                message = states.message,
+                retryable = states.retryable,
+                onRetry = null,
+            )
+
+            else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(5) { SkeletonListCard() }
+            }
         }
     }
 }
@@ -346,18 +748,83 @@ private fun CitySelectionScreen(
 ) {
     var query by remember { mutableStateOf("") }
     val stateName = (states as? LoadState.Ready)?.data?.firstOrNull { it.slug == stateSlug }?.name ?: stateSlug
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text(stateName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        SearchField(query, "Search cities") { query = it }
-        Spacer(Modifier.height(8.dp))
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .imePadding(),
+    ) {
+        Text(
+            text = "Cities in $stateName",
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        SearchField(
+            query = query,
+            label = "Search city name...",
+            onChange = { query = it },
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         when (cities) {
-            is LoadState.Ready -> LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(cities.data.filter { it.state.slug == stateSlug && it.name.contains(query, true) }) { city ->
-                    ListRow(city.name, city.state.name) { onSelect(city) }
+            is LoadState.Ready -> {
+                val filtered = cities.data.filter { it.state.slug == stateSlug && it.name.contains(query, ignoreCase = true) }
+                if (filtered.isEmpty()) {
+                    EmptyPanel(
+                        title = "No cities found",
+                        message = "No city matches '$query' in $stateName.",
+                    )
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(filtered) { city ->
+                            OutlinedCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelect(city) },
+                                shape = RoundedCornerShape(12.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = city.name,
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        )
+                                        Text(
+                                            text = city.state.name,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            is LoadState.Error -> ErrorPanel(cities.message, cities.retryable, null)
-            else -> LoadingPanel()
+
+            is LoadState.Error -> ErrorPanel(
+                message = cities.message,
+                retryable = cities.retryable,
+                onRetry = null,
+            )
+
+            else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(5) { SkeletonListCard() }
+            }
         }
     }
 }
@@ -372,42 +839,247 @@ private fun RateDetailsScreen(
     when (state) {
         is LoadState.Ready -> {
             val details = state.data
-            val favorite = favorites.any { it.stateSlug == details.state.slug && it.citySlug == details.city.slug }
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val isFavorite = favorites.any { it.stateSlug == details.state.slug && it.citySlug == details.city.slug }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 item {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Column { Text(details.city.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold); Text(details.state.name) }
-                        Row {
-                            IconButton(onClick = { viewModel.toggleFavorite(FavoriteCity(details.state.slug, details.city.slug, details.state.name, details.city.name)) }) {
-                                Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = if (favorite) "Remove favorite" else "Add favorite")
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = details.city.name,
+                                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = details.state.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
-                            IconButton(onClick = { onShare("${details.city.name} rates: ${details.goldRates.firstOrNull { it.purity == "22K" }?.pricePerGram ?: "-"} INR/g") }) { Icon(Icons.Default.Share, "Share rates") }
+                            Row {
+                                IconButton(onClick = {
+                                    viewModel.toggleFavorite(
+                                        FavoriteCity(
+                                            stateSlug = details.state.slug,
+                                            citySlug = details.city.slug,
+                                            stateName = details.state.name,
+                                            cityName = details.city.name,
+                                        ),
+                                    )
+                                }) {
+                                    Icon(
+                                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(onClick = {
+                                    val price = details.goldRates.firstOrNull { it.purity == "24K" }?.pricePerGram
+                                    val text = "${details.city.name} Rates - 24K Gold: ${price?.let { formatInr(it) } ?: "-"} /g, Silver: ${formatInr(details.silverRate.pricePerGram)} /g. RateStack app: ${BuildConfig.WEBSITE_URL}"
+                                    onShare(text)
+                                }) {
+                                    Icon(Icons.Default.Share, contentDescription = "Share rates")
+                                }
+                            }
                         }
                     }
                 }
-                items(details.goldRates) { RateCard(it.purity + " Gold", it.pricePerGram, it.change, it.changePercent) }
-                item { SilverCard(details.silverRate) }
-                item { LastUpdated(details.lastUpdated, details.source.name, state.fromCache) }
-                if (details.indicative) item { Text("Indicative city rate; national source: ${details.source.name}", style = MaterialTheme.typography.bodySmall) }
+
+                item {
+                    ProminentGoldHeroCard(goldRates = details.goldRates)
+                }
+
+                item {
+                    Text(
+                        text = "Gold Rates Breakdown",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+
+                items(details.goldRates) { rate ->
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column {
+                                Text(
+                                    text = "${rate.purity} Gold",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                )
+                                Text(
+                                    text = "per gram",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = formatInr(rate.pricePerGram),
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                )
+                                PriceDeltaBadge(change = rate.change, percent = rate.changePercent)
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    SilverRateCard(silverRate = details.silverRate)
+                }
+
+                item {
+                    LastUpdatedBadge(
+                        updatedTimeIso = details.lastUpdated,
+                        sourceName = details.source.name,
+                        fromCache = state.fromCache,
+                    )
+                }
+
+                if (details.indicative) {
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Indicative city rate based on national benchmark source (${details.source.name}).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
-        is LoadState.Error -> ErrorPanel(state.message, state.retryable, null)
-        else -> LoadingPanel()
+
+        is LoadState.Error -> ErrorPanel(
+            message = state.message,
+            retryable = state.retryable,
+            onRetry = null,
+        )
+
+        else -> Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+        }
     }
 }
 
 @Composable
-private fun FavoritesScreen(favorites: List<FavoriteCity>, viewModel: RateStackViewModel, navController: NavHostController) {
+private fun FavoritesScreen(
+    favorites: List<FavoriteCity>,
+    viewModel: RateStackViewModel,
+    navController: NavHostController,
+) {
     if (favorites.isEmpty()) {
-        EmptyPanel("No favorite cities yet", "Add a city from its rate details screen.")
+        EmptyPanel(
+            title = "No Favorite Cities",
+            message = "Save your frequently visited cities here for instant access to live rates.",
+        )
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            Text(
+                text = "Saved Cities (${favorites.size})",
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+
         items(favorites) { favorite ->
-            Card(Modifier.fillMaxWidth().clickable { navController.navigate("rates/${favorite.stateSlug}/${favorite.citySlug}") }) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) { Text(favorite.cityName, fontWeight = FontWeight.Bold); Text(favorite.stateName, style = MaterialTheme.typography.bodySmall) }
-                    IconButton(onClick = { viewModel.removeFavorite(favorite) }) { Icon(Icons.Default.Favorite, "Remove favorite") }
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        navController.navigate("rates/${favorite.stateSlug}/${favorite.citySlug}")
+                    },
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(8.dp),
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = favorite.cityName,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = favorite.stateName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = { viewModel.removeFavorite(favorite) }) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Remove favorite",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                        )
+                    }
                 }
             }
         }
@@ -415,90 +1087,332 @@ private fun FavoritesScreen(favorites: List<FavoriteCity>, viewModel: RateStackV
 }
 
 @Composable
-private fun SettingsScreen(viewModel: RateStackViewModel, openExternal: (String) -> Unit, onShare: (String) -> Unit, onRateApp: () -> Unit) {
+private fun SettingsScreen(
+    viewModel: RateStackViewModel,
+    openExternal: (String) -> Unit,
+    onShare: (String) -> Unit,
+    onRateApp: () -> Unit,
+) {
     val context = LocalContext.current
     val selection by viewModel.selection.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
     var notifications by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) { notifications = viewModelNotificationPreference(viewModel, context) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        item { Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        item { SettingRow("Notifications", if (notifications) "Enabled" else "Disabled") { notifications = !notifications; viewModel.setNotifications(notifications) } }
-        item { SettingRow("Default state", selection.first ?: "Not set", null) }
-        item { SettingRow("Default city", selection.second ?: "Not set", null) }
-        item { SettingRow("Clear offline cache", "Remove stored rate snapshots") { viewModel.clearCache() } }
-        item { SettingRow("RateStack version", BuildConfig.VERSION_NAME, null) }
-        item { SettingRow("Privacy Policy", "Open in browser") { openExternal(BuildConfig.PRIVACY_POLICY_URL) } }
-        item { SettingRow("Rate this app", "Open Google Play") { onRateApp() } }
-        item { SettingRow("Share app", "Tell a friend") { onShare("RateStack: ${BuildConfig.WEBSITE_URL}") } }
+    var showThemeDialog by remember { mutableStateOf(false) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        notifications = viewModelNotificationPreference(viewModel, context)
     }
+
+    if (showThemeDialog) {
+        ThemeSelectionDialog(
+            currentMode = themeMode,
+            onModeSelected = { mode ->
+                viewModel.setThemeMode(mode)
+                showThemeDialog = false
+            },
+            onDismiss = { showThemeDialog = false },
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+
+            // Category: Location
+            item {
+                SettingsCategoryCard(title = "Location") {
+                    SettingTile(
+                        title = "Selected Region",
+                        subtitle = if (selection.first == null) "Not set" else "${selection.second}, ${selection.first}",
+                        icon = Icons.Default.LocationOn,
+                    )
+                }
+            }
+
+            // Category: Preferences
+            item {
+                SettingsCategoryCard(title = "Preferences") {
+                    SettingToggleTile(
+                        title = "Notifications",
+                        subtitle = if (notifications) "Receive price alert notifications" else "Notifications disabled",
+                        icon = Icons.Default.Notifications,
+                        checked = notifications,
+                        onCheckedChange = { enabled ->
+                            notifications = enabled
+                            viewModel.setNotifications(enabled)
+                        },
+                    )
+
+                    SettingTile(
+                        title = "App Theme",
+                        subtitle = when (themeMode) {
+                            AppThemeMode.SYSTEM -> "System Default"
+                            AppThemeMode.LIGHT -> "Light Mode"
+                            AppThemeMode.DARK -> "Dark Mode"
+                        },
+                        icon = Icons.Default.Settings,
+                        onClick = { showThemeDialog = true },
+                    )
+                }
+            }
+
+            // Category: Storage
+            item {
+                SettingsCategoryCard(title = "Storage & Cache") {
+                    SettingTile(
+                        title = "Clear Offline Cache",
+                        subtitle = "Remove stored rate snapshots",
+                        icon = Icons.Default.Refresh,
+                        onClick = {
+                            viewModel.clearCache()
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Offline cache cleared.")
+                            }
+                        },
+                    )
+                }
+            }
+
+            // Category: About & Legal
+            item {
+                SettingsCategoryCard(title = "About & Support") {
+                    SettingTile(
+                        title = "Rate App",
+                        subtitle = "Open Google Play Store listing",
+                        icon = Icons.Default.Star,
+                        onClick = onRateApp,
+                    )
+
+                    SettingTile(
+                        title = "Share App",
+                        subtitle = "Tell friends about RateStack",
+                        icon = Icons.Default.Share,
+                        onClick = { onShare("RateStack - Live Gold & Silver Prices in India: ${BuildConfig.WEBSITE_URL}") },
+                    )
+
+                    SettingTile(
+                        title = "Privacy Policy",
+                        subtitle = "Opens in external browser",
+                        icon = Icons.Default.Lock,
+                        onClick = { openExternal(BuildConfig.PRIVACY_POLICY_URL) },
+                    )
+
+                    SettingTile(
+                        title = "App Version",
+                        subtitle = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        icon = Icons.Default.Info,
+                    )
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(16.dp)) }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+}
+
+@Composable
+private fun SettingsCategoryCard(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+            ),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+        ) {
+            Column {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingTile(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingToggleTile(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
+    }
+}
+
+@Composable
+private fun ThemeSelectionDialog(
+    currentMode: AppThemeMode,
+    onModeSelected: (AppThemeMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select App Theme", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.selectableGroup()) {
+                AppThemeMode.entries.forEach { mode ->
+                    val label = when (mode) {
+                        AppThemeMode.SYSTEM -> "System Default"
+                        AppThemeMode.LIGHT -> "Light Mode"
+                        AppThemeMode.DARK -> "Dark Mode"
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .selectable(
+                                selected = (mode == currentMode),
+                                onClick = { onModeSelected(mode) },
+                                role = Role.RadioButton,
+                            )
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = (mode == currentMode),
+                            onClick = null,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+private fun SearchField(
+    query: String,
+    label: String,
+    onChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text(label) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onChange("") }) {
+                    Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                }
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+    )
 }
 
 private suspend fun viewModelNotificationPreference(viewModel: RateStackViewModel, context: Context): Boolean =
     PreferencesRepository(context.applicationContext).notificationsEnabled()
 
-@Composable
-private fun SettingRow(title: String, subtitle: String, action: (() -> Unit)? = null) {
-    OutlinedCard(Modifier.fillMaxWidth().clickable(enabled = action != null) { action?.invoke() }) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.SemiBold); Text(subtitle, style = MaterialTheme.typography.bodySmall) }
-            if (action != null) TextButton(onClick = action) { Text("Open") }
-        }
-    }
+private fun routeTitle(route: String?): String = when {
+    route?.startsWith("states") == true -> "Select State"
+    route?.startsWith("cities") == true -> "Select City"
+    route?.startsWith("rates") == true -> "Rate Details"
+    route == Routes.FAVORITES -> "Favorites"
+    route == Routes.SETTINGS -> "Settings"
+    else -> "RateStack"
 }
-
-@Composable
-private fun SearchField(query: String, label: String, onChange: (String) -> Unit) {
-    androidx.compose.material3.OutlinedTextField(query, onChange, Modifier.fillMaxWidth(), label = { Text(label) }, singleLine = true)
-}
-
-@Composable
-private fun ListRow(title: String, subtitle: String, onClick: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth().clickable { onClick() }) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Column { Text(title, fontWeight = FontWeight.SemiBold); Text(subtitle, style = MaterialTheme.typography.bodySmall) } } }
-}
-
-@Composable
-private fun RateCard(label: String, price: Double, change: Double?, percent: Double?) {
-    Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Text("per gram", style = MaterialTheme.typography.bodySmall) }
-            Column(horizontalAlignment = Alignment.End) { Text(formatInr(price), style = MaterialTheme.typography.titleLarge); ChangeIndicator(change, percent) }
-        }
-    }
-}
-
-@Composable
-private fun SilverCard(rate: com.ratestack.app.data.SilverRate) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) { Text("Silver 999", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Text(formatInr(rate.pricePerGram) + " / gram", style = MaterialTheme.typography.titleLarge); rate.pricePerKilogram?.let { Text(formatInr(it) + " / kilogram") }; ChangeIndicator(rate.changePerGram, rate.changePercent) }
-    }
-}
-
-@Composable
-private fun ChangeIndicator(change: Double?, percent: Double?) {
-    val value = change ?: return
-    val positive = value >= 0
-    Row(verticalAlignment = Alignment.CenterVertically) { Text(if (positive) "↑" else "↓", color = if (positive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold); Text("${if (positive) "+" else ""}${formatInr(value)}${percent?.let { " (${String.format(Locale.US, "%.2f", it)}%)" } ?: ""}", style = MaterialTheme.typography.bodySmall) }
-}
-
-@Composable
-private fun LastUpdated(updated: String, source: String, fromCache: Boolean) { Text("Updated ${formatDate(updated)} · Source: $source${if (fromCache) " · Offline snapshot" else ""}", style = MaterialTheme.typography.bodySmall) }
-
-@Composable private fun LoadingPanel() { Box(Modifier.fillMaxWidth().padding(36.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-@Composable private fun EmptyPanel(title: String, message: String) { Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(title, style = MaterialTheme.typography.titleLarge); Text(message, style = MaterialTheme.typography.bodyMedium) } } }
-@Composable private fun ErrorPanel(message: String, retryable: Boolean, retry: (() -> Unit)?) { Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(if (retryable) "Connection problem" else "Unable to load", style = MaterialTheme.typography.titleLarge); Text(message); if (retry != null) OutlinedButton(onClick = retry) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("Retry") } } }
-
-private fun formatInr(value: Double): String = NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(value)
-
-private fun formatDate(value: String): String {
-    val patterns = listOf("yyyy-MM-dd'T'HH:mm:ss.SSSX", "yyyy-MM-dd'T'HH:mm:ssX")
-    for (pattern in patterns) {
-        val parsed = runCatching { SimpleDateFormat(pattern, Locale.ENGLISH).parse(value) }.getOrNull() ?: continue
-        return SimpleDateFormat("dd MMM yyyy, h:mm a", Locale.ENGLISH).apply { timeZone = TimeZone.getDefault() }.format(parsed)
-    }
-    return value
-}
-
-private fun routeTitle(route: String?): String = when { route?.startsWith("states") == true -> "Choose state"; route?.startsWith("cities") == true -> "Choose city"; route?.startsWith("rates") == true -> "Rate details"; route == Routes.FAVORITES -> "Favorites"; route == Routes.SETTINGS -> "Settings"; else -> "RateStack" }
 
 private fun navigateLink(
     navController: NavHostController,
@@ -520,7 +1434,8 @@ private fun navigateLink(
 }
 
 class RateStackViewModelFactory(private val repository: RateRepository, private val preferences: PreferencesStore) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = RateStackViewModel(repository, preferences) as T
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = RateStackViewModel(repository, preferences) as T
 }
 
 private fun LoadState.Ready<RateDetails>.fromCache(): Boolean = fromCache

@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.first
 
 private val Context.rateStackDataStore by preferencesDataStore(name = "ratestack_preferences")
 
+enum class AppThemeMode { SYSTEM, LIGHT, DARK }
+
 interface PreferencesStore {
     suspend fun saveSelection(stateSlug: String, citySlug: String)
     suspend fun readSelection(): Pair<String?, String?>
@@ -19,6 +21,8 @@ interface PreferencesStore {
     suspend fun saveFavorites(favorites: List<FavoriteCity>)
     suspend fun notificationsEnabled(): Boolean
     suspend fun setNotificationsEnabled(enabled: Boolean)
+    suspend fun readThemeMode(): AppThemeMode
+    suspend fun setThemeMode(mode: AppThemeMode)
     suspend fun saveHome(home: HomeData)
     suspend fun readHome(): HomeData?
     suspend fun saveRateDetails(details: RateDetails)
@@ -34,6 +38,7 @@ class PreferencesRepository(
     private val selectedCityKey = stringPreferencesKey("selected_city")
     private val favoritesKey = stringPreferencesKey("favorite_cities")
     private val notificationsKey = booleanPreferencesKey("notifications_enabled")
+    private val themeModeKey = stringPreferencesKey("theme_mode")
     private val homeCacheKey = stringPreferencesKey("cache_home")
 
     override suspend fun saveSelection(stateSlug: String, citySlug: String) {
@@ -63,6 +68,15 @@ class PreferencesRepository(
 
     override suspend fun setNotificationsEnabled(enabled: Boolean) {
         context.rateStackDataStore.edit { it[notificationsKey] = enabled }
+    }
+
+    override suspend fun readThemeMode(): AppThemeMode {
+        val raw = context.rateStackDataStore.data.first()[themeModeKey] ?: return AppThemeMode.SYSTEM
+        return runCatching { AppThemeMode.valueOf(raw) }.getOrDefault(AppThemeMode.SYSTEM)
+    }
+
+    override suspend fun setThemeMode(mode: AppThemeMode) {
+        context.rateStackDataStore.edit { it[themeModeKey] = mode.name }
     }
 
     override suspend fun saveHome(home: HomeData) {

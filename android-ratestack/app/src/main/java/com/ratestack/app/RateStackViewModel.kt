@@ -10,6 +10,7 @@ import com.ratestack.app.data.RateDetails
 import com.ratestack.app.data.RatesDataSource
 import com.ratestack.app.data.RepositoryResult
 import com.ratestack.app.data.StateOption
+import com.ratestack.app.data.AppThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,11 +38,14 @@ class RateStackViewModel(
     val favorites: StateFlow<List<FavoriteCity>> = _favorites.asStateFlow()
     private val _selection = MutableStateFlow<Pair<String?, String?>>(null to null)
     val selection: StateFlow<Pair<String?, String?>> = _selection.asStateFlow()
+    private val _themeMode = MutableStateFlow(AppThemeMode.SYSTEM)
+    val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
 
     init {
         refreshHome()
         loadFavorites()
         loadSelection()
+        loadThemeMode()
     }
 
     fun refreshHome() = launchLoad(_home) { repository.home() }
@@ -97,12 +101,18 @@ class RateStackViewModel(
         viewModelScope.launch { preferences.setNotificationsEnabled(enabled) }
     }
 
+    fun setThemeMode(mode: AppThemeMode) {
+        _themeMode.value = mode
+        viewModelScope.launch { preferences.setThemeMode(mode) }
+    }
+
     fun clearCache() {
         viewModelScope.launch { preferences.clearCache() }
     }
 
     private fun loadFavorites() = viewModelScope.launch { _favorites.value = preferences.readFavorites() }
     private fun loadSelection() = viewModelScope.launch { _selection.value = preferences.readSelection() }
+    private fun loadThemeMode() = viewModelScope.launch { _themeMode.value = preferences.readThemeMode() }
 
     private fun <T> launchLoad(
         state: MutableStateFlow<LoadState<T>>,

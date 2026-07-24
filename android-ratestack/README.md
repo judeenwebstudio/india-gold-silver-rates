@@ -149,6 +149,182 @@ Outputs:
 Verify the AAB is signed before upload. For production, enable Google Play App
 Signing and retain the local key as the upload key.
 
+## Firebase setup
+
+Firebase is integrated in code but remains optional for local builds. The
+Google Services and Crashlytics Gradle plugins are applied only when
+`app/google-services.json` exists, so a developer without Firebase access can
+still run tests and build the app.
+
+`google-services.json` is ignored by Git. Never commit Firebase service-account
+keys, server credentials, keystores, passwords, or signing credentials.
+
+### Create and connect the Firebase project
+
+1. Open [Firebase Console](https://console.firebase.google.com/) and create a
+   production project. Use a separate Firebase project for development or QA if
+   you need test data isolated from production.
+2. In **Project settings > Your apps**, add an Android app.
+3. Register the exact package name `com.ratestack.app`. It must match
+   `applicationId`; it is case-sensitive.
+4. Enter the optional app nickname `RateStack Android`.
+5. Download `google-services.json`.
+6. Place it locally at:
+   `android-ratestack/app/google-services.json`.
+7. Sync Gradle and rebuild. `BuildConfig.FIREBASE_CONFIGURED` will then be
+   generated as `true`.
+
+The configuration file contains Firebase project identifiers, but project
+policy intentionally keeps it out of source control. Restrict every server API
+key and service account independently in Google Cloud/Firebase.
+
+### Enable and test Cloud Messaging
+
+1. In Firebase Console, open **Messaging** and complete the Cloud Messaging
+   setup for the registered Android app.
+2. In **Project settings > Cloud Messaging**, confirm the Cloud Messaging API
+   is enabled.
+3. Install a build containing the matching `google-services.json` on a physical
+   device, or an emulator image that includes Google Play services.
+4. On Android 13+, allow notifications after RateStack explains the request.
+   Earlier supported Android versions do not receive a runtime permission
+   prompt.
+5. To obtain a token without storing or logging it, set a debugger breakpoint
+   in `RateStackMessagingService.onNewToken`, reinstall or clear app data, and
+   copy the `token` value from the debugger variable inspector. Do not paste
+   tokens into source files or commit them.
+6. In Firebase Messaging, choose **Send test message**, paste the temporary
+   registration token, and send the message.
+
+The service accepts notification title/body values and these optional custom
+data keys:
+
+| Key | Purpose |
+| --- | --- |
+| `url` | Preferred destination URL |
+| `link` | Alternate destination URL |
+| `deeplink` | Alternate destination URL |
+| `channel` | `rate_alerts` (default) or `general_updates` |
+
+Trusted RateStack HTTPS destinations open in the WebView. Any `/admin` URL,
+cleartext URL, malformed URL, or unsafe scheme falls back to the public
+homepage. External HTTPS destinations use the device's URL handler outside the
+WebView. For consistent foreground/background/closed behavior, include the URL
+as custom data; Android delivers background notification payload data to the
+launcher activity when the user taps the system notification.
+
+The app never logs or persists FCM registration tokens and does not upload them
+to a RateStack server.
+
+### Enable and test Crashlytics
+
+1. In Firebase Console, open **Crashlytics** for `com.ratestack.app` and complete
+   the onboarding workflow.
+2. Confirm `app/google-services.json` is present locally.
+3. Build and distribute a release variant through a private Internal Testing
+   track. Debug builds explicitly disable Crashlytics collection.
+4. For a safe first-event test, create a temporary local QA-only action that
+   throws `RuntimeException("Crashlytics setup test")`, build a release test
+   version, trigger it once on a non-production test device, and then remove
+   that temporary action before committing or promoting the build.
+5. Relaunch the test app so the report can upload, then check the Crashlytics
+   dashboard. Reports can take several minutes to appear.
+
+Never deliberately crash a production build used by customers. RateStack does
+not set Crashlytics user IDs, names, email addresses, or custom personal-data
+keys. Release collection is enabled only when Firebase is configured; debug
+collection remains disabled.
+
+## Google Play in-app updates
+
+RateStack checks Google Play for an update and starts the flexible flow only
+when a newer allowed version is available. It records the prompted version
+locally to avoid repeatedly interrupting the user. After download, an
+indefinite Material snackbar offers **Restart** and calls `completeUpdate()`
+only when the user accepts.
+
+This cannot be validated with a locally installed APK. Test it through Google
+Play Internal Testing:
+
+1. Upload and publish a signed AAB with one version code to an Internal Testing
+   track.
+2. Opt a test Google account into that track and install RateStack from the Play
+   Store link.
+3. Increase `RATESTACK_VERSION_CODE`, build a new signed AAB, and publish it to
+   the same track.
+4. Wait until Google Play makes the new build available, then open the older
+   installed version.
+5. Accept the flexible update, continue using the app during download, and
+   confirm the **Restart** action completes installation.
+
+Installing the APK directly with Android Studio or `adb` does not exercise the
+real Play update flow.
+
+## Google Play in-app review
+
+The review API is never requested on first launch. A successful session is
+counted only after a trusted RateStack page loads. The first attempt becomes
+eligible after five successful sessions and waits another 30 seconds of active
+usage. Later attempts require at least ten additional successful sessions.
+Failures and Play quota suppression are intentionally silent. The existing
+**Rate RateStack** action remains the permanent Play Store fallback.
+
+Test review behavior using Google Play Internal Testing or Internal App Sharing
+with an account eligible for that test release. Google Play controls whether
+the dialog appears, and successful task completion does not prove the user saw
+or submitted a review. Do not rely on sideloaded builds for final verification.
+
+## Android App Links
+
+The manifest requests verified HTTPS App Links only for:
+
+- `/`
+- `/gold-rate` and `/gold-rate/*`
+- `/silver-rate` and `/silver-rate/*`
+- `/state` and `/state/*`
+- `/city` and `/city/*`
+
+Admin paths are not declared and remain blocked by the runtime URL policy.
+App Links are prepared but **not verified** until the production website hosts
+a statement containing the actual Google Play App Signing certificate
+fingerprint.
+
+The prepared template is:
+
+`app-links/assetlinks.json`
+
+To obtain the production SHA-256 fingerprint:
+
+1. Upload a signed AAB and enroll in Google Play App Signing.
+2. Open Play Console and find **App signing** under the current **App
+   integrity** or **Play Store protection** section.
+3. Under **App signing key certificate** (not the upload key certificate), copy
+   the SHA-256 certificate fingerprint.
+4. Replace
+   `REPLACE_WITH_PLAY_APP_SIGNING_SHA256_FINGERPRINT` in the template. Keep the
+   colon-separated uppercase format shown by Play Console.
+
+Deploy the completed file on the existing website at exactly:
+
+`https://india-gold-silver-rates.vercel.app/.well-known/assetlinks.json`
+
+It must return HTTP 200 directly over HTTPS, without authentication or
+redirects, and should use `Content-Type: application/json`. Do not put the
+placeholder template online. This Android project does not deploy or alter the
+website.
+
+After deployment, reinstall the Play-signed app and test:
+
+```powershell
+adb shell pm set-app-links --package com.ratestack.app 0 all
+adb shell pm verify-app-links --re-verify com.ratestack.app
+adb shell pm get-app-links com.ratestack.app
+adb shell am start -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "https://india-gold-silver-rates.vercel.app/gold-rate/test"
+```
+
+Do not describe the links as verified until the domain-verification result is
+successful with the certificate used by Google Play on installed releases.
+
 ## Publish to Google Play Console
 
 1. Create a Google Play developer account and a new app named **RateStack**.
@@ -169,10 +345,13 @@ These notes are an implementation summary, not legal advice. The Play Console
 answers must match the live website, its privacy policy, and the versions of
 Google Analytics and AdSense actually enabled at submission time.
 
-- The native app requests only `INTERNET` and `ACCESS_NETWORK_STATE`.
-- It does not request storage, camera, microphone, location, contacts, phone,
-  or notification permissions.
-- File uploads are user-initiated through Android’s system document picker.
+- The native app requests `INTERNET`, `ACCESS_NETWORK_STATE`, and
+  `POST_NOTIFICATIONS` on Android 13+ because notifications are an enabled
+  feature. The notification permission is requested only after Firebase is
+  configured and a public page has loaded successfully.
+- It does not request storage, camera, microphone, location, contacts, or
+  phone permissions.
+- File uploads are user-initiated through Android's system document picker.
 - Downloads are placed in the app-specific external Downloads directory.
 - The native layer does not add a JavaScript bridge and does not collect its
   own user profile data.
@@ -183,7 +362,7 @@ Google Analytics and AdSense actually enabled at submission time.
 - External links leave the WebView and are handled by installed apps or the
   default browser.
 
-Review the website’s current consent flow, retention, deletion process, and
+Review the website's current consent flow, retention, deletion process, and
 third-party disclosures before completing Google Play’s Data safety form.
 
 ## Security behavior

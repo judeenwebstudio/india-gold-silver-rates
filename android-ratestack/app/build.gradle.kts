@@ -4,6 +4,12 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+val firebaseConfigPresent = file("google-services.json").isFile
+if (firebaseConfigPresent) {
+    pluginManager.apply("com.google.gms.google-services")
+    pluginManager.apply("com.google.firebase.crashlytics")
+}
+
 fun quotedBuildConfig(value: String): String =
     "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
@@ -66,6 +72,7 @@ android {
             "PRIVACY_POLICY_URL",
             quotedBuildConfig(privacyPolicyUrl),
         )
+        buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigPresent.toString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -84,12 +91,14 @@ android {
     buildTypes {
         getByName("debug") {
             isMinifyEnabled = false
+            manifestPlaceholders["crashlyticsCollectionEnabled"] = false
         }
 
         getByName("release") {
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
+            manifestPlaceholders["crashlyticsCollectionEnabled"] = true
             signingConfig = if (releaseSigningConfigured) {
                 signingConfigs.getByName("release")
             } else {
@@ -140,7 +149,14 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core)
     implementation(libs.androidx.swipe.refresh)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.messaging)
     implementation(libs.google.material)
+    implementation(libs.play.app.update)
+    implementation(libs.play.app.update.ktx)
+    implementation(libs.play.review)
+    implementation(libs.play.review.ktx)
 
     testImplementation(libs.junit)
 }

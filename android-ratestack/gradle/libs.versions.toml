@@ -3,8 +3,13 @@ agp = "9.2.1"
 activity = "1.8.0"
 appcompat = "1.6.1"
 core = "1.12.0"
+firebaseBom = "34.16.0"
+firebaseCrashlyticsPlugin = "3.0.7"
+googleServicesPlugin = "4.5.0"
 junit = "4.13.2"
 material = "1.11.0"
+playAppUpdate = "2.1.0"
+playReview = "2.0.2"
 swipeRefresh = "1.1.0"
 
 [libraries]
@@ -12,8 +17,17 @@ androidx-activity = { module = "androidx.activity:activity-ktx", version.ref = "
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-core = { module = "androidx.core:core-ktx", version.ref = "core" }
 androidx-swipe-refresh = { module = "androidx.swiperefreshlayout:swiperefreshlayout", version.ref = "swipeRefresh" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
+firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 google-material = { module = "com.google.android.material:material", version.ref = "material" }
 junit = { module = "junit:junit", version.ref = "junit" }
+play-app-update = { module = "com.google.android.play:app-update", version.ref = "playAppUpdate" }
+play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "playAppUpdate" }
+play-review = { module = "com.google.android.play:review", version.ref = "playReview" }
+play-review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "playReview" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServicesPlugin" }

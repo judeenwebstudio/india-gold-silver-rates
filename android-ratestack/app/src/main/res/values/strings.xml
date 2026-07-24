@@ -26,4 +26,17 @@
     <string name="privacy_url_invalid">The privacy policy URL is not configured correctly.</string>
     <string name="version_message">Version %1$s\n\nCurrent gold and silver rates, powered by RateStack.</string>
     <string name="no_app_for_link">No compatible app is installed for this link.</string>
+    <string name="notification_channel_rate_alerts_id" translatable="false">rate_alerts</string>
+    <string name="notification_channel_rate_alerts">Gold and silver rate alerts</string>
+    <string name="notification_channel_rate_alerts_description">Important RateStack gold and silver rate notifications.</string>
+    <string name="notification_channel_general">RateStack updates</string>
+    <string name="notification_channel_general_description">General RateStack product and service updates.</string>
+    <string name="notification_default_title">RateStack update</string>
+    <string name="notification_default_body">Open RateStack for the latest gold and silver rates.</string>
+    <string name="notification_permission_title">Stay updated</string>
+    <string name="notification_permission_message">Allow RateStack notifications to receive useful gold and silver rate updates. You can change this later in Android settings.</string>
+    <string name="enable_notifications">Enable notifications</string>
+    <string name="not_now">Not now</string>
+    <string name="update_downloaded">A RateStack update is ready to install.</string>
+    <string name="restart_to_update">Restart</string>
 </resources>

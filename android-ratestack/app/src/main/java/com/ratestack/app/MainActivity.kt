@@ -1,10 +1,12 @@
 package com.ratestack.app
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -31,6 +33,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -45,6 +49,10 @@ class MainActivity : AppCompatActivity() {
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var lastFailedUrl: String? = null
     private var receivedMainFrameError = false
+    private var successfulSessionRecorded = false
+    private var notificationPermissionChecked = false
+    private var reviewPromptRunnable: Runnable? = null
+    private lateinit var playUpdateCoordinator: PlayUpdateCoordinator
 
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -56,6 +64,12 @@ class MainActivity : AppCompatActivity() {
         }
         fileChooserCallback?.onReceiveValue(resultUris)
         fileChooserCallback = null
+    }
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        // Permission denial is respected silently. Notifications remain optional.
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,9 +84,11 @@ class MainActivity : AppCompatActivity() {
         configureWebView()
         configureRefreshAndRetry()
         configureBackNavigation()
+        playUpdateCoordinator = PlayUpdateCoordinator(this, binding.root)
+        playUpdateCoordinator.start()
 
         if (savedInstanceState == null || binding.webView.restoreState(savedInstanceState) == null) {
-            loadHome()
+            loadIncomingDestination(intent)
         }
     }
 
@@ -98,7 +114,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @Suppress("DEPRECATION")
+    @SuppressLint("SetJavaScriptEnabled", "DEPRECATION")
     private fun configureWebView() {
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
         CookieManager.getInstance().apply {
@@ -158,6 +175,9 @@ class MainActivity : AppCompatActivity() {
                 binding.swipeRefresh.isRefreshing = false
                 if (!receivedMainFrameError) {
                     showWebContent()
+                    if (urlPolicy.classify(url) == NavigationDestination.INTERNAL) {
+                        onSuccessfulPageLoaded()
+                    }
                 }
             }
 
@@ -343,12 +363,104 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadHome() {
-        if (isOnline()) {
-            binding.webView.loadUrl(BuildConfig.WEBSITE_URL)
-        } else {
-            showNetworkError(BuildConfig.WEBSITE_URL)
+    private fun loadIncomingDestination(sourceIntent: Intent) {
+        val incomingUrl = sourceIntent.getStringExtra(NotificationHelper.EXTRA_NOTIFICATION_URL)
+            ?: sourceIntent.getStringExtra(NotificationHelper.DATA_KEY_URL)
+            ?: sourceIntent.getStringExtra(NotificationHelper.DATA_KEY_LINK)
+            ?: sourceIntent.getStringExtra(NotificationHelper.DATA_KEY_DEEP_LINK)
+            ?: sourceIntent.dataString
+
+        if (incomingUrl.isNullOrBlank()) {
+            loadHome()
+            return
         }
+
+        when (urlPolicy.classify(incomingUrl)) {
+            NavigationDestination.INTERNAL -> loadInternalUrl(incomingUrl)
+            NavigationDestination.ADMIN_BLOCKED -> {
+                showMessage(getString(R.string.admin_pages_unavailable))
+                loadHome()
+            }
+            NavigationDestination.EXTERNAL_HTTPS,
+            NavigationDestination.EMAIL,
+            NavigationDestination.TELEPHONE,
+            NavigationDestination.WHATSAPP,
+            -> {
+                handleNavigation(incomingUrl)
+                if (binding.webView.url == null) {
+                    loadHome()
+                }
+            }
+            NavigationDestination.BLOCKED -> {
+                showMessage(getString(R.string.unsafe_link_blocked))
+                loadHome()
+            }
+        }
+    }
+
+    private fun loadInternalUrl(url: String) {
+        if (isOnline()) {
+            binding.webView.loadUrl(url)
+        } else {
+            showNetworkError(url)
+        }
+    }
+
+    private fun loadHome() {
+        loadInternalUrl(BuildConfig.WEBSITE_URL)
+    }
+
+    private fun onSuccessfulPageLoaded() {
+        maybeRequestNotificationPermission()
+        if (successfulSessionRecorded) {
+            return
+        }
+
+        successfulSessionRecorded = true
+        val successfulSessions = PlayReviewCoordinator.recordSuccessfulSession(this)
+        reviewPromptRunnable = Runnable {
+            if (!isFinishing && !isDestroyed && hasWindowFocus()) {
+                PlayReviewCoordinator.requestIfEligible(this, successfulSessions)
+            }
+        }.also { binding.root.postDelayed(it, REVIEW_PROMPT_DELAY_MILLIS) }
+    }
+
+    private fun maybeRequestNotificationPermission() {
+        if (
+            notificationPermissionChecked ||
+            !BuildConfig.FIREBASE_CONFIGURED ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+        ) {
+            return
+        }
+        notificationPermissionChecked = true
+
+        if (
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
+        val preferences = getSharedPreferences(
+            NOTIFICATION_PREFERENCES_NAME,
+            Context.MODE_PRIVATE,
+        )
+        if (preferences.getBoolean(KEY_NOTIFICATION_PERMISSION_ASKED, false)) {
+            return
+        }
+
+        preferences.edit { putBoolean(KEY_NOTIFICATION_PERMISSION_ASKED, true) }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.notification_permission_title)
+            .setMessage(R.string.notification_permission_message)
+            .setNegativeButton(R.string.not_now, null)
+            .setPositiveButton(R.string.enable_notifications) { _, _ ->
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            .show()
     }
 
     private fun showLoading(show: Boolean) {
@@ -492,7 +604,25 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        loadIncomingDestination(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::playUpdateCoordinator.isInitialized) {
+            playUpdateCoordinator.onResume()
+        }
+    }
+
     override fun onDestroy() {
+        reviewPromptRunnable?.let(binding.root::removeCallbacks)
+        reviewPromptRunnable = null
+        if (::playUpdateCoordinator.isInitialized) {
+            playUpdateCoordinator.destroy()
+        }
         fileChooserCallback?.onReceiveValue(null)
         fileChooserCallback = null
         binding.webView.apply {
@@ -502,5 +632,11 @@ class MainActivity : AppCompatActivity() {
             destroy()
         }
         super.onDestroy()
+    }
+
+    private companion object {
+        const val REVIEW_PROMPT_DELAY_MILLIS = 30_000L
+        const val NOTIFICATION_PREFERENCES_NAME = "ratestack_notifications"
+        const val KEY_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
     }
 }

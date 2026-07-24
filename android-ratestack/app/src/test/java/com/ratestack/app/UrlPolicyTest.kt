@@ -7,7 +7,7 @@ class UrlPolicyTest {
     private val policy = UrlPolicy("india-gold-silver-rates.vercel.app")
 
     @Test
-    fun allowsOnlyExactTrustedHttpsHostInsideWebView() {
+    fun allowsOnlyExactTrustedHttpsHost() {
         assertEquals(
             NavigationDestination.INTERNAL,
             policy.classify("https://india-gold-silver-rates.vercel.app/cities/chennai"),

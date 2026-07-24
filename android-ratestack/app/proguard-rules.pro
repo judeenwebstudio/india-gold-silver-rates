@@ -1,5 +1,5 @@
-# Keep the application entry point and WebView clients discoverable after R8.
+# Keep Android entry points and Retrofit/Gson DTO field names stable for release.
 -keep class com.ratestack.app.MainActivity { *; }
-
-# No JavaScript bridge is exposed. Do not add broad @JavascriptInterface keep
-# rules unless a reviewed bridge is intentionally introduced in the future.
+-keep class com.ratestack.app.RateStackApplication { *; }
+-keep class com.ratestack.app.RateStackMessagingService { *; }
+-keep class com.ratestack.app.data.** { *; }

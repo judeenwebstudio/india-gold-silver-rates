@@ -1,6 +1,6 @@
 # RateStack Android
 
-Production Android wrapper for the public RateStack website:
+Production native Android client for the public RateStack API:
 
 `https://india-gold-silver-rates.vercel.app`
 
@@ -19,11 +19,28 @@ replace or modify the Next.js application.
 | Compile SDK | Android 36.1 |
 | Default version | `1` / `1.0.0` |
 
-The app uses Material Design 3 and a secured WebView. Only the exact configured
-RateStack host can open inside the WebView. External HTTPS links open in the
-device browser, supported email/telephone/WhatsApp links open in their
-corresponding apps, and all `/admin` paths are redirected to the public
-homepage.
+The app uses Kotlin, Jetpack Compose, Material Design 3, MVVM, Retrofit,
+coroutines/Flow, and DataStore. It renders native screens from the typed
+RateStack REST API; it does not embed website pages. Privacy Policy and other
+external informational links open in the device browser. Admin paths are
+blocked and never become in-app destinations.
+
+## Native architecture and API
+
+The repository layer consumes these production endpoints without assuming
+additional fields:
+
+- `GET /api/v1/home`: `latestGoldRates`, `latestSilverRate`, `lastUpdated`,
+  `source`, `featuredCities`
+- `GET /api/v1/states`: `states` (`name`, `slug`, `code`, `cityCount`), `total`
+- `GET /api/v1/cities`: `cities` (`name`, `slug`, `state`, `ratesUrl`), `total`
+- `GET /api/v1/rates/{state}/{city}`: `state`, `city`, `goldRates`, `silverRate`,
+  `lastUpdated`, `source`, `indicative`
+
+Successful rate responses are cached in DataStore for offline display. Network
+requests use typed envelope/error handling, a 15-second operation timeout,
+three attempts with exponential backoff, and preserve the last successful
+snapshot when the API is unavailable.
 
 ## Open in Android Studio
 
@@ -206,10 +223,10 @@ data keys:
 | `deeplink` | Alternate destination URL |
 | `channel` | `rate_alerts` (default) or `general_updates` |
 
-Trusted RateStack HTTPS destinations open in the WebView. Any `/admin` URL,
-cleartext URL, malformed URL, or unsafe scheme falls back to the public
-homepage. External HTTPS destinations use the device's URL handler outside the
-WebView. For consistent foreground/background/closed behavior, include the URL
+Trusted RateStack URLs in notification data map to native Home, state, or rate
+details destinations. Any `/admin` URL, cleartext URL, malformed URL, or unsafe
+scheme falls back to native Home. External HTTPS destinations use the device's
+browser. For consistent foreground/background/closed behavior, include the URL
 as custom data; Android delivers background notification payload data to the
 launcher activity when the user taps the system notification.
 
@@ -355,12 +372,10 @@ Google Analytics and AdSense actually enabled at submission time.
 - Downloads are placed in the app-specific external Downloads directory.
 - The native layer does not add a JavaScript bridge and does not collect its
   own user profile data.
-- The loaded website may use first-party cookies, Google Analytics 4, AdSense,
-  and server-side analytics. Those services may process identifiers, page
-  activity, coarse location, device information, diagnostics, and advertising
-  data according to the live site configuration and user consent.
-- External links leave the WebView and are handled by installed apps or the
-  default browser.
+- The API and Firebase services may process identifiers, device information,
+  diagnostics, and notification data according to the live configuration and
+  user consent.
+- External links are handled by installed apps or the default browser.
 
 Review the website's current consent flow, retention, deletion process, and
 third-party disclosures before completing Google Play’s Data safety form.
@@ -368,17 +383,12 @@ third-party disclosures before completing Google Play’s Data safety form.
 ## Security behavior
 
 - HTTPS is mandatory and cleartext traffic is disabled.
-- JavaScript is enabled only because the RateStack site requires it.
-- DOM storage and first-party cookies are enabled.
-- Third-party WebView cookies are disabled.
-- Mixed content, file access, content access, JavaScript-created windows, and
-  unsafe URL schemes are blocked.
-- SSL errors are cancelled and are never bypassed.
-- Safe Browsing is enabled on supported Android versions.
-- No JavaScript interface is exposed.
-- Every `/admin` URL is blocked inside the app and redirects to the public
-  homepage.
-- Downloads are accepted only from the trusted RateStack host.
+- Retrofit/OkHttp uses normal platform TLS validation with bounded timeouts.
+- No HTML rendering, browser navigation, JavaScript interface, cookie store, or
+  unsafe scheme handler is present in the native app.
+- Every `/admin` URL is blocked and redirects to native Home.
+- Privacy Policy and unsupported external destinations open only in the device
+  browser.
 
 ## Configuration reference
 

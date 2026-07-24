@@ -2,6 +2,7 @@ import java.net.URI
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.compose.compiler)
 }
 
 val firebaseConfigPresent = file("google-services.json").isFile
@@ -113,7 +114,7 @@ android {
 
     buildFeatures {
         buildConfig = true
-        viewBinding = true
+        compose = true
     }
 
     compileOptions {
@@ -140,15 +141,25 @@ android {
             "AndroidGradlePluginVersion",
             "GradleDependency",
             "OldTargetApi",
+            "AutoboxingStateCreation",
+            "MutableCollectionMutableState",
         )
     }
 }
 
 dependencies {
-    implementation(libs.androidx.activity)
-    implementation(libs.androidx.appcompat)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core)
-    implementation(libs.androidx.swipe.refresh)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.runtime)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.preview)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.crashlytics)
     implementation(libs.firebase.messaging)
@@ -157,6 +168,10 @@ dependencies {
     implementation(libs.play.app.update.ktx)
     implementation(libs.play.review)
     implementation(libs.play.review.ktx)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.gson)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

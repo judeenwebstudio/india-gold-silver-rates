@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { RazorpayCheckoutModal } from "@/components/RazorpayCheckoutModal";
 
 export default function CustomerSchemesDashboardPage() {
   const [schemes, setSchemes] = useState<any[]>([]);
@@ -105,56 +106,31 @@ export default function CustomerSchemesDashboardPage() {
     }
   }, [selectedSchemeId]);
 
-  const handlePayInstallment = async () => {
-    const token = getToken();
-    if (!token || !selectedSchemeId) return;
+  // Payment modal & result state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentSuccessReceiptNumber, setPaymentSuccessReceiptNumber] = useState<string | null>(null);
+  const [paymentFailureError, setPaymentFailureError] = useState<string | null>(null);
 
+  const handleOpenPaymentModal = () => {
     setError(null);
-    setPaying(true);
+    setPaymentSuccessReceiptNumber(null);
+    setPaymentFailureError(null);
+    setShowPaymentModal(true);
+  };
 
-    try {
-      // 1. Create Payment Order
-      const orderRes = await fetch(`/api/v1/me/schemes/${selectedSchemeId}/payments/order`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ gateway: "RAZORPAY" }),
-      });
-
-      const orderData = await orderRes.json();
-      if (!orderData.success) {
-        throw new Error(orderData.error?.message || "Failed to initiate payment");
-      }
-
-      // 2. Verify Payment (Sandbox)
-      const verifyRes = await fetch(`/api/v1/me/schemes/${selectedSchemeId}/payments/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          paymentOrderId: orderData.data.paymentOrderId,
-          gatewayPaymentId: `pay_sandbox_${Date.now()}`,
-          gatewaySignature: "mock_valid_signature",
-        }),
-      });
-
-      const verifyData = await verifyRes.json();
-      if (!verifyData.success) {
-        throw new Error(verifyData.error?.message || "Payment verification failed");
-      }
-
-      // Refresh scheme & dashboard metrics
+  const handlePaymentSuccess = (receiptNumber: string) => {
+    setShowPaymentModal(false);
+    setPaymentSuccessReceiptNumber(receiptNumber);
+    const token = getToken();
+    if (token) {
       loadUserSchemes(token);
-      loadSchemeDashboard(token, selectedSchemeId);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setPaying(false);
+      if (selectedSchemeId) loadSchemeDashboard(token, selectedSchemeId);
     }
+  };
+
+  const handlePaymentFailure = (errorMessage: string) => {
+    setShowPaymentModal(false);
+    setPaymentFailureError(errorMessage);
   };
 
   const handleViewReceipt = async (receiptId: string) => {
@@ -343,9 +319,9 @@ export default function CustomerSchemesDashboardPage() {
                 <div className="rounded-2xl border border-stone-800 bg-stone-900/90 p-4 flex flex-wrap items-center justify-between gap-3">
                   <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">Quick Actions:</span>
                   <div className="flex flex-wrap items-center gap-2">
-                    <a href="#next-payment" className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs transition-colors">
+                    <button onClick={handleOpenPaymentModal} className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs transition-colors">
                       💳 Pay Installment
-                    </a>
+                    </button>
                     <a href="#payment-history" className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold text-xs border border-stone-700 transition-colors">
                       📜 Payment History
                     </a>
@@ -521,11 +497,10 @@ export default function CustomerSchemesDashboardPage() {
                       </p>
                       <button
                         type="button"
-                        onClick={handlePayInstallment}
-                        disabled={paying}
-                        className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
+                        onClick={handleOpenPaymentModal}
+                        className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all"
                       >
-                        {paying ? "Processing Payment..." : "Pay Now (Sandbox) →"}
+                        Pay Now (Sandbox) →
                       </button>
                     </div>
                   )}
@@ -582,8 +557,7 @@ export default function CustomerSchemesDashboardPage() {
                                 {p.retryable && (
                                   <button
                                     type="button"
-                                    onClick={handlePayInstallment}
-                                    disabled={paying}
+                                    onClick={handleOpenPaymentModal}
                                     className="px-3 py-1.5 rounded-lg bg-amber-500 text-stone-950 font-bold text-[0.7rem] hover:bg-amber-400"
                                   >
                                     Retry Payment
@@ -774,6 +748,81 @@ export default function CustomerSchemesDashboardPage() {
           </>
         )}
       </main>
+
+      {/* Razorpay Sandbox Checkout Modal */}
+      {showPaymentModal && activeScheme && (
+        <RazorpayCheckoutModal
+          enrollment={activeScheme}
+          dashboardData={dashboardData}
+          userName={userName}
+          userPhone={userPhone}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
+          onFailure={handlePaymentFailure}
+        />
+      )}
+
+      {/* Payment Success Modal */}
+      {paymentSuccessReceiptNumber && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-stone-900 border border-emerald-500/40 p-6 md:p-8 shadow-2xl space-y-4 text-center text-stone-100">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 grid place-items-center mx-auto text-emerald-400 text-2xl font-bold">
+              ✓
+            </div>
+            <h3 className="font-display text-xl font-bold text-emerald-300">Payment Successful!</h3>
+            <p className="text-xs text-stone-300">
+              Your installment payment was verified and credited to your Scheme Purchase Balance.
+            </p>
+            <div className="bg-stone-950 p-3.5 rounded-2xl border border-stone-800 text-xs font-mono text-amber-300">
+              Receipt Reference: {paymentSuccessReceiptNumber}
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPaymentSuccessReceiptNumber(null)}
+                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold shadow-md"
+              >
+                Return to Refreshed Dashboard →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Failure Modal */}
+      {paymentFailureError && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-stone-900 border border-red-500/40 p-6 md:p-8 shadow-2xl space-y-4 text-center text-stone-100">
+            <div className="w-16 h-16 rounded-full bg-red-500/20 border border-red-500/40 grid place-items-center mx-auto text-red-400 text-2xl font-bold">
+              ✕
+            </div>
+            <h3 className="font-display text-xl font-bold text-red-400">Payment Unsuccessful</h3>
+            <p className="text-xs text-stone-300 font-semibold">{paymentFailureError}</p>
+            <p className="text-[0.7rem] text-stone-400">
+              Your installment remains unpaid. No money was deducted from your scheme balance.
+            </p>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPaymentFailureError(null)}
+                className="flex-1 py-3 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-bold border border-stone-700"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentFailureError(null);
+                  handleOpenPaymentModal();
+                }}
+                className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold shadow-md"
+              >
+                Retry Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Receipt Modal */}
       {receiptModalData && (

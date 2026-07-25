@@ -25,9 +25,6 @@ export function AdminSidebar() {
       </div>
 
       <div className="flex-1 px-4 py-6">
-        <p className="mb-3 px-3 text-[0.62rem] font-black uppercase tracking-[0.2em] text-stone-500">
-          Workspace
-        </p>
         <AdminNavigation />
       </div>
 

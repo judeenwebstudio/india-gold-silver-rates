@@ -89,30 +89,31 @@ export async function GET(
     // Fetch benchmark live metal rates
     let relevantCurrentMetalRate = null;
     try {
-      const rates = await getLatestNationalBaseRates();
+      const snapshot = await getLatestNationalBaseRates();
       if (enrollment.metalType === 'GOLD') {
-        const gold22k = rates.find((r) => r.metalType === 'GOLD' && r.purity === 'K22');
+        const gold22k = snapshot.rates.find((r) => r.id === 'gold-22k');
         if (gold22k) {
           relevantCurrentMetalRate = {
             metalType: 'GOLD',
             purity: 'K22',
-            pricePerGramInr: Number(gold22k.pricePerGram),
-            pricePerGramPaise: Math.round(Number(gold22k.pricePerGram) * 100),
-            source: gold22k.source || 'IBJA Benchmark',
-            recordedAt: gold22k.recordedAt,
+            pricePerGramInr: gold22k.price,
+            pricePerGramPaise: Math.round(gold22k.price * 100),
+            source: snapshot.source || 'IBJA Benchmark',
+            recordedAt: snapshot.recordedAt || new Date().toISOString(),
           };
         }
       } else {
-        const silver999 = rates.find((r) => r.metalType === 'SILVER' && r.purity === 'P999');
-        if (silver999) {
+        const silverGram = snapshot.rates.find((r) => r.id === 'silver-gram');
+        const silverKg = snapshot.rates.find((r) => r.id === 'silver-kg');
+        if (silverGram) {
           relevantCurrentMetalRate = {
             metalType: 'SILVER',
             purity: 'P999',
-            pricePerGramInr: Number(silver999.pricePerGram),
-            pricePerKgInr: Number(silver999.pricePerKilogram || Number(silver999.pricePerGram) * 1000),
-            pricePerGramPaise: Math.round(Number(silver999.pricePerGram) * 100),
-            source: silver999.source || 'IBJA Benchmark',
-            recordedAt: silver999.recordedAt,
+            pricePerGramInr: silverGram.price,
+            pricePerKgInr: silverKg?.price || silverGram.price * 1000,
+            pricePerGramPaise: Math.round(silverGram.price * 100),
+            source: snapshot.source || 'IBJA Benchmark',
+            recordedAt: snapshot.recordedAt || new Date().toISOString(),
           };
         }
       }

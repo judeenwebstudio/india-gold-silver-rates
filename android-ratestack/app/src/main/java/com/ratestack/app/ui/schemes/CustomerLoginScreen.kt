@@ -85,9 +85,17 @@ fun CustomerLoginScreen(
                     // Mobile Number Field
                     OutlinedTextField(
                         value = phone,
-                        onValueChange = {
-                            if (it.length <= 10 && it.all { char -> char.isDigit() }) {
-                                phone = it
+                        onValueChange = { input ->
+                            val digits = input.replace(Regex("\\D"), "")
+                            val clean = if (digits.length == 12 && digits.startsWith("91")) {
+                                digits.substring(2)
+                            } else if (digits.length == 11 && digits.startsWith("0")) {
+                                digits.substring(1)
+                            } else {
+                                digits
+                            }
+                            if (clean.length <= 10) {
+                                phone = clean
                                 validationError = null
                             }
                         },

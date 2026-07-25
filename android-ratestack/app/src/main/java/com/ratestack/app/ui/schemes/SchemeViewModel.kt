@@ -98,19 +98,43 @@ class SchemeViewModel(
         }
     }
 
+    private fun normalizePhoneNumber(phone: String): String {
+        var digits = phone.replace(Regex("\\D"), "")
+        if (digits.length == 12 && digits.startsWith("91")) {
+            digits = digits.substring(2)
+        } else if (digits.length == 11 && digits.startsWith("0")) {
+            digits = digits.substring(1)
+        }
+        return digits
+    }
+
     fun login(phone: String, pass: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _authActionState.value = LoadState.Loading
+            val normalizedPhone = normalizePhoneNumber(phone)
             try {
-                val res = ApiProvider.service.loginUser(mapOf("phone" to phone, "password" to pass))
+                val body = mapOf(
+                    "identifier" to normalizedPhone,
+                    "phone" to normalizedPhone,
+                    "password" to pass,
+                )
+                val res = ApiProvider.service.loginUser(body)
+
+                if (com.ratestack.app.BuildConfig.DEBUG) {
+                    android.util.Log.d(
+                        "RateStackAuth",
+                        "Login Endpoint: ${com.ratestack.app.BuildConfig.WEBSITE_URL}/api/v1/auth/login | Code: ${res.code()} | Mobile: $normalizedPhone | Error: ${res.body()?.error?.message}",
+                    )
+                }
+
                 if (res.isSuccessful && res.body()?.success == true) {
                     val authData = res.body()?.data
                     if (authData?.token != null) {
                         repository.saveUserToken(authData.token)
-                        repository.saveUserDetails(authData.user?.fullName ?: "Customer", authData.user?.phone ?: phone)
+                        repository.saveUserDetails(authData.user?.fullName ?: "Customer", authData.user?.phone ?: normalizedPhone)
                         _userToken.value = authData.token
                         _userName.value = authData.user?.fullName ?: "Customer"
-                        _userPhone.value = authData.user?.phone ?: phone
+                        _userPhone.value = authData.user?.phone ?: normalizedPhone
                         _authActionState.value = LoadState.Ready(authData)
                         loadMySchemes()
                         onSuccess()
@@ -118,7 +142,7 @@ class SchemeViewModel(
                         _authActionState.value = LoadState.Error("Invalid response from server")
                     }
                 } else {
-                    val errMsg = res.body()?.error?.message ?: "Login failed. Please check credentials."
+                    val errMsg = res.body()?.error?.message ?: if (res.code() == 404) "No account found. Please register." else "Incorrect mobile number or password."
                     _authActionState.value = LoadState.Error(errMsg)
                 }
             } catch (e: Exception) {
@@ -130,18 +154,30 @@ class SchemeViewModel(
     fun register(fullName: String, phone: String, pass: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _authActionState.value = LoadState.Loading
+            val normalizedPhone = normalizePhoneNumber(phone)
             try {
-                val res = ApiProvider.service.registerUser(
-                    mapOf("fullName" to fullName, "phone" to phone, "password" to pass)
+                val body = mapOf(
+                    "fullName" to fullName.trim(),
+                    "phone" to normalizedPhone,
+                    "password" to pass,
                 )
+                val res = ApiProvider.service.registerUser(body)
+
+                if (com.ratestack.app.BuildConfig.DEBUG) {
+                    android.util.Log.d(
+                        "RateStackAuth",
+                        "Register Endpoint: ${com.ratestack.app.BuildConfig.WEBSITE_URL}/api/v1/auth/register | Code: ${res.code()} | Mobile: $normalizedPhone | Error: ${res.body()?.error?.message}",
+                    )
+                }
+
                 if (res.isSuccessful && res.body()?.success == true) {
                     val authData = res.body()?.data
                     if (authData?.token != null) {
                         repository.saveUserToken(authData.token)
-                        repository.saveUserDetails(authData.user?.fullName ?: fullName, authData.user?.phone ?: phone)
+                        repository.saveUserDetails(authData.user?.fullName ?: fullName, authData.user?.phone ?: normalizedPhone)
                         _userToken.value = authData.token
                         _userName.value = authData.user?.fullName ?: fullName
-                        _userPhone.value = authData.user?.phone ?: phone
+                        _userPhone.value = authData.user?.phone ?: normalizedPhone
                         _authActionState.value = LoadState.Ready(authData)
                         loadMySchemes()
                         onSuccess()

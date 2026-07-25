@@ -73,3 +73,14 @@ export async function hashPassword(password: string): Promise<string> {
 export async function comparePassword(password: string, hash: string): Promise<boolean> {
   return await bcrypt.compare(password, hash);
 }
+
+export function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+  let digits = phone.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.substring(2);
+  } else if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.substring(1);
+  }
+  return digits;
+}

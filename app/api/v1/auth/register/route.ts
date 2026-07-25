@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hashPassword, signSchemeToken } from '@/lib/schemes/user-auth';
+import { hashPassword, normalizePhoneNumber, signSchemeToken } from '@/lib/schemes/user-auth';
 import { z } from 'zod';
 
 const registerSchema = z.object({
@@ -26,11 +26,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const { fullName, phone, email, password, address, city, state, pincode } = parsed.data;
+    const { fullName, phone: rawPhone, email, password, address, city, state, pincode } = parsed.data;
+    const normalizedPhone = normalizePhoneNumber(rawPhone);
+
+    if (normalizedPhone.length < 10) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Please enter a valid 10-digit mobile number' } },
+        { status: 400 }
+      );
+    }
 
     // Check existing phone
-    const existingPhone = await prisma.schemeUser.findUnique({
-      where: { phone },
+    const existingPhone = await prisma.schemeUser.findFirst({
+      where: {
+        OR: [
+          { phone: normalizedPhone },
+          { phone: rawPhone },
+        ],
+      },
     });
 
     if (existingPhone) {
@@ -45,7 +58,7 @@ export async function POST(request: Request) {
     const user = await prisma.schemeUser.create({
       data: {
         fullName,
-        phone,
+        phone: normalizedPhone,
         email: email || null,
         passwordHash,
         address: address || null,

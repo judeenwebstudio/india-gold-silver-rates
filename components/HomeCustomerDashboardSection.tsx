@@ -244,7 +244,75 @@ export function HomeCustomerDashboardSection() {
 
   if (!userToken) {
     return (
-      <>
+      <section id="my-schemes" className="scroll-mt-20 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="rounded-3xl border border-stone-800 bg-stone-900/90 p-6 md:p-8 text-stone-100 shadow-xl space-y-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-stone-800 pb-6">
+            <div>
+              <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 mb-2">
+                RateStack Coin Savings Plan
+              </span>
+              <h2 className="font-display text-xl md:text-2xl font-extrabold text-amber-100">
+                Gold &amp; Silver Savings Scheme Overview
+              </h2>
+              <p className="text-xs text-stone-400 mt-1 max-w-2xl">
+                Save monthly in 22K Gold (916) or 999 Fine Silver coins with 0% interest, double-entry verified accounting, and weight-based physical coin redemption upon maturity.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => triggerAuthRequired("login")}
+                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-md transition-all"
+              >
+                Sign In to Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={() => triggerAuthRequired("register")}
+                className="px-4 py-2.5 rounded-xl border border-stone-700 bg-stone-800 hover:bg-stone-700 text-amber-300 font-bold text-xs shadow-sm transition-all"
+              >
+                Register
+              </button>
+            </div>
+          </div>
+
+          {/* Guest Action Cards: My Schemes, Pay Installment, Redeem Coin */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div
+              onClick={() => triggerAuthRequired("login")}
+              className="cursor-pointer rounded-2xl border border-stone-800 bg-stone-950/60 p-4 hover:border-amber-500/40 transition-all space-y-1 group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">My Schemes</span>
+                <span className="text-stone-500 group-hover:translate-x-1 transition-transform text-xs">Login &rarr;</span>
+              </div>
+              <p className="text-[0.7rem] text-stone-400">View your active enrolled 22K Gold &amp; 999 Silver scheme accounts.</p>
+            </div>
+
+            <div
+              onClick={() => triggerAuthRequired("login")}
+              className="cursor-pointer rounded-2xl border border-stone-800 bg-stone-950/60 p-4 hover:border-amber-500/40 transition-all space-y-1 group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Pay Installment</span>
+                <span className="text-stone-500 group-hover:translate-x-1 transition-transform text-xs">Login &rarr;</span>
+              </div>
+              <p className="text-[0.7rem] text-stone-400">Pay monthly installments securely with instant ledger verification &amp; receipts.</p>
+            </div>
+
+            <div
+              onClick={() => triggerAuthRequired("login")}
+              className="cursor-pointer rounded-2xl border border-stone-800 bg-stone-950/60 p-4 hover:border-amber-500/40 transition-all space-y-1 group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Redeem Coin</span>
+                <span className="text-stone-500 group-hover:translate-x-1 transition-transform text-xs">Login &rarr;</span>
+              </div>
+              <p className="text-[0.7rem] text-stone-400">Request live server quotation &amp; coin delivery upon scheme maturity.</p>
+            </div>
+          </div>
+        </div>
+
         {showAuthModal && (
           <AuthModal
             initialMode={authMode}
@@ -257,7 +325,7 @@ export function HomeCustomerDashboardSection() {
             }}
           />
         )}
-      </>
+      </section>
     );
   }
 
@@ -265,19 +333,19 @@ export function HomeCustomerDashboardSection() {
     <section id="my-schemes" className="scroll-mt-20 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       {/* Authenticated Customer Scheme Dashboard */}
       <div className="space-y-6 text-stone-100">
-          <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-r from-stone-900 via-amber-950/30 to-stone-900 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-2xl">
-            <div>
-              <span className="inline-block px-3 py-1 rounded-full text-[0.68rem] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 mb-2">
-                Customer Savings Dashboard
-              </span>
-              <h2 className="font-display text-2xl md:text-3xl font-extrabold text-amber-100">
-                My Gold &amp; Silver Schemes
-              </h2>
-              <p className="text-xs text-stone-400 mt-1">
-                Verified Scheme Purchase Balance: <span className="font-extrabold text-amber-300">₹{totalCombinedBalance.toLocaleString("en-IN")}</span> across {schemes.length} enrolled accounts
-              </p>
-            </div>
-            <Link
+        <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-r from-stone-900 via-amber-950/30 to-stone-900 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-2xl">
+          <div>
+            <span className="inline-block px-3 py-1 rounded-full text-[0.68rem] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/30 mb-2">
+              Customer Savings Dashboard
+            </span>
+            <h2 className="font-display text-2xl md:text-3xl font-extrabold text-amber-100">
+              Welcome back to RateStack Savings!
+            </h2>
+            <p className="text-xs text-stone-400 mt-1">
+              Verified Scheme Purchase Balance: <span className="font-extrabold text-amber-300">₹{totalCombinedBalance.toLocaleString("en-IN")}</span> across {schemes.length} enrolled accounts
+            </p>
+          </div>
+          <Link
               href="/schemes"
               className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-md transition-all shrink-0"
             >

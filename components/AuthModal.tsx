@@ -22,6 +22,10 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
     setError(null);
 
     if (mode === "register") {
+      if (!fullName || fullName.trim().length < 2) {
+        setError("Please enter your full name.");
+        return;
+      }
       if (!phone || phone.length < 10) {
         setError("Please enter a valid 10-digit mobile number.");
         return;
@@ -43,7 +47,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
           body: JSON.stringify({
             phone,
             password,
-            fullName: fullName.trim() || `Member ${phone.slice(-4)}`,
+            fullName: fullName.trim(),
           }),
         });
 
@@ -126,12 +130,13 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           {mode === "register" && (
             <div>
-              <label className="block font-bold text-stone-300 mb-1">Full Name (Optional)</label>
+              <label className="block font-bold text-stone-300 mb-1">Full Name *</label>
               <input
                 type="text"
                 placeholder="e.g. Ramesh Kumar"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                required
                 className="w-full rounded-xl bg-stone-950 border border-stone-800 p-3 text-stone-100 font-semibold focus:border-amber-500 focus:outline-none"
               />
             </div>

@@ -66,11 +66,24 @@ export function Header() {
           </Link>
 
           <nav className="hidden items-center gap-6 lg:flex" aria-label="Primary navigation">
-            {navigation.map((item) => (
-              <a key={item.href} href={item.href} className="text-xs font-bold text-stone-700 transition-colors hover:text-amber-800">
-                {item.label}
-              </a>
-            ))}
+            {navigation.map((item) => {
+              if (item.label === "My Schemes" && !userToken) {
+                return (
+                  <button
+                    key={item.href}
+                    onClick={() => handleOpenAuth("login")}
+                    className="text-xs font-bold text-stone-700 transition-colors hover:text-amber-800"
+                  >
+                    {item.label}
+                  </button>
+                );
+              }
+              return (
+                <a key={item.href} href={item.href} className="text-xs font-bold text-stone-700 transition-colors hover:text-amber-800">
+                  {item.label}
+                </a>
+              );
+            })}
           </nav>
 
           <div className="flex items-center gap-3">
@@ -129,11 +142,24 @@ export function Header() {
         {open && (
           <nav className="border-t border-stone-200 bg-[#fbfaf7] px-4 py-4 lg:hidden" aria-label="Mobile navigation">
             <div className="mx-auto grid max-w-7xl gap-2">
-              {navigation.map((item) => (
-                <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-stone-700 hover:bg-amber-50">
-                  {item.label}
-                </a>
-              ))}
+              {navigation.map((item) => {
+                if (item.label === "My Schemes" && !userToken) {
+                  return (
+                    <button
+                      key={item.href}
+                      onClick={() => { setOpen(false); handleOpenAuth("login"); }}
+                      className="text-left rounded-lg px-3 py-2.5 text-sm font-semibold text-stone-700 hover:bg-amber-50"
+                    >
+                      {item.label}
+                    </button>
+                  );
+                }
+                return (
+                  <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-stone-700 hover:bg-amber-50">
+                    {item.label}
+                  </a>
+                );
+              })}
               {!userToken && (
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-200">
                   <button

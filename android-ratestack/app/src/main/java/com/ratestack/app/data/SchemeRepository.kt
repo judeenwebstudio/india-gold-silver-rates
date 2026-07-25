@@ -3,12 +3,14 @@ package com.ratestack.app.data
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.google.gson.Gson
 
 class SchemeRepository(
     private val api: RateStackApi,
     private val context: Context,
 ) {
     private val prefs: SharedPreferences = context.getSharedPreferences("ratestack_scheme_prefs", Context.MODE_PRIVATE)
+    private val gson = Gson()
 
     fun getUserToken(): String? {
         return prefs.getString("scheme_user_token", null)
@@ -28,15 +30,26 @@ class SchemeRepository(
             if (response.isSuccessful && response.body()?.success == true) {
                 val data = response.body()?.data
                 if (data != null) {
+                    prefs.edit { putString("cached_schemes_list", gson.toJson(data)) }
                     RepositoryResult.Success(data)
                 } else {
                     RepositoryResult.Failure("Empty scheme response")
                 }
             } else {
-                RepositoryResult.Failure(response.body()?.error?.message ?: "Failed to fetch schemes")
+                readCachedSchemes() ?: RepositoryResult.Failure(response.body()?.error?.message ?: "Failed to fetch schemes")
             }
         } catch (e: Exception) {
-            RepositoryResult.Failure(e.message ?: "Network error")
+            readCachedSchemes() ?: RepositoryResult.Failure(e.message ?: "Network error")
+        }
+    }
+
+    private fun readCachedSchemes(): RepositoryResult<SchemeListResponseDto>? {
+        val json = prefs.getString("cached_schemes_list", null) ?: return null
+        return try {
+            val data = gson.fromJson(json, SchemeListResponseDto::class.java)
+            RepositoryResult.Success(data, fromCache = true, warning = "Offline read-only view")
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -45,12 +58,23 @@ class SchemeRepository(
             val response = api.getMySchemes("Bearer $token")
             if (response.isSuccessful && response.body()?.success == true) {
                 val data = response.body()?.data ?: emptyList()
+                prefs.edit { putString("cached_my_schemes", gson.toJson(data)) }
                 RepositoryResult.Success(data)
             } else {
-                RepositoryResult.Failure(response.body()?.error?.message ?: "Failed to fetch my schemes")
+                readCachedMySchemes() ?: RepositoryResult.Failure(response.body()?.error?.message ?: "Failed to fetch my schemes")
             }
         } catch (e: Exception) {
-            RepositoryResult.Failure(e.message ?: "Network error")
+            readCachedMySchemes() ?: RepositoryResult.Failure(e.message ?: "Network error")
+        }
+    }
+
+    private fun readCachedMySchemes(): RepositoryResult<List<SchemeEnrollmentDto>>? {
+        val json = prefs.getString("cached_my_schemes", null) ?: return null
+        return try {
+            val data = gson.fromJson(json, Array<SchemeEnrollmentDto>::class.java).toList()
+            RepositoryResult.Success(data, fromCache = true, warning = "Offline read-only view")
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -60,15 +84,26 @@ class SchemeRepository(
             if (response.isSuccessful && response.body()?.success == true) {
                 val data = response.body()?.data
                 if (data != null) {
+                    prefs.edit { putString("cached_dashboard_$enrollmentId", gson.toJson(data)) }
                     RepositoryResult.Success(data)
                 } else {
                     RepositoryResult.Failure("Dashboard data not found")
                 }
             } else {
-                RepositoryResult.Failure(response.body()?.error?.message ?: "Failed to fetch dashboard")
+                readCachedDashboard(enrollmentId) ?: RepositoryResult.Failure(response.body()?.error?.message ?: "Failed to fetch dashboard")
             }
         } catch (e: Exception) {
-            RepositoryResult.Failure(e.message ?: "Network error")
+            readCachedDashboard(enrollmentId) ?: RepositoryResult.Failure(e.message ?: "Network error")
+        }
+    }
+
+    private fun readCachedDashboard(enrollmentId: String): RepositoryResult<SchemeDashboardDto>? {
+        val json = prefs.getString("cached_dashboard_$enrollmentId", null) ?: return null
+        return try {
+            val data = gson.fromJson(json, SchemeDashboardDto::class.java)
+            RepositoryResult.Success(data, fromCache = true, warning = "Offline read-only view")
+        } catch (e: Exception) {
+            null
         }
     }
 }

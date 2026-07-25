@@ -232,7 +232,7 @@ data class SchemeEnrollmentDto(
     val maturityDate: String?,
 )
 
-data class SchemeDashboardDto(
+data class EnrollmentSummaryDto(
     val id: String?,
     val accountNumber: String?,
     val productName: String?,
@@ -241,19 +241,67 @@ data class SchemeDashboardDto(
     val tenureMonths: Int?,
     val monthlyAmount: Double?,
     val totalScheduledAmount: Double?,
-    val schemePurchaseBalance: Double?,
-    val eligiblePurchaseValue: Double?,
-    val remainingAmount: Double?,
-    val paidInstallmentCount: Int?,
-    val remainingInstallmentCount: Int?,
-    val nextDueDate: String?,
-    val overdueAmount: Double?,
-    val status: String?,
-    val progressPercent: Double?,
     val startDate: String?,
     val maturityDate: String?,
+    val nextDueDate: String?,
+    val status: String?,
+)
+
+data class NextInstallmentDto(
+    val id: String?,
+    val installmentNo: Int?,
+    val dueDate: String?,
+    val amount: Double?,
+    val status: String?,
+    val statusTag: String?,
+)
+
+data class PaymentOrderHistoryDto(
+    val id: String?,
+    val orderId: String?,
+    val amount: Double?,
+    val gateway: String?,
+    val status: String?,
+    val gatewayPaymentId: String?,
+    val createdAt: String?,
+    val retryable: Boolean?,
+)
+
+data class RedemptionEligibilityDto(
+    val isEligible: Boolean?,
+    val maturityDate: String?,
+    val remainingInstallments: Int?,
+    val reasonIfNotEligible: String?,
+)
+
+data class MetalRateInfoDto(
+    val metalType: String?,
+    val purity: String?,
+    val pricePerGramInr: Double?,
+    val pricePerKgInr: Double?,
+    val source: String?,
+    val recordedAt: String?,
+)
+
+data class SchemeDashboardDto(
+    val enrollment: EnrollmentSummaryDto?,
+    val schemePlan: SchemePlanDto?,
+    val schemePurchaseBalance: Double?,
+    val eligiblePurchaseValue: Double?,
+    val verifiedContributionTotal: Double?,
+    val scheduledTotal: Double?,
+    val remainingScheduledAmount: Double?,
+    val paidInstallmentCount: Int?,
+    val remainingInstallmentCount: Int?,
+    val totalInstallments: Int?,
+    val progressPercent: Double?,
+    val nextInstallment: NextInstallmentDto?,
     val installments: List<InstallmentDto>?,
+    val recentPayments: List<PaymentOrderHistoryDto>?,
     val recentReceipts: List<ReceiptDto>?,
+    val redemptionEligibility: RedemptionEligibilityDto?,
+    val redemptionStatus: Map<String, Any>?,
+    val relevantCurrentMetalRate: MetalRateInfoDto?,
 )
 
 data class InstallmentDto(
@@ -270,6 +318,24 @@ data class ReceiptDto(
     val receiptNumber: String?,
     val amount: Double?,
     val paymentDate: String?,
+    val paymentOrderId: String?,
+)
+
+data class DetailedReceiptDto(
+    val id: String?,
+    val receiptNumber: String?,
+    val amount: Double?,
+    val paymentDate: String?,
+    val accountNumber: String?,
+    val productName: String?,
+    val userName: String?,
+    val merchantDetails: MerchantDetailsDto?,
+)
+
+data class MerchantDetailsDto(
+    val sellerName: String?,
+    val gstin: String?,
+    val invoiceIssuer: String?,
 )
 
 data class RedemptionQuotationDto(
@@ -312,4 +378,3 @@ data class SchemeUserDto(
     val phone: String?,
     val email: String?,
 )
-

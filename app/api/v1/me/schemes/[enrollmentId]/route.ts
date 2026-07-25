@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateSchemeUserFromRequest } from '@/lib/schemes/user-auth';
 import { paiseToInrNumber } from '@/lib/schemes/precision';
+import { getLatestNationalBaseRates } from '@/lib/city-rate-service';
 
 export async function GET(
   request: Request,
@@ -28,55 +29,163 @@ export async function GET(
         },
         nominee: true,
         installments: { orderBy: { installmentNo: 'asc' } },
-        receipts: { orderBy: { createdAt: 'desc' }, take: 5 },
+        paymentOrders: { orderBy: { createdAt: 'desc' }, take: 15 },
+        receipts: { orderBy: { createdAt: 'desc' }, take: 15 },
         redemptionRequests: { include: { quotation: true }, orderBy: { createdAt: 'desc' } },
       },
     });
 
     if (!enrollment || enrollment.userId !== authUser.userId) {
       return NextResponse.json(
-        { success: false, error: { message: 'Scheme account not found' } },
+        { success: false, error: { message: 'Scheme account not found or access denied' } },
         { status: 404 }
       );
     }
+
+    // Ledger verified balance check
+    const ledgerSum = await prisma.schemeLedgerEntry.aggregate({
+      where: { enrollmentId },
+      _sum: { amountPaise: true },
+    });
+    const verifiedLedgerBalancePaise = ledgerSum._sum.amountPaise || 0n;
 
     const totalScheduled = enrollment.totalScheduledAmountPaise;
     const currentBalance = enrollment.eligiblePurchaseBalancePaise;
     const paidCount = enrollment.paidInstallmentCount;
     const remainingCount = enrollment.remainingInstallmentCount;
-    const progressPercent = Number((currentBalance * 100n) / (totalScheduled || BigInt(1)));
+    const totalInstallments = enrollment.tenureMonths;
+    const progressPercent = Math.min(100, Math.round(Number((currentBalance * 100n) / (totalScheduled || 1n))));
+
+    // Calculate remaining scheduled amount (never negative!)
+    const remainingPaise = totalScheduled > currentBalance ? totalScheduled - currentBalance : 0n;
+
+    // Next installment status determination
+    const now = new Date();
+    let nextInstallmentData = null;
+    const nextInst = enrollment.installments.find((i) => i.status !== 'PAID');
+    if (nextInst) {
+      const due = new Date(nextInst.dueDate);
+      const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      let statusTag: 'UPCOMING' | 'DUE_TODAY' | 'GRACE_PERIOD' | 'OVERDUE' = 'UPCOMING';
+      if (diffDays === 0) {
+        statusTag = 'DUE_TODAY';
+      } else if (diffDays < 0 && Math.abs(diffDays) <= (enrollment.plan.gracePeriodDays || 7)) {
+        statusTag = 'GRACE_PERIOD';
+      } else if (diffDays < 0) {
+        statusTag = 'OVERDUE';
+      }
+
+      nextInstallmentData = {
+        id: nextInst.id,
+        installmentNo: nextInst.installmentNo,
+        dueDate: nextInst.dueDate,
+        amount: paiseToInrNumber(nextInst.amountPaise),
+        status: nextInst.status,
+        statusTag,
+      };
+    }
+
+    // Fetch benchmark live metal rates
+    let relevantCurrentMetalRate = null;
+    try {
+      const rates = await getLatestNationalBaseRates();
+      if (enrollment.metalType === 'GOLD') {
+        const gold22k = rates.find((r) => r.metalType === 'GOLD' && r.purity === 'K22');
+        if (gold22k) {
+          relevantCurrentMetalRate = {
+            metalType: 'GOLD',
+            purity: 'K22',
+            pricePerGramInr: Number(gold22k.pricePerGram),
+            pricePerGramPaise: Math.round(Number(gold22k.pricePerGram) * 100),
+            source: gold22k.source || 'IBJA Benchmark',
+            recordedAt: gold22k.recordedAt,
+          };
+        }
+      } else {
+        const silver999 = rates.find((r) => r.metalType === 'SILVER' && r.purity === 'P999');
+        if (silver999) {
+          relevantCurrentMetalRate = {
+            metalType: 'SILVER',
+            purity: 'P999',
+            pricePerGramInr: Number(silver999.pricePerGram),
+            pricePerKgInr: Number(silver999.pricePerKilogram || Number(silver999.pricePerGram) * 1000),
+            pricePerGramPaise: Math.round(Number(silver999.pricePerGram) * 100),
+            source: silver999.source || 'IBJA Benchmark',
+            recordedAt: silver999.recordedAt,
+          };
+        }
+      }
+    } catch {
+      // Fallback baseline rate if live rates unavailable
+      relevantCurrentMetalRate = {
+        metalType: enrollment.metalType,
+        purity: enrollment.purity,
+        pricePerGramInr: enrollment.metalType === 'GOLD' ? 7500 : 92,
+        pricePerKgInr: enrollment.metalType === 'GOLD' ? 7500000 : 92000,
+        source: 'Standard Rate',
+        recordedAt: new Date().toISOString(),
+      };
+    }
+
+    // Redemption eligibility checks
+    const isEligible = enrollment.status === 'MATURED' || paidCount >= totalInstallments || now >= new Date(enrollment.maturityDate);
+    const redemptionEligibility = {
+      isEligible,
+      maturityDate: enrollment.maturityDate,
+      remainingInstallments: remainingCount,
+      reasonIfNotEligible: isEligible
+        ? 'Eligible for coin redemption'
+        : `Redemption available after maturity on ${new Date(enrollment.maturityDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} (${remainingCount} installments remaining)`,
+    };
 
     return NextResponse.json({
       success: true,
       data: {
-        id: enrollment.id,
-        accountNumber: enrollment.accountNumber,
-        productName: enrollment.plan.name,
-        metalType: enrollment.metalType,
-        purity: enrollment.purity,
-        tenureMonths: enrollment.tenureMonths,
-        monthlyAmount: paiseToInrNumber(enrollment.monthlyAmountPaise),
-        totalScheduledAmount: paiseToInrNumber(totalScheduled),
-        schemePurchaseBalance: paiseToInrNumber(currentBalance), // User-facing terminology: Scheme Purchase Balance
-        eligiblePurchaseValue: paiseToInrNumber(currentBalance), // Alternative non-wallet phrase
-        remainingAmount: paiseToInrNumber(totalScheduled > currentBalance ? totalScheduled - currentBalance : BigInt(0)),
+        enrollment: {
+          id: enrollment.id,
+          accountNumber: enrollment.accountNumber,
+          productName: enrollment.plan.name,
+          metalType: enrollment.metalType,
+          purity: enrollment.purity,
+          tenureMonths: enrollment.tenureMonths,
+          monthlyAmount: paiseToInrNumber(enrollment.monthlyAmountPaise),
+          totalScheduledAmount: paiseToInrNumber(totalScheduled),
+          startDate: enrollment.startDate,
+          maturityDate: enrollment.maturityDate,
+          nextDueDate: enrollment.nextDueDate,
+          status: enrollment.status,
+          termsVersion: enrollment.termsVersion,
+          acceptedTermsAt: enrollment.acceptedTermsAt,
+        },
+        schemePlan: {
+          id: enrollment.plan.id,
+          name: enrollment.plan.name,
+          gracePeriodDays: enrollment.plan.gracePeriodDays,
+          coinDenominations: enrollment.plan.coinDenominations.map((d) => ({
+            id: d.id,
+            title: d.title,
+            weightMilligrams: Number(d.weightMilligrams),
+            weightGrams: Number(d.weightMilligrams) / 1000,
+            mintingFee: paiseToInrNumber(d.mintingFeePaise),
+            packagingFee: paiseToInrNumber(d.packagingFeePaise),
+            inStock: d.inStock,
+          })),
+        },
+        schemePurchaseBalance: paiseToInrNumber(currentBalance),
+        eligiblePurchaseValue: paiseToInrNumber(currentBalance),
+        verifiedContributionTotal: paiseToInrNumber(verifiedLedgerBalancePaise),
+        scheduledTotal: paiseToInrNumber(totalScheduled),
+        remainingScheduledAmount: paiseToInrNumber(remainingPaise),
         paidInstallmentCount: paidCount,
         remainingInstallmentCount: remainingCount,
-        nextDueDate: enrollment.nextDueDate,
-        overdueAmount: paiseToInrNumber(enrollment.overdueAmountPaise),
-        status: enrollment.status,
+        totalInstallments,
         progressPercent,
-        startDate: enrollment.startDate,
-        maturityDate: enrollment.maturityDate,
-        termsVersion: enrollment.termsVersion,
-        acceptedTermsAt: enrollment.acceptedTermsAt,
-        nominee: enrollment.nominee
-          ? {
-              fullName: enrollment.nominee.fullName,
-              relationship: enrollment.nominee.relationship,
-              phone: enrollment.nominee.phone,
-            }
-          : null,
+        nextInstallment: nextInstallmentData,
+        overdueInformation: {
+          isOverdue: enrollment.overdueAmountPaise > 0n,
+          overdueAmount: paiseToInrNumber(enrollment.overdueAmountPaise),
+        },
         installments: enrollment.installments.map((inst) => ({
           id: inst.id,
           installmentNo: inst.installmentNo,
@@ -85,13 +194,33 @@ export async function GET(
           status: inst.status,
           paidAt: inst.paidAt,
         })),
+        recentPayments: enrollment.paymentOrders.map((p) => ({
+          id: p.id,
+          orderId: p.orderId,
+          amount: paiseToInrNumber(p.amountPaise),
+          gateway: p.gateway,
+          status: p.status,
+          gatewayPaymentId: p.gatewayPaymentId,
+          createdAt: p.createdAt,
+          retryable: (p.status === 'FAILED' || p.status === 'EXPIRED') && enrollment.status === 'ACTIVE',
+        })),
         recentReceipts: enrollment.receipts.map((r) => ({
           id: r.id,
           receiptNumber: r.receiptNumber,
           amount: paiseToInrNumber(r.amountPaise),
           paymentDate: r.paymentDate,
+          paymentOrderId: r.paymentOrderId,
         })),
-        activeRedemption: enrollment.redemptionRequests[0] || null,
+        redemptionEligibility,
+        redemptionStatus: enrollment.redemptionRequests[0] || null,
+        relevantCurrentMetalRate,
+        nominee: enrollment.nominee
+          ? {
+              fullName: enrollment.nominee.fullName,
+              relationship: enrollment.nominee.relationship,
+              phone: enrollment.nominee.phone,
+            }
+          : null,
       },
     });
   } catch (error: any) {

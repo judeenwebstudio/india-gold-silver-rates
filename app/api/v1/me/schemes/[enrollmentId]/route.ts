@@ -99,7 +99,7 @@ export async function GET(
             pricePerGramInr: gold22k.price,
             pricePerGramPaise: Math.round(gold22k.price * 100),
             source: snapshot.source || 'IBJA Benchmark',
-            recordedAt: snapshot.recordedAt || new Date().toISOString(),
+            recordedAt: snapshot.sourceTimestamp || snapshot.lastUpdatedAt || new Date().toISOString(),
           };
         }
       } else {
@@ -113,7 +113,7 @@ export async function GET(
             pricePerKgInr: silverKg?.price || silverGram.price * 1000,
             pricePerGramPaise: Math.round(silverGram.price * 100),
             source: snapshot.source || 'IBJA Benchmark',
-            recordedAt: snapshot.recordedAt || new Date().toISOString(),
+            recordedAt: snapshot.sourceTimestamp || snapshot.lastUpdatedAt || new Date().toISOString(),
           };
         }
       }

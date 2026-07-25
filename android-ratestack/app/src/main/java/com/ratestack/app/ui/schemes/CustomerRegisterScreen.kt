@@ -1,0 +1,236 @@
+package com.ratestack.app.ui.schemes
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@Composable
+fun CustomerRegisterScreen(
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRegisterSubmit: (fullName: String, phone: String, pass: String) -> Unit,
+    onNavigateLogin: () -> Unit,
+) {
+    var fullName by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var validationError by remember { mutableStateOf<String?>(null) }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color(0xFF0F0D0B),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1917)),
+                shape = RoundedCornerShape(24.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD97706).copy(alpha = 0.4f)),
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "Create Savings Account",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFEF3C7),
+                    )
+
+                    Text(
+                        text = "Join 22K Gold & 999 Silver Coin Savings Schemes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFA8A29E),
+                        modifier = Modifier.padding(top = 4.dp, bottom = 18.dp),
+                    )
+
+                    if (errorMessage != null || validationError != null) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 14.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF451A03),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444)),
+                        ) {
+                            Text(
+                                text = "⚠️ ${errorMessage ?: validationError}",
+                                color = Color(0xFFFCA5A5),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(12.dp),
+                            )
+                        }
+                    }
+
+                    // Full Name Field
+                    OutlinedTextField(
+                        value = fullName,
+                        onValueChange = {
+                            fullName = it
+                            validationError = null
+                        },
+                        label = { Text("Full Name", color = Color.Gray) },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFFD97706)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFD97706),
+                            unfocusedBorderColor = Color(0xFF44403C),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Mobile Number Field
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = {
+                            if (it.length <= 10 && it.all { char -> char.isDigit() }) {
+                                phone = it
+                                validationError = null
+                            }
+                        },
+                        label = { Text("Indian Mobile Number (10 digits)", color = Color.Gray) },
+                        leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFFD97706)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFD97706),
+                            unfocusedBorderColor = Color(0xFF44403C),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Password Field
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = {
+                            password = it
+                            validationError = null
+                        },
+                        label = { Text("Password", color = Color.Gray) },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFD97706)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFD97706),
+                            unfocusedBorderColor = Color(0xFF44403C),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Confirm Password Field
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = {
+                            confirmPassword = it
+                            validationError = null
+                        },
+                        label = { Text("Confirm Password", color = Color.Gray) },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFD97706)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFD97706),
+                            unfocusedBorderColor = Color(0xFF44403C),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Register Button
+                    Button(
+                        onClick = {
+                            if (fullName.trim().isEmpty()) {
+                                validationError = "Please enter your Full Name."
+                            } else if (phone.length != 10) {
+                                validationError = "Please enter a valid 10-digit mobile number."
+                            } else if (password.length < 6) {
+                                validationError = "Password must be at least 6 characters long."
+                            } else if (password != confirmPassword) {
+                                validationError = "Passwords do not match."
+                            } else {
+                                validationError = null
+                                onRegisterSubmit(fullName.trim(), phone.trim(), password)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        enabled = !isLoading,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                color = Color.Black,
+                                strokeWidth = 2.5.dp,
+                            )
+                        } else {
+                            Text(
+                                text = "Create Account →",
+                                color = Color.Black,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Login Link
+                    TextButton(onClick = onNavigateLogin) {
+                        Text(
+                            text = "Already have an account? Sign In",
+                            color = Color(0xFFFBBF24),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

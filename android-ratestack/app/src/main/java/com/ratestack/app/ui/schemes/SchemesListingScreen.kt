@@ -3,64 +3,46 @@ package com.ratestack.app.ui.schemes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ratestack.app.data.SchemeEnrollmentDto
 import com.ratestack.app.data.SchemePlanDto
+import java.util.Locale
 
 @Composable
 fun SchemesListingScreen(
     plans: List<SchemePlanDto>,
+    userSchemes: List<SchemeEnrollmentDto>,
+    isLoggedIn: Boolean,
+    userName: String?,
     isLoading: Boolean,
-    onJoinScheme: (String, Double) -> Unit,
-    onViewMySchemes: () -> Unit,
+    onLoginClick: () -> Unit,
+    onRegisterClick: () -> Unit,
+    onJoinScheme: (planId: String, monthlyAmount: Double) -> Unit,
+    onSelectScheme: (enrollmentId: String) -> Unit,
+    onLogoutClick: () -> Unit,
 ) {
     var selectedPlanId by remember { mutableStateOf(plans.firstOrNull()?.id ?: "") }
     var monthlyAmount by remember { mutableStateOf(1000.0) }
 
-    val selectedPlan = plans.find { it.id == selectedPlanId } ?: plans.firstOrNull()
-    val tenure = selectedPlan?.tenureMonths ?: 12
-    val totalScheduled = monthlyAmount * tenure
-    val minCoinPrice = selectedPlan?.minCoinEstPriceInr ?: 0.0
-    val showWarning = totalScheduled > 0 && minCoinPrice > 0 && totalScheduled < minCoinPrice
-
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFFBFAF7),
+        color = Color(0xFF0F0D0B),
     ) {
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFFB45309))
+                CircularProgressIndicator(color = Color(0xFFD97706))
             }
         } else {
             LazyColumn(
@@ -69,60 +51,220 @@ fun SchemesListingScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Header & My Schemes Quick Action
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text(
-                                text = "Coin Savings Scheme",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1C1917),
-                            )
-                            Text(
-                                text = "Disciplined Savings for 22K Gold & 999 Silver Coins",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF78716C),
-                            )
-                        }
-                        Button(
-                            onClick = onViewMySchemes,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB45309)),
-                            shape = RoundedCornerShape(12.dp),
-                        ) {
-                            Text("My Schemes", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                // Compliance Badge
+                // Header & Auth Action Row
                 item {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
-                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1917)),
+                        shape = RoundedCornerShape(20.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF44403C)),
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "🛡️ Scheme Purchase Balance Model",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = Color(0xFF78350F),
-                            )
-                            Text(
-                                text = "Non-withdrawable coin purchase savings plan. Zero interest or guaranteed returns.",
-                                fontSize = 11.sp,
-                                color = Color(0xFF92400E),
-                            )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isLoggedIn) "Welcome, ${userName ?: "Customer"}" else "Coin Savings Scheme",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFEF3C7),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = if (isLoggedIn) "RateStack Scheme Portal" else "Disciplined Gold & Silver Savings",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFFA8A29E),
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            if (isLoggedIn) {
+                                Button(
+                                    onClick = onLogoutClick,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                ) {
+                                    Text("Logout", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+                                }
+                            } else {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    OutlinedButton(
+                                        onClick = onLoginClick,
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFBBF24)),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD97706)),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    ) {
+                                        Text("Login", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                    }
+                                    Button(
+                                        onClick = onRegisterClick,
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    ) {
+                                        Text("Register", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black, maxLines = 1)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
-                // Scheme Products Cards
+                // If Logged In & Has Enrolled Schemes -> Display My Schemes Cards
+                if (isLoggedIn && userSchemes.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "MY ENROLLED SCHEMES",
+                            color = Color(0xFFFBBF24),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp,
+                        )
+                    }
+
+                    items(userSchemes) { scheme ->
+                        val isGold = scheme.metalType == "GOLD"
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectScheme(scheme.id ?: "") },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isGold) Color(0xFF1E1912) else Color(0xFF16191E)
+                            ),
+                            shape = RoundedCornerShape(18.dp),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isGold) Color(0xFF78350F) else Color(0xFF334155)
+                            ),
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = scheme.productName ?: "Savings Scheme",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (scheme.status == "MATURED") Color(0xFF065F46) else Color(0xFF1E3A8A),
+                                    ) {
+                                        Text(
+                                            text = scheme.status ?: "ACTIVE",
+                                            color = Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = "Account #${scheme.accountNumber}",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFF59E0B),
+                                    fontWeight = FontWeight.Bold,
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Column {
+                                        Text("Scheme Purchase Balance", fontSize = 10.sp, color = Color.Gray)
+                                        Text(
+                                            "₹${String.format(Locale.US, "%,.0f", scheme.schemePurchaseBalance ?: 0.0)}",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 18.sp,
+                                            color = Color(0xFFFEF3C7),
+                                        )
+                                    }
+
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("Installments", fontSize = 10.sp, color = Color.Gray)
+                                        Text(
+                                            "${scheme.paidInstallmentCount ?: 0} / ${scheme.tenureMonths ?: 12} Paid",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = Color(0xFF34D399),
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Button(
+                                    onClick = { onSelectScheme(scheme.id ?: "") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                                    shape = RoundedCornerShape(12.dp),
+                                ) {
+                                    Text("Open Scheme Dashboard →", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                }
+
+                // If Logged In & NO Schemes -> Display Clean No-Scheme Message
+                if (isLoggedIn && userSchemes.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1917)),
+                            shape = RoundedCornerShape(18.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF44403C)),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(
+                                    text = "You have not joined any savings scheme yet.",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFFFEF3C7),
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Select a Gold or Silver coin scheme below to begin your savings journey.",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFA8A29E),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Available Scheme Plans List
+                item {
+                    Text(
+                        text = "AVAILABLE SAVINGS SCHEMES",
+                        color = Color(0xFFFBBF24),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                    )
+                }
+
                 items(plans) { plan ->
                     val isSelected = plan.id == selectedPlanId
                     val isGold = plan.metalType == "GOLD"
@@ -130,17 +272,15 @@ fun SchemesListingScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                selectedPlanId = plan.id ?: ""
-                            },
+                            .clickable { selectedPlanId = plan.id ?: "" },
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) Color(0xFFFFFBEB) else Color.White
+                            containerColor = if (isGold) Color(0xFF181512) else Color(0xFF141619)
                         ),
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            if (isSelected) Color(0xFFD97706) else Color(0xFFE7E5E4)
+                            if (isSelected) Color(0xFFD97706) else Color(0xFF292524)
                         ),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(
@@ -152,107 +292,52 @@ fun SchemesListingScreen(
                                     text = plan.name ?: "Savings Scheme",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 16.sp,
-                                    color = Color(0xFF1C1917),
+                                    color = Color.White,
                                 )
-                                if (isSelected) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isGold) Color(0xFF78350F) else Color(0xFF334155),
+                                ) {
                                     Text(
-                                        text = "Selected",
-                                        fontWeight = FontWeight.Bold,
+                                        text = "${plan.tenureMonths} Months",
+                                        color = Color.White,
                                         fontSize = 10.sp,
-                                        color = Color(0xFFB45309),
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(8.dp))
-
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Tenure: ${plan.tenureMonths} Months | Grace Period: ${plan.gracePeriodDays} Days",
+                                text = "Purity: ${plan.purity ?: "22K"} • Min Monthly: ₹${plan.minMonthlyAmount?.toInt() ?: 1000}",
                                 fontSize = 12.sp,
-                                color = Color(0xFF57534E),
+                                color = Color.Gray,
                             )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
                             Button(
-                                onClick = { onJoinScheme(plan.id ?: "", monthlyAmount) },
+                                onClick = {
+                                    if (!isLoggedIn) {
+                                        onLoginClick()
+                                    } else {
+                                        onJoinScheme(plan.id ?: "", monthlyAmount)
+                                    }
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isGold) Color(0xFFB45309) else Color(0xFF334155)
+                                    containerColor = if (isGold) Color(0xFFD97706) else Color(0xFF475569)
                                 ),
                                 shape = RoundedCornerShape(12.dp),
                             ) {
-                                Text("Join Scheme (${plan.tenureMonths}M) \u2192", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
-                // Dynamic Calculator Component
-                if (selectedPlan != null) {
-                    item {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE7E5E4)),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = "🧮 Savings Calculator",
+                                    text = if (isLoggedIn) "Join Scheme (${plan.tenureMonths}M) →" else "Login to Join Scheme →",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = Color(0xFF1C1917),
+                                    color = if (isGold) Color.Black else Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf(500.0, 1000.0, 2000.0, 5000.0).forEach { amt ->
-                                        Button(
-                                            onClick = { monthlyAmount = amt },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = if (monthlyAmount == amt) Color(0xFFB45309) else Color(0xFFF5F5F4)
-                                            ),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.weight(1f),
-                                        ) {
-                                            Text(
-                                                "₹${amt.toInt()}",
-                                                fontSize = 10.sp,
-                                                color = if (monthlyAmount == amt) Color.White else Color(0xFF44403C)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text("Monthly Contribution:", fontSize = 12.sp, color = Color(0xFF57534E))
-                                    Text("₹${monthlyAmount.toInt()}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text("Scheduled Purchase Balance:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1C1917))
-                                    Text("₹${totalScheduled.toInt()}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF78350F))
-                                }
-
-                                if (showWarning) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "⚠️ Total scheduled balance (₹${totalScheduled.toInt()}) is below lowest coin cost (₹${minCoinPrice.toInt()}). Additional difference payment may be required at maturity.",
-                                        fontSize = 11.sp,
-                                        color = Color(0xFFB45309),
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
                             }
                         }
                     }

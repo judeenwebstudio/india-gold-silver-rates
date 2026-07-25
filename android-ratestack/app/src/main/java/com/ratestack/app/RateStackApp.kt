@@ -129,6 +129,9 @@ private object Routes {
     const val HOME = "home"
     const val SCHEMES = "schemes"
     const val MY_SCHEMES = "my_schemes"
+    const val CUSTOMER_LOGIN = "customer_login"
+    const val CUSTOMER_REGISTER = "customer_register"
+    const val CUSTOMER_PROFILE = "customer_profile"
     const val STATES = "states"
     const val CITIES = "cities/{state}"
     const val RATES = "rates/{state}/{city}"
@@ -149,6 +152,11 @@ fun RateStackApp(
     val viewModel: RateStackViewModel = viewModel(
         factory = remember { RateStackViewModelFactory(repository, preferences) },
     )
+    val schemeRepository = remember { com.ratestack.app.data.SchemeRepository(ApiProvider.service, context.applicationContext) }
+    val schemeViewModel: com.ratestack.app.ui.schemes.SchemeViewModel = viewModel(
+        factory = remember { SchemeViewModelFactory(schemeRepository) },
+    )
+
     val navController = rememberNavController()
     var splashVisible by remember { mutableStateOf(true) }
 
@@ -200,38 +208,153 @@ fun RateStackApp(
                     val rates by viewModel.rates.collectAsState()
                     HomeScreen(home, rates, selection, viewModel, navController, onShare)
                 }
+
                 composable(Routes.SCHEMES) {
+                    val userToken by schemeViewModel.userToken.collectAsState()
+                    val userName by schemeViewModel.userName.collectAsState()
+                    val schemePlansState by schemeViewModel.schemePlans.collectAsState()
+                    val mySchemesState by schemeViewModel.mySchemes.collectAsState()
+
+                    val isLoggedIn = !userToken.isNullOrBlank()
+                    val plans = (schemePlansState as? LoadState.Ready)?.data?.plans ?: emptyList()
+                    val userSchemes = (mySchemesState as? LoadState.Ready)?.data ?: emptyList()
+                    val isLoading = schemePlansState is LoadState.Loading || (isLoggedIn && mySchemesState is LoadState.Loading)
+
                     com.ratestack.app.ui.schemes.SchemesListingScreen(
-                        plans = emptyList(),
-                        isLoading = false,
+                        plans = plans,
+                        userSchemes = userSchemes,
+                        isLoggedIn = isLoggedIn,
+                        userName = userName,
+                        isLoading = isLoading,
+                        onLoginClick = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                        onRegisterClick = { navController.navigate(Routes.CUSTOMER_REGISTER) },
                         onJoinScheme = { planId, amount ->
-                            navController.navigate(Routes.MY_SCHEMES)
+                            if (!isLoggedIn) {
+                                navController.navigate(Routes.CUSTOMER_LOGIN)
+                            } else {
+                                schemeViewModel.joinScheme(
+                                    planId,
+                                    amount,
+                                    onSuccess = { schemeViewModel.loadMySchemes() },
+                                    onError = { }
+                                )
+                            }
                         },
-                        onViewMySchemes = {
-                            navController.navigate(Routes.MY_SCHEMES)
-                        }
-                    )
-                }
-                composable(Routes.MY_SCHEMES) {
-                    com.ratestack.app.ui.schemes.MySchemesScreen(
-                        schemes = emptyList(),
-                        isLoading = false,
                         onSelectScheme = { enrollmentId ->
                             navController.navigate("scheme_dashboard/$enrollmentId")
+                        },
+                        onLogoutClick = { schemeViewModel.logout() }
+                    )
+                }
+
+                composable(Routes.CUSTOMER_LOGIN) {
+                    val authState by schemeViewModel.authActionState.collectAsState()
+                    val isLoading = authState is LoadState.Loading
+                    val errorMsg = (authState as? LoadState.Error)?.message
+
+                    com.ratestack.app.ui.schemes.CustomerLoginScreen(
+                        isLoading = isLoading,
+                        errorMessage = errorMsg,
+                        onLoginSubmit = { phone, pass ->
+                            schemeViewModel.login(phone, pass) {
+                                schemeViewModel.resetAuthActionState()
+                                navController.navigate(Routes.SCHEMES) {
+                                    popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
+                                }
+                            }
+                        },
+                        onNavigateRegister = {
+                            schemeViewModel.resetAuthActionState()
+                            navController.navigate(Routes.CUSTOMER_REGISTER) {
+                                popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
+                            }
                         }
                     )
                 }
+
+                composable(Routes.CUSTOMER_REGISTER) {
+                    val authState by schemeViewModel.authActionState.collectAsState()
+                    val isLoading = authState is LoadState.Loading
+                    val errorMsg = (authState as? LoadState.Error)?.message
+
+                    com.ratestack.app.ui.schemes.CustomerRegisterScreen(
+                        isLoading = isLoading,
+                        errorMessage = errorMsg,
+                        onRegisterSubmit = { fullName, phone, pass ->
+                            schemeViewModel.register(fullName, phone, pass) {
+                                schemeViewModel.resetAuthActionState()
+                                navController.navigate(Routes.SCHEMES) {
+                                    popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }
+                                }
+                            }
+                        },
+                        onNavigateLogin = {
+                            schemeViewModel.resetAuthActionState()
+                            navController.navigate(Routes.CUSTOMER_LOGIN) {
+                                popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
                 composable(
                     "scheme_dashboard/{enrollmentId}",
                     arguments = listOf(navArgument("enrollmentId") { type = NavType.StringType }),
-                ) {
+                ) { entry ->
+                    val enrollmentId = entry.arguments?.getString("enrollmentId").orEmpty()
+                    LaunchedEffect(enrollmentId) {
+                        schemeViewModel.loadSchemeDashboard(enrollmentId)
+                    }
+
+                    val dashboardState by schemeViewModel.schemeDashboard.collectAsState()
+                    val isLoading = dashboardState is LoadState.Loading
+                    val dashboardData = (dashboardState as? LoadState.Ready)?.data
+                    val isOffline = (dashboardState as? LoadState.Ready)?.fromCache ?: false
+
                     com.ratestack.app.ui.schemes.SchemeDashboardScreen(
-                        dashboard = null,
-                        isLoading = false,
-                        onPayInstallment = { },
-                        onRequestRedemption = { }
+                        dashboard = dashboardData,
+                        isLoading = isLoading,
+                        onPayInstallment = {
+                            schemeViewModel.createPaymentOrder(
+                                enrollmentId,
+                                onSuccess = { order ->
+                                    // Simulated Sandbox verification for Android flow
+                                    schemeViewModel.verifyPayment(
+                                        enrollmentId,
+                                        order.paymentOrderId ?: "",
+                                        "pay_android_sandbox_${System.currentTimeMillis()}",
+                                        "mock_valid_signature",
+                                        onSuccess = { },
+                                        onError = { }
+                                    )
+                                },
+                                onError = { }
+                            )
+                        },
+                        onRequestRedemption = { },
+                        isOffline = isOffline
                     )
                 }
+
+                composable(Routes.CUSTOMER_PROFILE) {
+                    val userName by schemeViewModel.userName.collectAsState()
+                    val userPhone by schemeViewModel.userPhone.collectAsState()
+                    val mySchemesState by schemeViewModel.mySchemes.collectAsState()
+                    val schemesList = (mySchemesState as? LoadState.Ready)?.data ?: emptyList()
+
+                    com.ratestack.app.ui.schemes.CustomerProfileScreen(
+                        userName = userName,
+                        userPhone = userPhone,
+                        totalSchemesCount = schemesList.size,
+                        onLogoutClick = {
+                            schemeViewModel.logout()
+                            navController.navigate(Routes.SCHEMES) {
+                                popUpTo(Routes.CUSTOMER_PROFILE) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
                 composable(Routes.STATES) {
                     val states by viewModel.states.collectAsState()
                     LaunchedEffect(Unit) { viewModel.loadLocations() }
@@ -1477,6 +1600,11 @@ private fun navigateLink(
 class RateStackViewModelFactory(private val repository: RateRepository, private val preferences: PreferencesStore) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T = RateStackViewModel(repository, preferences) as T
+}
+
+class SchemeViewModelFactory(private val repository: com.ratestack.app.data.SchemeRepository) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = com.ratestack.app.ui.schemes.SchemeViewModel(repository) as T
 }
 
 private fun LoadState.Ready<RateDetails>.fromCache(): Boolean = fromCache

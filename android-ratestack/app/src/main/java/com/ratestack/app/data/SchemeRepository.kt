@@ -24,6 +24,28 @@ class SchemeRepository(
         prefs.edit { remove("scheme_user_token") }
     }
 
+    fun getUserName(): String? {
+        return prefs.getString("scheme_user_name", null)
+    }
+
+    fun getUserPhone(): String? {
+        return prefs.getString("scheme_user_phone", null)
+    }
+
+    fun saveUserDetails(name: String, phone: String) {
+        prefs.edit {
+            putString("scheme_user_name", name)
+            putString("scheme_user_phone", phone)
+        }
+    }
+
+    fun clearUserDetails() {
+        prefs.edit {
+            remove("scheme_user_name")
+            remove("scheme_user_phone")
+        }
+    }
+
     suspend fun getSchemes(): RepositoryResult<SchemeListResponseDto> {
         return try {
             val response = api.getSchemes()

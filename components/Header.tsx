@@ -7,9 +7,7 @@ import { AuthModal } from "@/components/AuthModal";
 
 const navigation = [
   { label: "Today’s rates", href: "/#rates" },
-  { label: "My Schemes", href: "/schemes/dashboard" },
   { label: "Coin Savings Scheme", href: "/schemes" },
-  { label: "Historical", href: "/#historical" },
   { label: "Cities", href: "/#cities" },
   { label: "Calculator", href: "/#calculator" },
 ];
@@ -75,24 +73,11 @@ export function Header() {
           </Link>
 
           <nav className="hidden items-center gap-6 lg:flex" aria-label="Primary navigation">
-            {navigation.map((item) => {
-              if (item.label === "My Schemes" && !userToken) {
-                return (
-                  <button
-                    key={item.href}
-                    onClick={() => handleOpenAuth("login")}
-                    className="text-xs font-bold text-stone-700 transition-colors hover:text-amber-800"
-                  >
-                    {item.label}
-                  </button>
-                );
-              }
-              return (
-                <a key={item.href} href={item.href} className="text-xs font-bold text-stone-700 transition-colors hover:text-amber-800">
-                  {item.label}
-                </a>
-              );
-            })}
+            {navigation.map((item) => (
+              <a key={item.href} href={item.href} className="text-xs font-bold text-stone-700 transition-colors hover:text-amber-800">
+                {item.label}
+              </a>
+            ))}
           </nav>
 
           <div className="flex items-center gap-3">
@@ -183,24 +168,11 @@ export function Header() {
                   Welcome, <span className="text-amber-800">{userName}</span>
                 </div>
               )}
-              {navigation.map((item) => {
-                if (item.label === "My Schemes" && !userToken) {
-                  return (
-                    <button
-                      key={item.href}
-                      onClick={() => { setOpen(false); handleOpenAuth("login"); }}
-                      className="text-left rounded-lg px-3 py-2.5 text-sm font-semibold text-stone-700 hover:bg-amber-50"
-                    >
-                      {item.label}
-                    </button>
-                  );
-                }
-                return (
-                  <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-stone-700 hover:bg-amber-50">
-                    {item.label}
-                  </a>
-                );
-              })}
+              {navigation.map((item) => (
+                <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-stone-700 hover:bg-amber-50">
+                  {item.label}
+                </a>
+              ))}
               {userToken ? (
                 <div className="pt-2 border-t border-stone-200 grid gap-1">
                   <Link

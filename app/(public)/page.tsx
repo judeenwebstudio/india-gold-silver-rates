@@ -2,6 +2,7 @@ import { Footer } from "@/components/Footer";
 import { HallmarkSection } from "@/components/HallmarkSection";
 import { Header } from "@/components/Header";
 import { HistoricalChart } from "@/components/HistoricalChart";
+import { HomeCustomerDashboardSection } from "@/components/HomeCustomerDashboardSection";
 import { HomeRateExperience } from "@/components/HomeRateExperience";
 import { MajorCityRates } from "@/components/MajorCityRates";
 import {
@@ -33,6 +34,7 @@ export default async function Home() {
     <>
       <Header />
       <main>
+        <HomeCustomerDashboardSection />
         <HomeRateExperience
           states={locations}
           initialSnapshot={initialSnapshot}

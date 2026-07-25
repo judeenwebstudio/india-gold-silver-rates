@@ -2,6 +2,7 @@ package com.ratestack.app.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 
 class SchemeRepository(
     private val api: RateStackApi,
@@ -14,11 +15,11 @@ class SchemeRepository(
     }
 
     fun saveUserToken(token: String) {
-        prefs.edit().putString("scheme_user_token", token).apply()
+        prefs.edit { putString("scheme_user_token", token) }
     }
 
     fun clearUserToken() {
-        prefs.edit().remove("scheme_user_token").apply()
+        prefs.edit { remove("scheme_user_token") }
     }
 
     suspend fun getSchemes(): RepositoryResult<SchemeListResponseDto> {

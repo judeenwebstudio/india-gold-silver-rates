@@ -55,7 +55,14 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
         if (resData.success) {
           localStorage.setItem("scheme_user_token", resData.data.token);
           localStorage.setItem("ratestack_user_token", resData.data.token);
+          if (resData.data.user?.fullName) {
+            localStorage.setItem("scheme_user_name", resData.data.user.fullName);
+          }
+          if (resData.data.user?.phone) {
+            localStorage.setItem("scheme_user_phone", resData.data.user.phone);
+          }
           onSuccess();
+          window.location.href = "/schemes/dashboard";
         } else {
           setError(resData.error?.message || "Registration failed. Please try again.");
         }
@@ -89,7 +96,14 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
         if (resData.success) {
           localStorage.setItem("scheme_user_token", resData.data.token);
           localStorage.setItem("ratestack_user_token", resData.data.token);
+          if (resData.data.user?.fullName) {
+            localStorage.setItem("scheme_user_name", resData.data.user.fullName);
+          }
+          if (resData.data.user?.phone) {
+            localStorage.setItem("scheme_user_phone", resData.data.user.phone);
+          }
           onSuccess();
+          window.location.href = "/schemes/dashboard";
         } else {
           setError(resData.error?.message || "Invalid credentials. Please check your mobile number and password.");
         }

@@ -7,7 +7,7 @@ import { AuthModal } from "@/components/AuthModal";
 
 const navigation = [
   { label: "Today’s rates", href: "/#rates" },
-  { label: "My Schemes", href: "/#my-schemes" },
+  { label: "My Schemes", href: "/schemes/dashboard" },
   { label: "Coin Savings Scheme", href: "/schemes" },
   { label: "Historical", href: "/#historical" },
   { label: "Cities", href: "/#cities" },
@@ -16,17 +16,23 @@ const navigation = [
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [userToken, setUserToken] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("Customer");
 
   useEffect(() => {
     const token = localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token");
     setUserToken(token);
+    const savedName = localStorage.getItem("scheme_user_name");
+    if (savedName) setUserName(savedName);
 
     const handleAuthChange = () => {
       const updatedToken = localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token");
       setUserToken(updatedToken);
+      const name = localStorage.getItem("scheme_user_name");
+      if (name) setUserName(name);
     };
 
     window.addEventListener("auth:change", handleAuthChange);
@@ -41,9 +47,12 @@ export function Header() {
   const handleLogout = () => {
     localStorage.removeItem("scheme_user_token");
     localStorage.removeItem("ratestack_user_token");
+    localStorage.removeItem("scheme_user_name");
+    localStorage.removeItem("scheme_user_phone");
     setUserToken(null);
+    setAccountDropdownOpen(false);
     window.dispatchEvent(new CustomEvent("auth:change"));
-    window.location.reload();
+    window.location.href = "/";
   };
 
   return (
@@ -88,21 +97,48 @@ export function Header() {
 
           <div className="flex items-center gap-3">
             {userToken ? (
-              <div className="flex items-center gap-3">
-                <a
-                  href="/#my-schemes"
-                  className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-100 text-amber-950 font-bold text-xs border border-amber-300/60"
-                >
-                  <span className="h-2 w-2 rounded-full bg-amber-600" />
-                  My Dashboard
-                </a>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="rounded-xl border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-bold text-stone-700 hover:bg-stone-100"
-                >
-                  Sign Out
-                </button>
+              <div className="relative flex items-center gap-3">
+                <span className="hidden md:inline-block text-xs font-bold text-stone-700">
+                  Welcome, <span className="text-amber-800 font-extrabold">{userName}</span>
+                </span>
+
+                {/* My Account Dropdown Trigger */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAccountDropdownOpen((prev) => !prev)}
+                    className="flex items-center gap-1.5 rounded-xl border border-amber-600/30 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-950 hover:bg-amber-100 shadow-sm"
+                  >
+                    <span>My Account</span>
+                    <span className="text-[0.6rem] text-amber-800">▼</span>
+                  </button>
+
+                  {accountDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white border border-stone-200 shadow-xl py-2 z-50 text-xs font-semibold text-stone-800 space-y-1">
+                      <Link
+                        href="/schemes/dashboard"
+                        onClick={() => setAccountDropdownOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-amber-50 hover:text-amber-900 transition-colors"
+                      >
+                        📊 My Dashboard
+                      </Link>
+                      <Link
+                        href="/schemes/dashboard#profile"
+                        onClick={() => setAccountDropdownOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-amber-50 hover:text-amber-900 transition-colors"
+                      >
+                        👤 My Profile
+                      </Link>
+                      <div className="border-t border-stone-100 my-1"></div>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 transition-colors font-bold"
+                      >
+                        🚪 Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -142,6 +178,11 @@ export function Header() {
         {open && (
           <nav className="border-t border-stone-200 bg-[#fbfaf7] px-4 py-4 lg:hidden" aria-label="Mobile navigation">
             <div className="mx-auto grid max-w-7xl gap-2">
+              {userToken && (
+                <div className="pb-2 border-b border-stone-200 text-xs font-bold text-stone-800">
+                  Welcome, <span className="text-amber-800">{userName}</span>
+                </div>
+              )}
               {navigation.map((item) => {
                 if (item.label === "My Schemes" && !userToken) {
                   return (
@@ -160,7 +201,30 @@ export function Header() {
                   </a>
                 );
               })}
-              {!userToken && (
+              {userToken ? (
+                <div className="pt-2 border-t border-stone-200 grid gap-1">
+                  <Link
+                    href="/schemes/dashboard"
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg px-3 py-2 text-sm font-bold text-amber-900 hover:bg-amber-50"
+                  >
+                    📊 My Dashboard
+                  </Link>
+                  <Link
+                    href="/schemes/dashboard#profile"
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg px-3 py-2 text-sm font-bold text-amber-900 hover:bg-amber-50"
+                  >
+                    👤 My Profile
+                  </Link>
+                  <button
+                    onClick={() => { setOpen(false); handleLogout(); }}
+                    className="text-left rounded-lg px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50"
+                  >
+                    🚪 Logout
+                  </button>
+                </div>
+              ) : (
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-200">
                   <button
                     onClick={() => { setOpen(false); handleOpenAuth("login"); }}
@@ -190,7 +254,6 @@ export function Header() {
             setShowAuthModal(false);
             setUserToken(localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token"));
             window.dispatchEvent(new CustomEvent("auth:change"));
-            window.location.reload();
           }}
         />
       )}

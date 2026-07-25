@@ -127,6 +127,8 @@ import kotlinx.coroutines.launch
 
 private object Routes {
     const val HOME = "home"
+    const val SCHEMES = "schemes"
+    const val MY_SCHEMES = "my_schemes"
     const val STATES = "states"
     const val CITIES = "cities/{state}"
     const val RATES = "rates/{state}/{city}"
@@ -182,6 +184,7 @@ fun RateStackApp(
             bottomBar = {
                 NavigationBar {
                     BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
+                    BottomItem(Routes.SCHEMES, "Schemes", Icons.Default.Star, currentRoute, navController)
                     BottomItem(Routes.FAVORITES, "Favorites", Icons.Default.Favorite, currentRoute, navController)
                     BottomItem(Routes.SETTINGS, "Settings", Icons.Default.Settings, currentRoute, navController)
                 }
@@ -196,6 +199,38 @@ fun RateStackApp(
                     val home by viewModel.home.collectAsState()
                     val rates by viewModel.rates.collectAsState()
                     HomeScreen(home, rates, selection, viewModel, navController, onShare)
+                }
+                composable(Routes.SCHEMES) {
+                    com.ratestack.app.ui.schemes.SchemesListingScreen(
+                        plans = emptyList(),
+                        isLoading = false,
+                        onJoinScheme = { planId, amount ->
+                            navController.navigate(Routes.MY_SCHEMES)
+                        },
+                        onViewMySchemes = {
+                            navController.navigate(Routes.MY_SCHEMES)
+                        }
+                    )
+                }
+                composable(Routes.MY_SCHEMES) {
+                    com.ratestack.app.ui.schemes.MySchemesScreen(
+                        schemes = emptyList(),
+                        isLoading = false,
+                        onSelectScheme = { enrollmentId ->
+                            navController.navigate("scheme_dashboard/$enrollmentId")
+                        }
+                    )
+                }
+                composable(
+                    "scheme_dashboard/{enrollmentId}",
+                    arguments = listOf(navArgument("enrollmentId") { type = NavType.StringType }),
+                ) {
+                    com.ratestack.app.ui.schemes.SchemeDashboardScreen(
+                        dashboard = null,
+                        isLoading = false,
+                        onPayInstallment = { },
+                        onRequestRedemption = { }
+                    )
                 }
                 composable(Routes.STATES) {
                     val states by viewModel.states.collectAsState()

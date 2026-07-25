@@ -4,11 +4,12 @@ import { useState } from "react";
 import Image from "next/image";
 
 const navigation = [
-  { label: "Today’s rates", href: "#rates" },
-  { label: "Historical", href: "#historical" },
-  { label: "Cities", href: "#cities" },
-  { label: "Calculator", href: "#calculator" },
-  { label: "Learn", href: "#hallmark" },
+  { label: "Today’s rates", href: "/#rates" },
+  { label: "Coin Savings Scheme", href: "/schemes" },
+  { label: "Historical", href: "/#historical" },
+  { label: "Cities", href: "/#cities" },
+  { label: "Calculator", href: "/#calculator" },
+  { label: "Learn", href: "/#hallmark" },
 ];
 
 export function Header() {

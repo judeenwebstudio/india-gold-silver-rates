@@ -222,3 +222,451 @@ model AnalyticsEvent {
   @@index([path, eventType, recordedAt])
   @@index([citySlug, recordedAt])
 }
+
+// ==========================================
+// GOLD & SILVER SAVINGS SCHEME MODULE
+// ==========================================
+
+enum SchemeStatus {
+  ACTIVE
+  PAUSED
+  MATURED
+  REDEMPTION_REQUESTED
+  QUOTED
+  REDEEMED
+  CANCELLED
+}
+
+enum InstallmentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  WAIVED
+}
+
+enum PaymentOrderStatus {
+  CREATED
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+}
+
+enum LedgerEntryType {
+  INSTALLMENT_CREDIT
+  MANUAL_ENTRY_CREDIT
+  PROMOTIONAL_BONUS_CREDIT
+  REVERSAL_DEBIT
+  REDEMPTION_DEBIT
+  REFUND_DEBIT
+}
+
+enum RedemptionStatus {
+  REQUESTED
+  QUOTED
+  USER_ACCEPTED
+  PAYMENT_PENDING
+  APPROVED
+  COIN_ALLOCATED
+  READY_FOR_COLLECTION
+  DISPATCHED
+  DELIVERED
+  COMPLETED
+  REJECTED
+  EXPIRED
+}
+
+enum KycStatus {
+  DISABLED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ManualPaymentStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  PROCESSED
+  REJECTED
+}
+
+model MerchantConfig {
+  id                 String    @id @default("default")
+  legalSellerName    String
+  gstin              String
+  invoiceIssuer      String
+  coinSupplier       String
+  fulfilmentEntity   String
+  refundLiableEntity String
+  ownerApproved      Boolean   @default(false)
+  caApproved         Boolean   @default(false)
+  legalApproved      Boolean   @default(false)
+  approvedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model SchemeUser {
+  id                 String              @id @default(cuid())
+  fullName           String
+  phone              String              @unique
+  email              String?             @unique
+  passwordHash       String
+  pinHash            String?
+  address            String?
+  city               String?
+  state              String?
+  pincode            String?
+  isActive           Boolean             @default(true)
+  kycRecordId        String?             @unique
+  kycRecord          KycRecord?          @relation(fields: [kycRecordId], references: [id])
+  enrollments        SchemeEnrollment[]
+  paymentOrders      PaymentOrder[]
+  redemptionRequests RedemptionRequest[]
+  auditLogs          AuditLog[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([phone, isActive])
+  @@index([email, isActive])
+}
+
+model KycRecord {
+  id                   String      @id @default(cuid())
+  panMasked            String?
+  aadhaarMasked        String?
+  alternativeIdType    String?
+  alternativeIdMasked String?
+  status               KycStatus   @default(PENDING)
+  documentUrlEncrypted String?
+  verifiedAt           DateTime?
+  schemeUser           SchemeUser?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+}
+
+model SchemePlan {
+  id                    String                    @id @default(cuid())
+  name                  String
+  metalType             MetalType
+  purity                MetalPurity
+  tenureMonths          Int
+  minMonthlyAmountPaise BigInt
+  maxMonthlyAmountPaise BigInt
+  presetAmountsJson     Json
+  gracePeriodDays       Int                       @default(7)
+  termsVersion          String
+  termsContent          String
+  kycRequired           Boolean                   @default(false)
+  visibility            Boolean                   @default(true)
+  isActive              Boolean                   @default(true)
+  version               Int                       @default(1)
+  versions              SchemePlanVersion[]
+  enrollments           SchemeEnrollment[]
+  coinDenominations     CoinProductDenomination[]
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([isActive, visibility])
+  @@index([metalType, purity])
+}
+
+model SchemePlanVersion {
+  id           String     @id @default(cuid())
+  planId       String
+  version      Int
+  snapshotJson Json
+  createdAt    DateTime   @default(now())
+  plan         SchemePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, version])
+}
+
+model CoinProductDenomination {
+  id                String     @id @default(cuid())
+  planId            String
+  plan              SchemePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  metalType         MetalType
+  purity            MetalPurity
+  weightMilligrams  BigInt
+  title             String
+  mintingFeePaise   BigInt     @default(0)
+  packagingFeePaise BigInt     @default(0)
+  inStock           Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@index([planId, inStock])
+  @@index([metalType, weightMilligrams])
+}
+
+model Nominee {
+  id           String           @id @default(cuid())
+  enrollmentId String           @unique
+  fullName     String
+  relationship String
+  phone        String?
+  age          Int?
+  enrollment   SchemeEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model SchemeEnrollment {
+  id                            String                @id @default(cuid())
+  accountNumber                 String                @unique
+  userId                        String
+  user                          SchemeUser            @relation(fields: [userId], references: [id])
+  planId                        String
+  plan                          SchemePlan            @relation(fields: [planId], references: [id])
+  metalType                     MetalType
+  purity                        MetalPurity
+  tenureMonths                  Int
+  monthlyAmountPaise            BigInt
+  totalScheduledAmountPaise     BigInt
+  eligiblePurchaseBalancePaise  BigInt                @default(0)
+  paidInstallmentCount          Int                   @default(0)
+  remainingInstallmentCount     Int
+  startDate                     DateTime
+  maturityDate                  DateTime
+  nextDueDate                   DateTime?
+  overdueAmountPaise            BigInt                @default(0)
+  status                        SchemeStatus          @default(ACTIVE)
+  termsVersion                  String
+  acceptedTermsAt               DateTime              @default(now())
+  nominee                       Nominee?
+  installments                  InstallmentSchedule[]
+  paymentOrders                 PaymentOrder[]
+  ledgerEntries                 SchemeLedgerEntry[]
+  receipts                      Receipt[]
+  redemptionRequests            RedemptionRequest[]
+  manualPaymentQueue            ManualPaymentQueue[]
+  refundRequests                RefundRequest[]
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
+
+  @@index([userId, status])
+  @@index([accountNumber])
+  @@index([status, maturityDate])
+  @@index([nextDueDate, status])
+}
+
+model InstallmentSchedule {
+  id             String           @id @default(cuid())
+  enrollmentId   String
+  enrollment     SchemeEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  installmentNo  Int
+  dueDate        DateTime
+  amountPaise    BigInt
+  status         InstallmentStatus @default(PENDING)
+  paidAt         DateTime?
+  paymentOrderId String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([enrollmentId, installmentNo])
+  @@index([enrollmentId, status])
+  @@index([dueDate, status])
+}
+
+model PaymentOrder {
+  id               String             @id @default(cuid())
+  orderId          String             @unique
+  enrollmentId     String
+  enrollment       SchemeEnrollment   @relation(fields: [enrollmentId], references: [id])
+  userId           String
+  user             SchemeUser         @relation(fields: [userId], references: [id])
+  amountPaise      BigInt
+  currency         String             @default("INR")
+  gateway          String
+  status           PaymentOrderStatus @default(CREATED)
+  idempotencyKey   String             @unique
+  gatewayOrderId   String?
+  gatewayPaymentId String?
+  gatewaySignature String?
+  receipts         Receipt[]
+  ledgerEntries    SchemeLedgerEntry[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([enrollmentId, status])
+  @@index([userId, createdAt])
+  @@index([gatewayOrderId])
+}
+
+model SchemeLedgerEntry {
+  id                 String           @id @default(cuid())
+  enrollmentId       String
+  enrollment         SchemeEnrollment @relation(fields: [enrollmentId], references: [id])
+  type               LedgerEntryType
+  amountPaise        BigInt
+  balanceAfterPaise  BigInt
+  referenceType      String
+  referenceId        String
+  paymentOrderId     String?
+  paymentOrder       PaymentOrder?    @relation(fields: [paymentOrderId], references: [id])
+  actorType          String
+  actorId            String?
+  metadata           Json?
+  createdAt          DateTime         @default(now())
+
+  @@index([enrollmentId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model Receipt {
+  id             String           @id @default(cuid())
+  receiptNumber  String           @unique
+  paymentOrderId String
+  paymentOrder   PaymentOrder     @relation(fields: [paymentOrderId], references: [id])
+  enrollmentId   String
+  enrollment     SchemeEnrollment @relation(fields: [enrollmentId], references: [id])
+  userId         String
+  amountPaise    BigInt
+  paymentDate    DateTime
+  pdfPath        String?
+  createdAt      DateTime         @default(now())
+
+  @@index([enrollmentId, createdAt])
+  @@index([receiptNumber])
+}
+
+model ManualPaymentQueue {
+  id               String              @id @default(cuid())
+  enrollmentId     String
+  enrollment       SchemeEnrollment    @relation(fields: [enrollmentId], references: [id])
+  installmentNo    Int?
+  amountPaise      BigInt
+  paymentMode      String
+  referenceNumber  String?
+  makerAdminId     String
+  checkerAdminId   String?
+  status           ManualPaymentStatus @default(PENDING_APPROVAL)
+  proofDocumentUrl String?
+  rejectionReason  String?
+  approvedAt       DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([status, createdAt])
+  @@index([enrollmentId, status])
+}
+
+model RedemptionQuotation {
+  id                           String            @id @default(cuid())
+  quotationNumber              String            @unique
+  redemptionRequestId          String            @unique
+  redemptionRequest            RedemptionRequest @relation(fields: [redemptionRequestId], references: [id], onDelete: Cascade)
+  rateSource                   String
+  rateTimestamp                DateTime
+  validUntil                   DateTime
+  ratePerGramPaise             BigInt
+  selectedWeightMilligrams     BigInt
+  metalValuePaise              BigInt
+  mintingChargesPaise          BigInt
+  packagingChargesPaise        BigInt
+  gstBasisPoints               Int               @default(300)
+  gstAmountPaise               BigInt
+  deliveryChargesPaise         BigInt
+  totalGrossValuePaise         BigInt
+  eligibleBalanceAppliedPaise BigInt
+  netDifferencePayablePaise    BigInt
+  userAccepted                 Boolean           @default(false)
+  userAcceptedAt               DateTime?
+  createdAt                    DateTime          @default(now())
+}
+
+model RedemptionRequest {
+  id                  String               @id @default(cuid())
+  enrollmentId        String
+  enrollment          SchemeEnrollment     @relation(fields: [enrollmentId], references: [id])
+  userId              String
+  user                SchemeUser           @relation(fields: [userId], references: [id])
+  status              RedemptionStatus     @default(REQUESTED)
+  collectionMethod    String
+  deliveryAddressJson Json?
+  quotation           RedemptionQuotation?
+  redemptionOrder     RedemptionOrder?
+  reviewedByAdminId   String?
+  adminNotes          String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([enrollmentId, status])
+  @@index([status, createdAt])
+}
+
+model RedemptionOrder {
+  id                        String            @id @default(cuid())
+  invoiceNumber             String            @unique
+  redemptionRequestId       String            @unique
+  redemptionRequest         RedemptionRequest @relation(fields: [redemptionRequestId], references: [id])
+  finalPricePerGramPaise    BigInt
+  actualWeightMilligrams    BigInt
+  finalGstPaise             BigInt
+  finalMakingChargesPaise   BigInt
+  finalDeliveryChargesPaise BigInt
+  finalDifferencePaidPaise  BigInt
+  paymentStatus             String
+  fulfillmentStatus         String
+  coinSerialNumber          String?
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+
+  @@index([invoiceNumber])
+  @@index([fulfillmentStatus, createdAt])
+}
+
+model RefundRequest {
+  id                   String           @id @default(cuid())
+  enrollmentId         String
+  enrollment           SchemeEnrollment @relation(fields: [enrollmentId], references: [id])
+  requestedAmountPaise BigInt
+  approvedAmountPaise  BigInt?
+  gatewayRefundId      String?
+  status               RefundStatus     @default(PENDING)
+  reasoning            String
+  approvedByAdminId    String?
+  processedAt          DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([enrollmentId, status])
+}
+
+model NotificationLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  enrollmentId String?
+  channel      String
+  eventType    String
+  title        String
+  body         String
+  metadata     Json?
+  sentAt       DateTime @default(now())
+
+  @@index([userId, sentAt])
+  @@index([enrollmentId, sentAt])
+}
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  actorType    String
+  actorId      String?
+  action       String
+  targetEntity String
+  targetId     String?
+  detailsJson  Json?
+  ipAddress    String?
+  user         SchemeUser? @relation(fields: [actorId], references: [id])
+  createdAt    DateTime    @default(now())
+
+  @@index([actorType, actorId])
+  @@index([action, createdAt])
+  @@index([targetEntity, targetId])
+}
+

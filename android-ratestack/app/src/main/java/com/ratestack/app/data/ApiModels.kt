@@ -174,3 +174,142 @@ sealed interface RepositoryResult<out T> {
         val retryable: Boolean = true,
     ) : RepositoryResult<Nothing>
 }
+
+// Savings Scheme DTOs
+data class SchemeListResponseDto(
+    val plans: List<SchemePlanDto>?,
+    val prevailingRates: SchemePrevailingRatesDto?,
+)
+
+data class SchemePrevailingRatesDto(
+    val gold22kPerGram: Double?,
+    val silver999PerGram: Double?,
+)
+
+data class SchemePlanDto(
+    val id: String?,
+    val name: String?,
+    val metalType: String?,
+    val purity: String?,
+    val tenureMonths: Int?,
+    val minMonthlyAmount: Double?,
+    val maxMonthlyAmount: Double?,
+    val presetAmounts: List<Double>?,
+    val gracePeriodDays: Int?,
+    val termsVersion: String?,
+    val kycRequired: Boolean?,
+    val coinDenominations: List<CoinDenomDto>?,
+    val minCoinEstPriceInr: Double?,
+)
+
+data class CoinDenomDto(
+    val id: String?,
+    val title: String?,
+    val weightGrams: Double?,
+    val mintingFee: Double?,
+    val packagingFee: Double?,
+    val inStock: Boolean?,
+)
+
+data class SchemeEnrollmentDto(
+    val id: String?,
+    val accountNumber: String?,
+    val productName: String?,
+    val metalType: String?,
+    val purity: String?,
+    val tenureMonths: Int?,
+    val monthlyAmount: Double?,
+    val totalScheduledAmount: Double?,
+    val schemePurchaseBalance: Double?,
+    val remainingAmount: Double?,
+    val paidInstallmentCount: Int?,
+    val remainingInstallmentCount: Int?,
+    val nextDueDate: String?,
+    val overdueAmount: Double?,
+    val status: String?,
+    val progressPercent: Double?,
+    val startDate: String?,
+    val maturityDate: String?,
+)
+
+data class SchemeDashboardDto(
+    val id: String?,
+    val accountNumber: String?,
+    val productName: String?,
+    val metalType: String?,
+    val purity: String?,
+    val tenureMonths: Int?,
+    val monthlyAmount: Double?,
+    val totalScheduledAmount: Double?,
+    val schemePurchaseBalance: Double?,
+    val eligiblePurchaseValue: Double?,
+    val remainingAmount: Double?,
+    val paidInstallmentCount: Int?,
+    val remainingInstallmentCount: Int?,
+    val nextDueDate: String?,
+    val overdueAmount: Double?,
+    val status: String?,
+    val progressPercent: Double?,
+    val startDate: String?,
+    val maturityDate: String?,
+    val installments: List<InstallmentDto>?,
+    val recentReceipts: List<ReceiptDto>?,
+)
+
+data class InstallmentDto(
+    val id: String?,
+    val installmentNo: Int?,
+    val dueDate: String?,
+    val amount: Double?,
+    val status: String?,
+    val paidAt: String?,
+)
+
+data class ReceiptDto(
+    val id: String?,
+    val receiptNumber: String?,
+    val amount: Double?,
+    val paymentDate: String?,
+)
+
+data class RedemptionQuotationDto(
+    val redemptionRequestId: String?,
+    val quotationNumber: String?,
+    val rateSource: String?,
+    val rateTimestamp: String?,
+    val validUntil: String?,
+    val ratePerGram: Double?,
+    val selectedWeightGrams: Double?,
+    val metalValue: Double?,
+    val mintingCharges: Double?,
+    val packagingCharges: Double?,
+    val gstRatePercent: Double?,
+    val gstAmount: Double?,
+    val deliveryCharges: Double?,
+    val totalGrossValue: Double?,
+    val schemePurchaseBalanceApplied: Double?,
+    val netDifferencePayable: Double?,
+    val userAccepted: Boolean?,
+)
+
+data class PaymentOrderResponseDto(
+    val paymentOrderId: String?,
+    val orderId: String?,
+    val gatewayOrderId: String?,
+    val amount: Double?,
+    val currency: String?,
+    val gateway: String?,
+)
+
+data class AuthResponseDto(
+    val token: String?,
+    val user: SchemeUserDto?,
+)
+
+data class SchemeUserDto(
+    val id: String?,
+    val fullName: String?,
+    val phone: String?,
+    val email: String?,
+)
+

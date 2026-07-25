@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ratestack.app.data.SchemeDashboardDto
+import java.util.Locale
 
 @Composable
 fun SchemeDashboardScreen(
@@ -163,7 +164,7 @@ fun SchemeDashboardScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "₹${String.format("%,.2f", balance)}",
+                        text = "₹${String.format(Locale.US, "%,.2f", balance)}",
                         color = Color(0xFFFEF3C7),
                         fontSize = 32.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -194,7 +195,7 @@ fun SchemeDashboardScreen(
                         Text(text = "Amount Paid", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "₹${String.format("%,.0f", dashboard.verifiedContributionTotal ?: 0.0)}",
+                            text = "₹${String.format(Locale.US, "%,.0f", dashboard.verifiedContributionTotal ?: 0.0)}",
                             color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
@@ -217,7 +218,7 @@ fun SchemeDashboardScreen(
                         Text(text = "Remaining", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "₹${String.format("%,.0f", dashboard.remainingScheduledAmount ?: 0.0)}",
+                            text = "₹${String.format(Locale.US, "%,.0f", dashboard.remainingScheduledAmount ?: 0.0)}",
                             color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
@@ -255,7 +256,7 @@ fun SchemeDashboardScreen(
                             fontSize = 11.sp,
                         )
                         Text(
-                            text = "₹${String.format("%,.0f", rateInfo.pricePerGramInr ?: 0.0)} / gram",
+                            text = "₹${String.format(Locale.US, "%,.0f", rateInfo.pricePerGramInr ?: 0.0)} / gram",
                             color = Color.White,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
@@ -286,7 +287,7 @@ fun SchemeDashboardScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(text = "Savings Progress", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text(text = "${String.format("%.1f", (dashboard.progressPercent ?: 0.0))}%", color = Color(0xFFF59E0B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "${String.format(Locale.US, "%.1f", (dashboard.progressPercent ?: 0.0))}%", color = Color(0xFFF59E0B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     LinearProgressIndicator(

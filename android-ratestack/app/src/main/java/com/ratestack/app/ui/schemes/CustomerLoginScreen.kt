@@ -1,6 +1,5 @@
 package com.ratestack.app.ui.schemes
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,6 +23,7 @@ fun CustomerLoginScreen(
     errorMessage: String?,
     onLoginSubmit: (phone: String, pass: String) -> Unit,
     onNavigateRegister: () -> Unit,
+    onNavigateForgotPassword: () -> Unit,
 ) {
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -137,7 +137,27 @@ fun CustomerLoginScreen(
                         shape = RoundedCornerShape(14.dp),
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    // Forgot Password Button (below Password Field)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        contentAlignment = Alignment.CenterEnd,
+                    ) {
+                        TextButton(
+                            onClick = onNavigateForgotPassword,
+                            contentPadding = PaddingValues(0.dp),
+                        ) {
+                            Text(
+                                text = "Forgot Password?",
+                                color = Color(0xFFFBBF24),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     // Login Button
                     Button(

@@ -670,3 +670,22 @@ model AuditLog {
   @@index([targetEntity, targetId])
 }
 
+model PasswordResetOtp {
+  id                  String    @id @default(cuid())
+  mobileNumber        String
+  otpHash             String
+  resetTokenHash      String?   @unique
+  expiresAt           DateTime
+  resetTokenExpiresAt DateTime?
+  resendAvailableAt   DateTime
+  attemptCount        Int       @default(0)
+  verifiedAt          DateTime?
+  consumedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([mobileNumber, createdAt])
+  @@index([resetTokenHash])
+}
+
+

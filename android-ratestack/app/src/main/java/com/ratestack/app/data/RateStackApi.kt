@@ -35,6 +35,21 @@ interface RateStackApi {
         @retrofit2.http.Body body: Map<String, String>,
     ): Response<ApiEnvelope<AuthResponseDto>>
 
+    @POST("api/v1/auth/forgot-password/request-otp")
+    suspend fun requestPasswordResetOtp(
+        @retrofit2.http.Body body: Map<String, String>,
+    ): Response<ApiEnvelope<Map<String, Any>>>
+
+    @POST("api/v1/auth/forgot-password/verify-otp")
+    suspend fun verifyPasswordResetOtp(
+        @retrofit2.http.Body body: Map<String, String>,
+    ): Response<VerifyOtpResponseDto>
+
+    @POST("api/v1/auth/forgot-password/reset")
+    suspend fun resetPassword(
+        @retrofit2.http.Body body: Map<String, String>,
+    ): Response<ApiEnvelope<Map<String, Any>>>
+
     @POST("api/v1/schemes/{id}/join")
     suspend fun joinScheme(
         @retrofit2.http.Header("Authorization") authHeader: String,

@@ -176,6 +176,12 @@ sealed interface RepositoryResult<out T> {
 }
 
 // Savings Scheme DTOs
+data class VerifyOtpResponseDto(
+    val success: Boolean,
+    val resetToken: String?,
+    val error: ApiErrorDto?,
+)
+
 data class SchemeListResponseDto(
     val plans: List<SchemePlanDto>?,
     val prevailingRates: SchemePrevailingRatesDto?,

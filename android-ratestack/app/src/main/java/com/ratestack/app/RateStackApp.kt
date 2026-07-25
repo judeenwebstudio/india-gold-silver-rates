@@ -131,6 +131,9 @@ private object Routes {
     const val MY_SCHEMES = "my_schemes"
     const val CUSTOMER_LOGIN = "customer_login"
     const val CUSTOMER_REGISTER = "customer_register"
+    const val FORGOT_PASSWORD = "forgot_password"
+    const val OTP_VERIFICATION = "otp_verification"
+    const val RESET_PASSWORD = "reset_password"
     const val CUSTOMER_PROFILE = "customer_profile"
     const val STATES = "states"
     const val CITIES = "cities/{state}"
@@ -269,6 +272,10 @@ fun RateStackApp(
                             navController.navigate(Routes.CUSTOMER_REGISTER) {
                                 popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
                             }
+                        },
+                        onNavigateForgotPassword = {
+                            schemeViewModel.clearForgotState()
+                            navController.navigate(Routes.FORGOT_PASSWORD)
                         }
                     )
                 }
@@ -295,6 +302,66 @@ fun RateStackApp(
                                 popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }
                             }
                         }
+                    )
+                }
+
+                composable(Routes.FORGOT_PASSWORD) {
+                    val forgotState by schemeViewModel.forgotActionState.collectAsState()
+                    val isLoading = forgotState is LoadState.Loading
+                    val errorMsg = (forgotState as? LoadState.Error)?.message
+
+                    com.ratestack.app.ui.schemes.ForgotPasswordScreen(
+                        isLoading = isLoading,
+                        errorMessage = errorMsg,
+                        onSendOtpSubmit = { phone ->
+                            schemeViewModel.requestPasswordResetOtp(phone) {
+                                navController.navigate(Routes.OTP_VERIFICATION)
+                            }
+                        },
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Routes.OTP_VERIFICATION) {
+                    val mobileNumber by schemeViewModel.forgotMobile.collectAsState()
+                    val forgotState by schemeViewModel.forgotActionState.collectAsState()
+                    val isLoading = forgotState is LoadState.Loading
+                    val errorMsg = (forgotState as? LoadState.Error)?.message
+
+                    com.ratestack.app.ui.schemes.OtpVerificationScreen(
+                        mobileNumber = mobileNumber,
+                        isLoading = isLoading,
+                        errorMessage = errorMsg,
+                        onVerifyOtpSubmit = { otp ->
+                            schemeViewModel.verifyPasswordResetOtp(otp) {
+                                navController.navigate(Routes.RESET_PASSWORD)
+                            }
+                        },
+                        onResendOtp = {
+                            schemeViewModel.requestPasswordResetOtp(mobileNumber) {}
+                        },
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Routes.RESET_PASSWORD) {
+                    val mobileNumber by schemeViewModel.forgotMobile.collectAsState()
+                    val forgotState by schemeViewModel.forgotActionState.collectAsState()
+                    val isLoading = forgotState is LoadState.Loading
+                    val errorMsg = (forgotState as? LoadState.Error)?.message
+
+                    com.ratestack.app.ui.schemes.ResetPasswordScreen(
+                        mobileNumber = mobileNumber,
+                        isLoading = isLoading,
+                        errorMessage = errorMsg,
+                        onResetPasswordSubmit = { newPass ->
+                            schemeViewModel.resetPassword(newPass) {
+                                navController.navigate(Routes.CUSTOMER_LOGIN) {
+                                    popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
+                                }
+                            }
+                        },
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
 

@@ -292,6 +292,87 @@ class SchemeViewModel(
         }
     }
 
+    private val _forgotMobile = MutableStateFlow("")
+    val forgotMobile: StateFlow<String> = _forgotMobile.asStateFlow()
+
+    private val _resetToken = MutableStateFlow<String?>(null)
+    val resetToken: StateFlow<String?> = _resetToken.asStateFlow()
+
+    private val _forgotActionState = MutableStateFlow<LoadState<String>?>(null)
+    val forgotActionState: StateFlow<LoadState<String>?> = _forgotActionState.asStateFlow()
+
+    fun setForgotMobile(mobile: String) {
+        _forgotMobile.value = normalizePhoneNumber(mobile)
+    }
+
+    fun clearForgotState() {
+        _forgotActionState.value = null
+    }
+
+    fun requestPasswordResetOtp(phone: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val normalized = normalizePhoneNumber(phone)
+            _forgotMobile.value = normalized
+            _forgotActionState.value = LoadState.Loading
+            try {
+                val res = ApiProvider.service.requestPasswordResetOtp(mapOf("mobileNumber" to normalized))
+                if (res.isSuccessful && res.body()?.success == true) {
+                    _forgotActionState.value = LoadState.Ready(res.body()?.data?.get("message")?.toString() ?: "OTP sent")
+                    onSuccess()
+                } else {
+                    val errMsg = res.body()?.error?.message ?: "Failed to send OTP. Please try again."
+                    _forgotActionState.value = LoadState.Error(errMsg)
+                }
+            } catch (e: Exception) {
+                _forgotActionState.value = LoadState.Error(e.message ?: "Network connection error")
+            }
+        }
+    }
+
+    fun verifyPasswordResetOtp(otp: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val mobile = _forgotMobile.value
+            _forgotActionState.value = LoadState.Loading
+            try {
+                val res = ApiProvider.service.verifyPasswordResetOtp(mapOf("mobileNumber" to mobile, "otp" to otp))
+                if (res.isSuccessful && res.body()?.success == true && !res.body()?.resetToken.isNullOrEmpty()) {
+                    _resetToken.value = res.body()?.resetToken
+                    _forgotActionState.value = LoadState.Ready("OTP verified successfully.")
+                    onSuccess()
+                } else {
+                    val errMsg = res.body()?.error?.message ?: "The verification code is incorrect."
+                    _forgotActionState.value = LoadState.Error(errMsg)
+                }
+            } catch (e: Exception) {
+                _forgotActionState.value = LoadState.Error(e.message ?: "Network connection error")
+            }
+        }
+    }
+
+    fun resetPassword(newPassword: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val token = _resetToken.value
+            if (token.isNullOrEmpty()) {
+                _forgotActionState.value = LoadState.Error("Invalid reset token. Please restart.")
+                return@launch
+            }
+            _forgotActionState.value = LoadState.Loading
+            try {
+                val res = ApiProvider.service.resetPassword(mapOf("resetToken" to token, "newPassword" to newPassword))
+                if (res.isSuccessful && res.body()?.success == true) {
+                    _forgotActionState.value = LoadState.Ready("Password reset successfully.")
+                    _resetToken.value = null
+                    onSuccess()
+                } else {
+                    val errMsg = res.body()?.error?.message ?: "Password reset failed."
+                    _forgotActionState.value = LoadState.Error(errMsg)
+                }
+            } catch (e: Exception) {
+                _forgotActionState.value = LoadState.Error(e.message ?: "Network connection error")
+            }
+        }
+    }
+
     fun resetAuthActionState() {
         _authActionState.value = null
     }

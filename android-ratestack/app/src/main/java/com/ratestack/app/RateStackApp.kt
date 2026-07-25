@@ -243,6 +243,7 @@ fun RateStackApp(
                         onSelectScheme = { enrollmentId ->
                             navController.navigate("scheme_dashboard/$enrollmentId")
                         },
+                        onProfileClick = { navController.navigate(Routes.CUSTOMER_PROFILE) },
                         onLogoutClick = { schemeViewModel.logout() }
                     )
                 }
@@ -394,7 +395,20 @@ fun RateStackApp(
                     FavoritesScreen(favorites, viewModel, navController)
                 }
                 composable(Routes.SETTINGS) {
-                    SettingsScreen(viewModel, onOpenExternal, onShare, onRateApp)
+                    val userToken by schemeViewModel.userToken.collectAsState()
+                    val userName by schemeViewModel.userName.collectAsState()
+                    val isLoggedIn = !userToken.isNullOrBlank()
+
+                    SettingsScreen(
+                        viewModel = viewModel,
+                        isLoggedIn = isLoggedIn,
+                        userName = userName,
+                        openExternal = onOpenExternal,
+                        onShare = onShare,
+                        onRateApp = onRateApp,
+                        onProfileClick = { navController.navigate(Routes.CUSTOMER_PROFILE) },
+                        onLogoutClick = { schemeViewModel.logout() }
+                    )
                 }
             }
         }
@@ -1253,9 +1267,13 @@ private fun FavoritesScreen(
 @Composable
 private fun SettingsScreen(
     viewModel: RateStackViewModel,
+    isLoggedIn: Boolean = false,
+    userName: String? = null,
     openExternal: (String) -> Unit,
     onShare: (String) -> Unit,
     onRateApp: () -> Unit,
+    onProfileClick: () -> Unit = {},
+    onLogoutClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val selection by viewModel.selection.collectAsState()
@@ -1293,6 +1311,25 @@ private fun SettingsScreen(
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onBackground,
                 )
+            }
+
+            if (isLoggedIn) {
+                item {
+                    SettingsCategoryCard(title = "Customer Account") {
+                        SettingTile(
+                            title = "Profile (${userName ?: "Customer"})",
+                            subtitle = "View active schemes & member details",
+                            icon = Icons.Default.Info,
+                            onClick = onProfileClick,
+                        )
+                        SettingTile(
+                            title = "Logout",
+                            subtitle = "Sign out of your RateStack scheme account",
+                            icon = Icons.Default.Clear,
+                            onClick = onLogoutClick,
+                        )
+                    }
+                }
             }
 
             // Category: Location

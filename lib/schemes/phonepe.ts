@@ -24,11 +24,15 @@ export interface PhonePeOrderResponse {
 }
 
 export function getPhonePeConfig() {
-  const merchantId = process.env.PHONEPE_MERCHANT_ID || 'PGTESTPAYUAT';
-  const saltKey = process.env.PHONEPE_SALT_KEY || '099eb0cd-02cf-4e2a-8aca-3e6c6aff0399';
-  const saltIndex = process.env.PHONEPE_SALT_INDEX || '1';
-  const env = (process.env.PHONEPE_ENV || 'SANDBOX').toUpperCase();
+  const merchantId = process.env.PHONEPE_MERCHANT_ID?.trim() || '';
+  const saltKey = process.env.PHONEPE_SALT_KEY?.trim() || '';
+  const saltIndex = process.env.PHONEPE_SALT_INDEX?.trim() || '';
+  const env = (process.env.PHONEPE_ENV || 'PRODUCTION').toUpperCase();
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://india-gold-silver-rates.vercel.app').replace(/\/$/, '');
+
+  if (!merchantId || !saltKey || !saltIndex) {
+    throw new Error('PhonePe credentials are missing');
+  }
 
   const baseUrl = env === 'PRODUCTION'
     ? 'https://api.phonepe.com/apis/hermes'
@@ -99,31 +103,24 @@ export async function createPhonePeOrder(params: CreatePhonePeOrderParams): Prom
     });
 
     const resData = await res.json().catch(() => ({}));
-    if (res.ok && resData.success && resData.data?.instrumentResponse?.redirectInfo?.url) {
-      return {
-        gatewayOrderId: params.orderId,
-        merchantTransactionId: params.orderId,
-        redirectUrl: resData.data.instrumentResponse.redirectInfo.url,
-        amountPaise: amountNumber,
-        currency: 'INR',
-        status: resData.code || 'PAYMENT_INITIATED',
-        merchantId: config.merchantId,
-      };
+    const redirectUrl = resData.data?.instrumentResponse?.redirectInfo?.url;
+    if (!res.ok || !resData.success || typeof redirectUrl !== 'string' || !redirectUrl.startsWith('https://')) {
+      throw new Error(`PhonePe order creation failed${resData.code ? ` (${resData.code})` : ''}`);
     }
-  } catch (err) {
-    // If PhonePe preprod API fails or is unreachable, fallback to PhonePe sandbox checkout simulator URL
-  }
 
-  const fallbackRedirectUrl = `${config.siteUrl}/schemes/dashboard/${params.enrollmentId}?payment=phonepe_sandbox_success&orderId=${params.orderId}`;
-  return {
-    gatewayOrderId: params.orderId,
-    merchantTransactionId: params.orderId,
-    redirectUrl: fallbackRedirectUrl,
-    amountPaise: amountNumber,
-    currency: 'INR',
-    status: 'PAYMENT_INITIATED',
-    merchantId: config.merchantId,
-  };
+    return {
+      gatewayOrderId: params.orderId,
+      merchantTransactionId: params.orderId,
+      redirectUrl,
+      amountPaise: amountNumber,
+      currency: 'INR',
+      status: resData.code || 'PAYMENT_INITIATED',
+      merchantId: config.merchantId,
+    };
+  } catch (err) {
+    if (err instanceof Error) throw err;
+    throw new Error('PhonePe order creation failed');
+  }
 }
 
 export async function checkPhonePePaymentStatus(merchantTransactionId: string) {
@@ -152,18 +149,18 @@ export async function checkPhonePePaymentStatus(merchantTransactionId: string) {
       };
     }
   } catch (err) {
-    // Failover for test mode
+    return {
+      success: false,
+      code: 'PAYMENT_STATUS_UNAVAILABLE',
+      message: err instanceof Error ? err.message : 'PhonePe payment status unavailable',
+      data: undefined,
+    };
   }
 
   return {
-    success: true,
-    code: 'PAYMENT_SUCCESS',
-    message: 'Sandbox Payment Verified',
-    data: {
-      merchantId: config.merchantId,
-      merchantTransactionId,
-      transactionId: `TX-PP-${Date.now()}`,
-      responseCode: 'SUCCESS',
-    },
+    success: false,
+    code: 'PAYMENT_NOT_SUCCESSFUL',
+    message: 'PhonePe did not confirm the payment',
+    data: undefined,
   };
 }

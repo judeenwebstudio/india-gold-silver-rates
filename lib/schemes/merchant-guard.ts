@@ -76,9 +76,29 @@ export async function checkMerchantGuard(): Promise<MerchantGuardResult> {
   };
 }
 
+export function isTestOrSandboxMode(): boolean {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const allowDevTesting = process.env.ALLOW_DEV_SCHEME_TESTING === 'true';
+  const allowSandbox = process.env.ALLOW_SANDBOX_SCHEMES === 'true';
+
+  if (allowDevTesting || allowSandbox) {
+    return true;
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    return true;
+  }
+
+  if (!keyId || keyId === 'mock_key' || keyId.startsWith('rzp_test_') || keyId.startsWith('mock_')) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function enforceMerchantGuardForLivePayments(): Promise<void> {
-  // Allow Sandbox/Dev override only in development node env
-  if (process.env.NODE_ENV === 'development' && process.env.ALLOW_DEV_SCHEME_TESTING === 'true') {
+  // Allow Sandbox/Test mode to proceed without live production approval blocks
+  if (isTestOrSandboxMode()) {
     return;
   }
 

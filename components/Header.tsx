@@ -56,19 +56,19 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-[#fbfaf7]/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-3" aria-label="RateStack home">
+        <div className="mx-auto flex min-w-0 h-18 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex min-w-0 flex-1 items-center gap-2 md:flex-none md:gap-3" aria-label="RateStack home">
             <Image
               src="/ratestack-logo.png"
               alt=""
               width={80}
               height={40}
               priority
-              className="h-10 w-20 rounded-lg border border-stone-200 bg-white object-cover shadow-sm"
+              className="h-8 w-16 shrink-0 rounded-lg border border-stone-200 bg-white object-cover shadow-sm md:h-10 md:w-20"
             />
-            <span className="leading-tight">
-              <span className="block font-display text-lg font-bold tracking-tight text-stone-900">RateStack</span>
-              <span className="block text-[0.62rem] font-bold uppercase tracking-[0.2em] text-amber-700">Gold &amp; silver</span>
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate font-display text-base font-bold tracking-tight text-stone-900 md:text-lg">RateStack</span>
+              <span className="block truncate text-[0.52rem] font-bold uppercase tracking-[0.15em] text-amber-700 md:text-[0.62rem] md:tracking-[0.2em]">Gold &amp; silver</span>
             </span>
           </Link>
 
@@ -80,7 +80,7 @@ export function Header() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 md:gap-3">
             {userToken ? (
               <div className="relative flex items-center gap-3">
                 <span className="hidden md:inline-block text-xs font-bold text-stone-700">
@@ -137,7 +137,7 @@ export function Header() {
                 <button
                   type="button"
                   onClick={() => handleOpenAuth("register")}
-                  className="rounded-xl bg-amber-700 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-amber-800 shadow-sm"
+                  className="hidden rounded-xl bg-amber-700 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-amber-800 shadow-sm md:inline-flex"
                 >
                   Register
                 </button>

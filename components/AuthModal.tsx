@@ -494,12 +494,13 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
         <div className="pt-4 border-t border-stone-800 text-center text-xs text-stone-400">
           {mode === "login" ? (
             <p>
-              Don't have a scheme account?{" "}
+              Don’t have an account?{" "}
               <button
+                type="button"
                 onClick={() => { setError(null); setSuccessMessage(null); setMode("register"); }}
                 className="font-bold text-amber-400 hover:underline"
               >
-                Register Here
+                Register
               </button>
             </p>
           ) : (

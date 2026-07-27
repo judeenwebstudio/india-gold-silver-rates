@@ -256,23 +256,19 @@ class SchemeViewModel(
                 )
             }
             try {
-                val body = mutableMapOf<String, Any>(
-                    "monthlyAmount" to monthlyAmount,
-                    "nomineeFullName" to nomineeFullName.trim(),
-                    "nomineeRelationship" to nomineeRelationship.trim(),
-                    "acceptedTermsVersion" to acceptedTermsVersion
+                val req = com.ratestack.app.data.JoinSchemeRequestDto(
+                    monthlyAmount = monthlyAmount,
+                    nomineeFullName = nomineeFullName.trim(),
+                    nomineeRelationship = nomineeRelationship.trim(),
+                    nomineePhone = if (!nomineePhone.isNull_or_empty()) normalizePhoneNumber(nomineePhone!!) else null,
+                    nomineeAge = if (nomineeAge != null && nomineeAge > 0) nomineeAge else null,
+                    acceptedTermsVersion = acceptedTermsVersion
                 )
-                if (!nomineePhone.isNull_or_empty()) {
-                    body["nomineePhone"] = normalizePhoneNumber(nomineePhone!!)
-                }
-                if (nomineeAge != null && nomineeAge > 0) {
-                    body["nomineeAge"] = nomineeAge
-                }
 
                 val res = ApiProvider.service.joinScheme(
                     "Bearer $token",
                     planId,
-                    body
+                    req
                 )
 
                 if (com.ratestack.app.BuildConfig.DEBUG) {
@@ -283,18 +279,21 @@ class SchemeViewModel(
                 }
 
                 if (res.isSuccessful && res.body()?.success == true) {
-                    val dataMap = res.body()?.data
-                    val enrollmentId = dataMap?.get("enrollmentId")?.toString() ?: ""
+                    val enrollmentData = res.body()?.data
+                    val enrollmentId = enrollmentData?.enrollmentId ?: ""
                     _joinSchemeActionState.value = LoadState.Ready("Account created")
                     loadMySchemes()
                     onSuccess(enrollmentId)
                 } else {
-                    val errMsg = res.body()?.error?.message ?: "Failed to join scheme"
+                    val errMsg = res.body()?.error?.message ?: "Unable to open the scheme account. Please try again."
                     _joinSchemeActionState.value = LoadState.Error(errMsg)
                     onError(errMsg)
                 }
             } catch (e: Exception) {
-                val errMsg = e.message ?: "Network error joining scheme"
+                if (com.ratestack.app.BuildConfig.DEBUG) {
+                    android.util.Log.e("RateStackScheme", "Join Scheme Exception: ${e.javaClass.simpleName}: ${e.message}")
+                }
+                val errMsg = "Unable to open the scheme account. Please try again."
                 _joinSchemeActionState.value = LoadState.Error(errMsg)
                 onError(errMsg)
             }

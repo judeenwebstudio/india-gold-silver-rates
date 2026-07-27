@@ -38,7 +38,7 @@ interface RateStackApi {
     @POST("api/v1/auth/forgot-password/request-otp")
     suspend fun requestPasswordResetOtp(
         @retrofit2.http.Body body: Map<String, String>,
-    ): Response<ApiEnvelope<Map<String, Any>>>
+    ): Response<ApiEnvelope<Map<String, String>>>
 
     @POST("api/v1/auth/forgot-password/verify-otp")
     suspend fun verifyPasswordResetOtp(
@@ -48,14 +48,14 @@ interface RateStackApi {
     @POST("api/v1/auth/forgot-password/reset")
     suspend fun resetPassword(
         @retrofit2.http.Body body: Map<String, String>,
-    ): Response<ApiEnvelope<Map<String, Any>>>
+    ): Response<ApiEnvelope<Map<String, String>>>
 
     @POST("api/v1/schemes/{id}/join")
     suspend fun joinScheme(
         @retrofit2.http.Header("Authorization") authHeader: String,
         @Path("id") planId: String,
-        @retrofit2.http.Body body: Map<String, Any>,
-    ): Response<ApiEnvelope<Map<String, Any>>>
+        @retrofit2.http.Body request: JoinSchemeRequestDto,
+    ): Response<ApiEnvelope<JoinSchemeResponseDto>>
 
     @GET("api/v1/me/schemes")
     suspend fun getMySchemes(
@@ -80,13 +80,13 @@ interface RateStackApi {
         @retrofit2.http.Header("Authorization") authHeader: String,
         @Path("enrollmentId") enrollmentId: String,
         @retrofit2.http.Body body: Map<String, String>,
-    ): Response<ApiEnvelope<Map<String, Any>>>
+    ): Response<ApiEnvelope<Map<String, String>>>
 
     @POST("api/v1/me/schemes/{enrollmentId}/redemption/quotation")
     suspend fun requestRedemptionQuotation(
         @retrofit2.http.Header("Authorization") authHeader: String,
         @Path("enrollmentId") enrollmentId: String,
-        @retrofit2.http.Body body: Map<String, Any>,
+        @retrofit2.http.Body request: RedemptionQuotationRequestDto,
     ): Response<ApiEnvelope<RedemptionQuotationDto>>
 
     @POST("api/v1/me/schemes/{enrollmentId}/redemption/accept")
@@ -94,6 +94,6 @@ interface RateStackApi {
         @retrofit2.http.Header("Authorization") authHeader: String,
         @Path("enrollmentId") enrollmentId: String,
         @retrofit2.http.Body body: Map<String, String>,
-    ): Response<ApiEnvelope<Map<String, Any>>>
+    ): Response<ApiEnvelope<Map<String, String>>>
 }
 

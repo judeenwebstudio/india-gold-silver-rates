@@ -176,6 +176,30 @@ sealed interface RepositoryResult<out T> {
 }
 
 // Savings Scheme DTOs
+data class JoinSchemeRequestDto(
+    val monthlyAmount: Double,
+    val nomineeFullName: String,
+    val nomineeRelationship: String,
+    val nomineePhone: String? = null,
+    val nomineeAge: Int? = null,
+    val acceptedTermsVersion: String = "v1.0-2026",
+)
+
+data class JoinSchemeResponseDto(
+    val enrollmentId: String?,
+    val accountNumber: String?,
+    val productName: String?,
+    val monthlyAmount: Double?,
+    val totalScheduledAmount: Double?,
+    val tenureMonths: Int?,
+    val startDate: String?,
+    val maturityDate: String?,
+)
+
+data class RedemptionQuotationRequestDto(
+    val coinDenominationId: String? = null,
+)
+
 data class VerifyOtpResponseDto(
     val success: Boolean,
     val resetToken: String?,

@@ -83,11 +83,11 @@ export async function POST(
     let gatewayOrderId = '';
     let usedGateway = gateway;
 
-    if (gateway === 'MOCK' || (process.env.NODE_ENV === 'development' && !process.env.RAZORPAY_KEY_ID)) {
-      if (process.env.NODE_ENV === 'production') {
+    if (gateway === 'MOCK' || ((process.env.NODE_ENV === 'development' || process.env.ALLOW_DEV_SCHEME_TESTING === 'true' || process.env.ALLOW_SANDBOX_SCHEMES === 'true') && !process.env.RAZORPAY_KEY_ID)) {
+      if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_SCHEME_TESTING !== 'true' && process.env.ALLOW_SANDBOX_SCHEMES !== 'true') {
         return NextResponse.json(
-          { success: false, error: { message: 'Mock gateway is disabled in production environment' } },
-          { status: 403 }
+          { success: false, error: { message: 'Razorpay API credentials are missing' } },
+          { status: 503 }
         );
       }
       const mockOrder = createMockPaymentOrder({
@@ -98,13 +98,23 @@ export async function POST(
       gatewayOrderId = mockOrder.gatewayOrderId;
       usedGateway = 'MOCK';
     } else {
-      const razorpayOrder = await createRazorpayOrder({
-        orderId,
-        amountPaise,
-        receiptNumber: orderId,
-      });
-      gatewayOrderId = razorpayOrder.gatewayOrderId;
-      usedGateway = 'RAZORPAY';
+      try {
+        const razorpayOrder = await createRazorpayOrder({
+          orderId,
+          amountPaise,
+          receiptNumber: orderId,
+        });
+        gatewayOrderId = razorpayOrder.gatewayOrderId;
+        usedGateway = 'RAZORPAY';
+      } catch (err: any) {
+        if (err.message?.includes('credentials')) {
+          return NextResponse.json(
+            { success: false, error: { message: 'Razorpay API credentials are missing' } },
+            { status: 503 }
+          );
+        }
+        throw err;
+      }
     }
 
     // Save PaymentOrder in DB
@@ -131,13 +141,14 @@ export async function POST(
         amount: paiseToInrNumber(paymentOrder.amountPaise),
         currency: paymentOrder.currency,
         gateway: paymentOrder.gateway,
-        keyId: process.env.RAZORPAY_KEY_ID || 'mock_key',
+        keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_mock_key',
       },
     });
   } catch (error: any) {
+    const isCredentialsErr = error?.message?.includes('credentials');
     return NextResponse.json(
       { success: false, error: { message: error.message || 'Failed to create payment order' } },
-      { status: 500 }
+      { status: isCredentialsErr ? 503 : 500 }
     );
   }
 }

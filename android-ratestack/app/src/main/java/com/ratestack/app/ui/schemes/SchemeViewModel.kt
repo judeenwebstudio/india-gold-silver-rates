@@ -371,19 +371,12 @@ class SchemeViewModel(
                         _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Unable to create payment order.")
                     }
                 } else {
-                    val rawErr = res.body()?.error?.message ?: ""
-                    val msg = if (rawErr.contains("credentials", ignoreCase = true) || rawErr.contains("configured", ignoreCase = true)) {
-                        "Payment service is not configured yet."
-                    } else {
-                        "Unable to create payment order."
-                    }
+                    val msg = extractSafeErrorMessage(res, "Unable to create payment order. Please try again.")
                     _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error(msg)
                 }
             } catch (e: Exception) {
-                if (com.ratestack.app.BuildConfig.DEBUG) {
-                    android.util.Log.e("RateStackPayment", "Order API Exception: ${e.javaClass.simpleName}: ${e.message}")
-                }
-                _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Unable to create payment order.")
+                val msg = extractExceptionMessage(e, "Unable to create payment order. Please try again.")
+                _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error(msg)
             }
         }
     }
@@ -430,14 +423,12 @@ class SchemeViewModel(
                     loadSchemeDashboard(enrollmentId)
                     loadMySchemes()
                 } else {
-                    val errMsg = res.body()?.error?.message ?: "Payment received but verification is pending."
+                    val errMsg = extractSafeErrorMessage(res, "Payment received but verification is pending.")
                     _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error(errMsg)
                 }
             } catch (e: Exception) {
-                if (com.ratestack.app.BuildConfig.DEBUG) {
-                    android.util.Log.e("RateStackPayment", "Verify API Exception: ${e.javaClass.simpleName}: ${e.message}")
-                }
-                _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Payment received but verification is pending.")
+                val errMsg = extractExceptionMessage(e, "Payment received but verification is pending.")
+                _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error(errMsg)
             }
         }
     }
@@ -533,6 +524,53 @@ class SchemeViewModel(
 
     fun resetAuthActionState() {
         _authActionState.value = null
+    }
+
+    private fun extractSafeErrorMessage(res: retrofit2.Response<*>, defaultFallback: String): String {
+        var rawMessage = ""
+        try {
+            val errorBodyStr = res.errorBody()?.string()
+            if (!errorBodyStr.isNullOrBlank()) {
+                val gson = com.google.gson.Gson()
+                val type = object : com.google.gson.reflect.TypeToken<com.ratestack.app.data.ApiEnvelope<Any>>() {}.type
+                val env: com.ratestack.app.data.ApiEnvelope<Any>? = gson.fromJson(errorBodyStr, type)
+                rawMessage = env?.error?.message.orEmpty()
+            }
+        } catch (e: Exception) {
+            if (com.ratestack.app.BuildConfig.DEBUG) {
+                android.util.Log.e("RateStackPayment", "Error parsing error response: ${e.message}")
+            }
+        }
+
+        if (rawMessage.isBlank()) {
+            rawMessage = (res.body() as? com.ratestack.app.data.ApiEnvelope<*>)?.error?.message.orEmpty()
+        }
+
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackPayment", "HTTP Status: ${res.code()} | Raw Error Message: '$rawMessage'")
+        }
+
+        return when {
+            res.code() == 401 -> "Your session has expired. Please login again."
+            res.code() == 503 || rawMessage.contains("credentials", ignoreCase = true) || rawMessage.contains("configured", ignoreCase = true) ->
+                "Payment service is not configured yet."
+            res.code() == 404 -> "Scheme account not found."
+            res.code() == 409 -> "A payment for this installment is already pending."
+            res.code() == 400 && rawMessage.isNotBlank() -> rawMessage
+            rawMessage.isNotBlank() && !rawMessage.contains("internal", ignoreCase = true) -> rawMessage
+            else -> defaultFallback
+        }
+    }
+
+    private fun extractExceptionMessage(e: Exception, defaultFallback: String): String {
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.e("RateStackPayment", "Exception: ${e.javaClass.simpleName}: ${e.message}")
+        }
+        return when (e) {
+            is java.net.UnknownHostException, is java.net.SocketTimeoutException, is java.net.ConnectException ->
+                "Unable to connect. Check your internet connection."
+            else -> defaultFallback
+        }
     }
 
     fun logout() {

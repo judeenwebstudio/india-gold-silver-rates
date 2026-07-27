@@ -48,11 +48,47 @@ class SchemeViewModel(
     private val _redemptionQuotationState = MutableStateFlow<LoadState<RedemptionQuotationDto>?>(null)
     val redemptionQuotationState: StateFlow<LoadState<RedemptionQuotationDto>?> = _redemptionQuotationState.asStateFlow()
 
+    private val _selectedPlan = MutableStateFlow<com.ratestack.app.data.SchemePlanDto?>(null)
+    val selectedPlan: StateFlow<com.ratestack.app.data.SchemePlanDto?> = _selectedPlan.asStateFlow()
+
+    private val _pendingJoinPlanId = MutableStateFlow<String?>(null)
+    val pendingJoinPlanId: StateFlow<String?> = _pendingJoinPlanId.asStateFlow()
+
+    private val _pendingJoinAmount = MutableStateFlow<Double?>(null)
+    val pendingJoinAmount: StateFlow<Double?> = _pendingJoinAmount.asStateFlow()
+
+    private val _joinSchemeActionState = MutableStateFlow<LoadState<String>?>(null)
+    val joinSchemeActionState: StateFlow<LoadState<String>?> = _joinSchemeActionState.asStateFlow()
+
     init {
         loadSchemePlans()
         if (!repository.getUserToken().isNull_or_empty()) {
             loadMySchemes()
         }
+    }
+
+    fun selectPlan(plan: com.ratestack.app.data.SchemePlanDto) {
+        _selectedPlan.value = plan
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackScheme", "Selected Scheme Plan ID: ${plan.id} Name: ${plan.name}")
+        }
+    }
+
+    fun setPendingJoin(planId: String, amount: Double? = null) {
+        _pendingJoinPlanId.value = planId
+        _pendingJoinAmount.value = amount
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackScheme", "Pending Join Saved: PlanID=$planId Amount=$amount")
+        }
+    }
+
+    fun clearPendingJoin() {
+        _pendingJoinPlanId.value = null
+        _pendingJoinAmount.value = null
+    }
+
+    fun resetJoinSchemeActionState() {
+        _joinSchemeActionState.value = null
     }
 
     private fun String?.isNull_or_empty(): Boolean = this == null || this.trim().isEmpty()
@@ -194,27 +230,73 @@ class SchemeViewModel(
         }
     }
 
-    fun joinScheme(planId: String, amount: Double, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun joinScheme(
+        planId: String,
+        monthlyAmount: Double,
+        nomineeFullName: String,
+        nomineeRelationship: String,
+        nomineePhone: String? = null,
+        nomineeAge: Int? = null,
+        acceptedTermsVersion: String = "v1.0-2026",
+        onSuccess: (enrollmentId: String) -> Unit,
+        onError: (String) -> Unit
+    ) {
         val token = repository.getUserToken()
         if (token.isNull_or_empty()) {
+            _joinSchemeActionState.value = LoadState.Error("Authentication required")
             onError("Authentication required")
             return
         }
         viewModelScope.launch {
+            _joinSchemeActionState.value = LoadState.Loading
+            if (com.ratestack.app.BuildConfig.DEBUG) {
+                android.util.Log.d(
+                    "RateStackScheme",
+                    "Joining Scheme PlanID=$planId Amount=$monthlyAmount Nominee=$nomineeFullName Rel=$nomineeRelationship Terms=$acceptedTermsVersion"
+                )
+            }
             try {
+                val body = mutableMapOf<String, Any>(
+                    "monthlyAmount" to monthlyAmount,
+                    "nomineeFullName" to nomineeFullName.trim(),
+                    "nomineeRelationship" to nomineeRelationship.trim(),
+                    "acceptedTermsVersion" to acceptedTermsVersion
+                )
+                if (!nomineePhone.isNull_or_empty()) {
+                    body["nomineePhone"] = normalizePhoneNumber(nomineePhone!!)
+                }
+                if (nomineeAge != null && nomineeAge > 0) {
+                    body["nomineeAge"] = nomineeAge
+                }
+
                 val res = ApiProvider.service.joinScheme(
                     "Bearer $token",
                     planId,
-                    mapOf("monthlyAmount" to amount)
+                    body
                 )
+
+                if (com.ratestack.app.BuildConfig.DEBUG) {
+                    android.util.Log.d(
+                        "RateStackScheme",
+                        "Join Scheme HTTP Code: ${res.code()} | Success: ${res.body()?.success} | Error: ${res.body()?.error?.message}"
+                    )
+                }
+
                 if (res.isSuccessful && res.body()?.success == true) {
+                    val dataMap = res.body()?.data
+                    val enrollmentId = dataMap?.get("enrollmentId")?.toString() ?: ""
+                    _joinSchemeActionState.value = LoadState.Ready("Account created")
                     loadMySchemes()
-                    onSuccess()
+                    onSuccess(enrollmentId)
                 } else {
-                    onError(res.body()?.error?.message ?: "Failed to join scheme")
+                    val errMsg = res.body()?.error?.message ?: "Failed to join scheme"
+                    _joinSchemeActionState.value = LoadState.Error(errMsg)
+                    onError(errMsg)
                 }
             } catch (e: Exception) {
-                onError(e.message ?: "Network error joining scheme")
+                val errMsg = e.message ?: "Network error joining scheme"
+                _joinSchemeActionState.value = LoadState.Error(errMsg)
+                onError(errMsg)
             }
         }
     }

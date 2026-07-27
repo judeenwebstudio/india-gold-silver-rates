@@ -128,6 +128,7 @@ import kotlinx.coroutines.launch
 private object Routes {
     const val HOME = "home"
     const val SCHEMES = "schemes"
+    const val SCHEME_JOIN = "scheme_join/{planId}"
     const val MY_SCHEMES = "my_schemes"
     const val CUSTOMER_LOGIN = "customer_login"
     const val CUSTOMER_REGISTER = "customer_register"
@@ -231,16 +232,20 @@ fun RateStackApp(
                         isLoading = isLoading,
                         onLoginClick = { navController.navigate(Routes.CUSTOMER_LOGIN) },
                         onRegisterClick = { navController.navigate(Routes.CUSTOMER_REGISTER) },
-                        onJoinScheme = { planId, amount ->
+                        onJoinScheme = { plan, amount ->
+                            schemeViewModel.selectPlan(plan)
+                            val planId = plan.id ?: ""
+                            if (com.ratestack.app.BuildConfig.DEBUG) {
+                                android.util.Log.d(
+                                    "RateStackNav",
+                                    "onJoinScheme Clicked: PlanID=$planId Name=${plan.name} IsLoggedIn=$isLoggedIn Amount=$amount"
+                                )
+                            }
                             if (!isLoggedIn) {
+                                schemeViewModel.setPendingJoin(planId, amount)
                                 navController.navigate(Routes.CUSTOMER_LOGIN)
                             } else {
-                                schemeViewModel.joinScheme(
-                                    planId,
-                                    amount,
-                                    onSuccess = { schemeViewModel.loadMySchemes() },
-                                    onError = { }
-                                )
+                                navController.navigate("scheme_join/${android.net.Uri.encode(planId)}")
                             }
                         },
                         onSelectScheme = { enrollmentId ->
@@ -248,6 +253,58 @@ fun RateStackApp(
                         },
                         onProfileClick = { navController.navigate(Routes.CUSTOMER_PROFILE) },
                         onLogoutClick = { schemeViewModel.logout() }
+                    )
+                }
+
+                composable(
+                    "scheme_join/{planId}",
+                    arguments = listOf(navArgument("planId") { type = NavType.StringType }),
+                ) { entry ->
+                    val planId = entry.arguments?.getString("planId").orEmpty()
+                    val schemePlansState by schemeViewModel.schemePlans.collectAsState()
+                    val plans = (schemePlansState as? LoadState.Ready)?.data?.plans ?: emptyList()
+                    val selectedPlan = plans.firstOrNull { it.id == planId } ?: schemeViewModel.selectedPlan.collectAsState().value
+
+                    val joinState by schemeViewModel.joinSchemeActionState.collectAsState()
+                    val isLoading = joinState is LoadState.Loading
+                    val errorMessage = (joinState as? LoadState.Error)?.message
+                    val initialAmount = schemeViewModel.pendingJoinAmount.collectAsState().value
+
+                    if (com.ratestack.app.BuildConfig.DEBUG) {
+                        android.util.Log.d(
+                            "RateStackNav",
+                            "Entered Destination: scheme_join/{planId} | planId=$planId | FoundPlan=${selectedPlan?.name}"
+                        )
+                    }
+
+                    com.ratestack.app.ui.schemes.JoinSchemeScreen(
+                        plan = selectedPlan,
+                        initialMonthlyAmount = initialAmount,
+                        isLoading = isLoading,
+                        errorMessage = errorMessage,
+                        onBackClick = {
+                            schemeViewModel.resetJoinSchemeActionState()
+                            navController.popBackStack()
+                        },
+                        onSubmitJoin = { amount, nomineeName, relationship, phone, age, termsVersion ->
+                            schemeViewModel.joinScheme(
+                                planId = planId,
+                                monthlyAmount = amount,
+                                nomineeFullName = nomineeName,
+                                nomineeRelationship = relationship,
+                                nomineePhone = phone,
+                                nomineeAge = age,
+                                acceptedTermsVersion = termsVersion,
+                                onSuccess = { enrollmentId ->
+                                    schemeViewModel.resetJoinSchemeActionState()
+                                    schemeViewModel.clearPendingJoin()
+                                    navController.navigate("scheme_dashboard/$enrollmentId") {
+                                        popUpTo(Routes.SCHEMES)
+                                    }
+                                },
+                                onError = { }
+                            )
+                        }
                     )
                 }
 
@@ -262,8 +319,15 @@ fun RateStackApp(
                         onLoginSubmit = { phone, pass ->
                             schemeViewModel.login(phone, pass) {
                                 schemeViewModel.resetAuthActionState()
-                                navController.navigate(Routes.SCHEMES) {
-                                    popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
+                                val pendingId = schemeViewModel.pendingJoinPlanId.value
+                                if (!pendingId.isNullOrBlank()) {
+                                    navController.navigate("scheme_join/${android.net.Uri.encode(pendingId)}") {
+                                        popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
+                                    }
+                                } else {
+                                    navController.navigate(Routes.SCHEMES) {
+                                        popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
+                                    }
                                 }
                             }
                         },

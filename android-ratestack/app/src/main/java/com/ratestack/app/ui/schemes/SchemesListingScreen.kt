@@ -30,7 +30,7 @@ fun SchemesListingScreen(
     isLoading: Boolean,
     onLoginClick: () -> Unit,
     onRegisterClick: () -> Unit,
-    onJoinScheme: (planId: String, monthlyAmount: Double) -> Unit,
+    onJoinScheme: (plan: SchemePlanDto, monthlyAmount: Double) -> Unit,
     onSelectScheme: (enrollmentId: String) -> Unit,
     onProfileClick: () -> Unit = {},
     onLogoutClick: () -> Unit,
@@ -365,15 +365,19 @@ fun SchemesListingScreen(
                 }
 
                 // 4. Public Scheme Plans List (Visible to Guests & Logged-In Users)
-                items(plans) { plan ->
+                items(plans, key = { it.id ?: "" }) { plan ->
                     val isGold = plan.metalType == "GOLD"
-                    val minAmount = plan.minMonthlyAmount ?: 500.0
+                    val minAmount = plan.minMonthlyAmount ?: 200.0
                     val currentSelectedAmount = selectedAmounts[plan.id] ?: minAmount
 
-                    val presetAmounts = listOf(500.0, 1000.0, 2000.0, 5000.0, 10000.0).filter { it >= minAmount }
+                    val presetAmounts = (plan.presetAmounts ?: listOf(500.0, 1000.0, 2000.0, 5000.0, 10000.0)).filter { it >= minAmount }
 
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onJoinScheme(plan, currentSelectedAmount)
+                            },
                         colors = CardDefaults.cardColors(
                             containerColor = if (isGold) Color(0xFF181512) else Color(0xFF141619)
                         ),
@@ -514,11 +518,7 @@ fun SchemesListingScreen(
                             // Join Scheme Button CTA
                             Button(
                                 onClick = {
-                                    if (!isLoggedIn) {
-                                        onLoginClick()
-                                    } else {
-                                        onJoinScheme(plan.id ?: "", currentSelectedAmount)
-                                    }
+                                    onJoinScheme(plan, currentSelectedAmount)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(

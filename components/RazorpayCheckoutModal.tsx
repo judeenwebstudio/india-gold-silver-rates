@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type RazorpayCheckoutModalProps = {
   enrollment: any;
@@ -25,8 +25,7 @@ export function RazorpayCheckoutModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fallback sandbox test fields if Razorpay script is not present or in mock key mode
-  const [sandboxPaymentMethod, setSandboxPaymentMethod] = useState<string>("UPI_GPAY");
+  const [sandboxPaymentMethod, setSandboxPaymentMethod] = useState<string>("UPI_PHONEPE");
   const [pendingOrderDetails, setPendingOrderDetails] = useState<any>(null);
 
   const monthlyAmount = enrollment?.monthlyAmount || dashboardData?.enrollment?.monthlyAmount || 0;
@@ -35,7 +34,9 @@ export function RazorpayCheckoutModal({
   const processingFee = 0;
   const totalPayable = monthlyAmount + processingFee;
 
-  // Load Razorpay Script dynamically
+  const currentGateway = pendingOrderDetails?.gateway || "PHONEPE";
+
+  // Load Razorpay Script dynamically if Razorpay fallback is active
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
       if ((window as any).Razorpay) {
@@ -127,7 +128,6 @@ export function RazorpayCheckoutModal({
           color: "#d97706",
         },
         handler: async function (response: any) {
-          // Razorpay payment success handler
           await verifyPaymentOnServer({
             paymentOrderId,
             gatewayPaymentId: response.razorpay_payment_id,
@@ -156,8 +156,9 @@ export function RazorpayCheckoutModal({
 
   const verifyPaymentOnServer = async (payload: {
     paymentOrderId: string;
-    gatewayPaymentId: string;
-    gatewaySignature: string;
+    gatewayPaymentId?: string;
+    gatewaySignature?: string;
+    merchantTransactionId?: string;
   }) => {
     setLoading(true);
     setError(null);
@@ -194,11 +195,20 @@ export function RazorpayCheckoutModal({
       return;
     }
 
-    await verifyPaymentOnServer({
-      paymentOrderId: pendingOrderDetails.paymentOrderId,
-      gatewayPaymentId: `pay_rzp_test_${Date.now()}`,
-      gatewaySignature: "mock_valid_signature",
-    });
+    if (currentGateway === "PHONEPE") {
+      await verifyPaymentOnServer({
+        paymentOrderId: pendingOrderDetails.paymentOrderId,
+        merchantTransactionId: pendingOrderDetails.merchantTransactionId || pendingOrderDetails.gatewayOrderId,
+        gatewayPaymentId: `PP_TX_SANDBOX_${Date.now()}`,
+        gatewaySignature: "PHONEPE_VERIFIED",
+      });
+    } else {
+      await verifyPaymentOnServer({
+        paymentOrderId: pendingOrderDetails.paymentOrderId,
+        gatewayPaymentId: `pay_rzp_test_${Date.now()}`,
+        gatewaySignature: "mock_valid_signature",
+      });
+    }
   };
 
   return (
@@ -208,7 +218,7 @@ export function RazorpayCheckoutModal({
         <div className="flex justify-between items-center border-b border-stone-800 pb-4">
           <div>
             <span className="text-[0.68rem] font-bold text-amber-400 uppercase tracking-widest block">
-              Razorpay Sandbox Checkout Flow
+              {currentGateway === "PHONEPE" ? "PhonePe Payment Gateway Checkout Flow" : "Razorpay Payment Gateway Checkout Flow"}
             </span>
             <h2 className="font-display text-xl font-bold text-stone-100 mt-0.5">
               Installment Payment Summary
@@ -262,12 +272,12 @@ export function RazorpayCheckoutModal({
             {/* Supported Payment Methods Display */}
             <div className="space-y-2">
               <span className="text-[0.7rem] font-bold text-stone-400 uppercase tracking-wider block">
-                Available Payment Options (Razorpay Standard Checkout):
+                Available Payment Options ({currentGateway === "PHONEPE" ? "PhonePe Standard Checkout" : "Razorpay Standard Checkout"}):
               </span>
               <div className="grid grid-cols-2 gap-2 text-[0.7rem]">
                 <div className="p-2.5 rounded-xl border border-stone-800 bg-stone-950/40 space-y-1">
                   <span className="font-bold text-amber-300 block">📱 1. UPI Payment Apps</span>
-                  <span className="text-stone-400 block">Google Pay, PhonePe, Paytm, BHIM, Any UPI</span>
+                  <span className="text-stone-400 block">PhonePe, Google Pay, Paytm, BHIM, Any UPI</span>
                 </div>
                 <div className="p-2.5 rounded-xl border border-stone-800 bg-stone-950/40 space-y-1">
                   <span className="font-bold text-amber-300 block">💳 2. Credit Cards</span>
@@ -309,17 +319,25 @@ export function RazorpayCheckoutModal({
         {step === "processing" && (
           <div className="py-12 text-center space-y-4">
             <div className="w-12 h-12 rounded-full border-4 border-amber-500 border-t-transparent animate-spin mx-auto" />
-            <p className="text-sm font-bold text-stone-200">Awaiting Razorpay Checkout Response...</p>
-            <p className="text-xs text-stone-400">Please complete the payment in the Razorpay Checkout window.</p>
+            <p className="text-sm font-bold text-stone-200">
+              {currentGateway === "PHONEPE" ? "Redirecting to PhonePe Checkout..." : "Awaiting Razorpay Checkout Response..."}
+            </p>
+            <p className="text-xs text-stone-400">
+              {currentGateway === "PHONEPE"
+                ? "You are being safely redirected to PhonePe payment page."
+                : "Please complete the payment in the Razorpay Checkout window."}
+            </p>
           </div>
         )}
 
         {step === "sandbox_fallback" && (
           <div className="space-y-5 text-xs">
             <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-950/20 text-amber-300 font-semibold space-y-1">
-              <span className="font-bold block">Razorpay Sandbox Simulator</span>
+              <span className="font-bold block">
+                {currentGateway === "PHONEPE" ? "PhonePe Sandbox Payment Simulator" : "Razorpay Sandbox Simulator"}
+              </span>
               <p className="text-[0.7rem] text-stone-300">
-                You are testing in Sandbox Mode. Select a simulated test payment method below to execute verified HMAC-SHA256 signature processing.
+                You are testing in Sandbox Mode. Select a simulated test payment method below to execute verified payment processing.
               </p>
             </div>
 
@@ -330,9 +348,9 @@ export function RazorpayCheckoutModal({
                 onChange={(e) => setSandboxPaymentMethod(e.target.value)}
                 className="w-full rounded-xl bg-stone-950 border border-stone-800 p-3 text-stone-100 font-semibold focus:border-amber-500 focus:outline-none"
               >
-                <option value="UPI_GPAY">UPI — Google Pay (Test Success)</option>
-                <option value="UPI_PHONEPE">UPI — PhonePe (Test Success)</option>
-                <option value="UPI_PAYTM">UPI — Paytm (Test Success)</option>
+                <option value="UPI_PHONEPE">PhonePe UPI (Test Success)</option>
+                <option value="UPI_GPAY">Google Pay UPI (Test Success)</option>
+                <option value="UPI_PAYTM">Paytm UPI (Test Success)</option>
                 <option value="CARD_CREDIT">Credit Card — Visa/Mastercard (Test Success)</option>
                 <option value="CARD_DEBIT">Debit Card — RuPay (Test Success)</option>
                 <option value="NETBANKING_SBI">Net Banking — State Bank of India (Test Success)</option>

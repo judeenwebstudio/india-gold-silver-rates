@@ -27,17 +27,18 @@ export async function POST(
       );
     }
 
-    // 2. Merchant compliance check
-    await enforceMerchantGuardForLivePayments();
-
-    const body = await request.json().catch(() => ({}));
-    const parsed = paymentOrderSchema.safeParse(body);
     const activeGateway = getActivePaymentGateway();
     console.log({
       activeGateway,
       paymentGatewayEnv: process.env.PAYMENT_GATEWAY,
       phonePeEnv: process.env.PHONEPE_ENV,
     });
+
+    // 2. Merchant compliance check
+    await enforceMerchantGuardForLivePayments();
+
+    const body = await request.json().catch(() => ({}));
+    const parsed = paymentOrderSchema.safeParse(body);
 
     if (activeGateway !== 'PHONEPE') {
       return NextResponse.json(

@@ -57,6 +57,23 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         window.decorView.postDelayed({ maybeRequestNotificationPermission() }, 1_500)
     }
 
+    fun startPhonePePaymentSheet(
+        redirectUrl: String,
+        merchantTransactionId: String,
+        onSuccess: (transactionId: String) -> Unit,
+        onError: (description: String?) -> Unit,
+    ) {
+        try {
+            if (redirectUrl.isNotBlank() && redirectUrl.startsWith("http")) {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(redirectUrl))
+                startActivity(intent)
+            }
+            onSuccess(merchantTransactionId)
+        } catch (e: Exception) {
+            onError(e.message ?: "Unable to launch PhonePe checkout.")
+        }
+    }
+
     fun startRazorpayPaymentSheet(
         keyId: String,
         razorpayOrderId: String,

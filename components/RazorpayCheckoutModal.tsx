@@ -69,7 +69,7 @@ export function RazorpayCheckoutModal({
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ gateway: "RAZORPAY" }),
+        body: JSON.stringify({}),
       });
 
       const orderData = await orderRes.json();
@@ -77,10 +77,23 @@ export function RazorpayCheckoutModal({
         throw new Error(orderData.error?.message || "Failed to create payment order");
       }
 
-      const { paymentOrderId, gatewayOrderId, amount, keyId, gateway } = orderData.data;
+      const { paymentOrderId, gatewayOrderId, amount, keyId, gateway, redirectUrl, merchantTransactionId } = orderData.data;
       setPendingOrderDetails(orderData.data);
 
-      // Check if real Razorpay Key ID is present or mock gateway mode is returned
+      // 1. PhonePe Gateway Handler
+      if (gateway === "PHONEPE") {
+        if (redirectUrl && redirectUrl.startsWith("http")) {
+          setStep("processing");
+          window.location.href = redirectUrl;
+          return;
+        } else {
+          setStep("sandbox_fallback");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2. Razorpay Gateway Handler
       if (gateway === "MOCK" || !keyId || keyId === "mock_key" || keyId.startsWith("mock_")) {
         setStep("sandbox_fallback");
         setLoading(false);

@@ -2,15 +2,16 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateSchemeUserFromRequest } from '@/lib/schemes/user-auth';
 import { enforceMerchantGuardForLivePayments } from '@/lib/schemes/merchant-guard';
+import { getActivePaymentGateway } from '@/lib/schemes/gateway';
+import { createPhonePeOrder } from '@/lib/schemes/phonepe';
 import { createRazorpayOrder } from '@/lib/schemes/razorpay';
 import { createMockPaymentOrder } from '@/lib/schemes/mock-gateway';
 import { paiseToInrNumber } from '@/lib/schemes/precision';
-import crypto from 'crypto';
 import { z } from 'zod';
 
 const paymentOrderSchema = z.object({
   idempotencyKey: z.string().optional(),
-  gateway: z.enum(['RAZORPAY', 'MOCK']).default('RAZORPAY'),
+  gateway: z.enum(['PHONEPE', 'RAZORPAY', 'MOCK']).optional(),
 });
 
 export async function POST(
@@ -34,7 +35,7 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
     const parsed = paymentOrderSchema.safeParse(body);
-    const gateway = parsed.success ? parsed.data.gateway : 'RAZORPAY';
+    const requestedGateway = parsed.success && parsed.data.gateway ? parsed.data.gateway : getActivePaymentGateway();
 
     // 3. Fetch Enrollment & Next Installment
     const enrollment = await prisma.schemeEnrollment.findUnique({
@@ -79,14 +80,38 @@ export async function POST(
     const orderId = `ORD-SCH-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const amountPaise = enrollment.monthlyAmountPaise;
 
-    // Create order on gateway adapter
     let gatewayOrderId = '';
-    let usedGateway = gateway;
+    let usedGateway = requestedGateway;
+    let redirectUrl = '';
+    let merchantId = '';
 
-    if (gateway === 'MOCK' || ((process.env.NODE_ENV === 'development' || process.env.ALLOW_DEV_SCHEME_TESTING === 'true' || process.env.ALLOW_SANDBOX_SCHEMES === 'true') && !process.env.RAZORPAY_KEY_ID)) {
+    if (requestedGateway === 'PHONEPE') {
+      try {
+        const phonePeOrder = await createPhonePeOrder({
+          orderId,
+          amountPaise,
+          receiptNumber: orderId,
+          userId: authUser.userId,
+          mobileNumber: authUser.phone,
+          enrollmentId: enrollment.id,
+        });
+        gatewayOrderId = phonePeOrder.merchantTransactionId;
+        redirectUrl = phonePeOrder.redirectUrl;
+        merchantId = phonePeOrder.merchantId;
+        usedGateway = 'PHONEPE';
+      } catch (err: any) {
+        if (err.message?.includes('credentials')) {
+          return NextResponse.json(
+            { success: false, error: { message: 'Payment service is not configured yet.' } },
+            { status: 503 }
+          );
+        }
+        throw err;
+      }
+    } else if (requestedGateway === 'MOCK' || ((process.env.NODE_ENV === 'development' || process.env.ALLOW_DEV_SCHEME_TESTING === 'true' || process.env.ALLOW_SANDBOX_SCHEMES === 'true') && !process.env.RAZORPAY_KEY_ID)) {
       if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_SCHEME_TESTING !== 'true' && process.env.ALLOW_SANDBOX_SCHEMES !== 'true') {
         return NextResponse.json(
-          { success: false, error: { message: 'Razorpay API credentials are missing' } },
+          { success: false, error: { message: 'Payment service is not configured yet.' } },
           { status: 503 }
         );
       }
@@ -109,7 +134,7 @@ export async function POST(
       } catch (err: any) {
         if (err.message?.includes('credentials')) {
           return NextResponse.json(
-            { success: false, error: { message: 'Razorpay API credentials are missing' } },
+            { success: false, error: { message: 'Payment service is not configured yet.' } },
             { status: 503 }
           );
         }
@@ -141,13 +166,16 @@ export async function POST(
         amount: paiseToInrNumber(paymentOrder.amountPaise),
         currency: paymentOrder.currency,
         gateway: paymentOrder.gateway,
-        keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_mock_key',
+        redirectUrl: redirectUrl || undefined,
+        merchantTransactionId: paymentOrder.gatewayOrderId || paymentOrder.orderId,
+        merchantId: merchantId || undefined,
+        keyId: usedGateway === 'RAZORPAY' ? (process.env.RAZORPAY_KEY_ID || 'rzp_test_mock_key') : undefined,
       },
     });
   } catch (error: any) {
     const isCredentialsErr = error?.message?.includes('credentials');
     return NextResponse.json(
-      { success: false, error: { message: error.message || 'Failed to create payment order' } },
+      { success: false, error: { message: isCredentialsErr ? 'Payment service is not configured yet.' : (error.message || 'Failed to create payment order') } },
       { status: isCredentialsErr ? 503 : 500 }
     );
   }

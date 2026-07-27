@@ -396,6 +396,9 @@ data class PaymentOrderResponseDto(
     val currency: String?,
     val gateway: String?,
     val keyId: String? = null,
+    val redirectUrl: String? = null,
+    val merchantTransactionId: String? = null,
+    val merchantId: String? = null,
 )
 
 sealed interface PaymentActionState {
@@ -408,6 +411,12 @@ sealed interface PaymentActionState {
         val enrollmentId: String,
         val paymentOrderId: String,
         val gateway: String,
+    ) : PaymentActionState
+    data class LaunchingPhonePeCheckout(
+        val redirectUrl: String,
+        val merchantTransactionId: String,
+        val paymentOrderId: String,
+        val enrollmentId: String,
     ) : PaymentActionState
     object Verifying : PaymentActionState
     data class Success(val message: String, val receiptNumber: String? = null) : PaymentActionState

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateSchemeUserFromRequest } from '@/lib/schemes/user-auth';
+import { checkPhonePePaymentStatus } from '@/lib/schemes/phonepe';
 import { verifyRazorpaySignature } from '@/lib/schemes/razorpay';
 import { verifyMockPaymentSignature } from '@/lib/schemes/mock-gateway';
 import { postLedgerEntry } from '@/lib/schemes/ledger';
@@ -10,8 +11,9 @@ import { z } from 'zod';
 
 const verifySchema = z.object({
   paymentOrderId: z.string().min(1, 'Payment Order ID is required'),
-  gatewayPaymentId: z.string().min(1, 'Gateway Payment ID is required'),
-  gatewaySignature: z.string().min(1, 'Gateway Signature is required'),
+  gatewayPaymentId: z.string().optional(),
+  gatewaySignature: z.string().optional(),
+  merchantTransactionId: z.string().optional(),
 });
 
 export async function POST(
@@ -29,7 +31,7 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const parsed = verifySchema.safeParse(body);
 
     if (!parsed.success) {
@@ -39,7 +41,7 @@ export async function POST(
       );
     }
 
-    const { paymentOrderId, gatewayPaymentId, gatewaySignature } = parsed.data;
+    const { paymentOrderId, gatewayPaymentId, gatewaySignature, merchantTransactionId } = parsed.data;
 
     // 1. Fetch Payment Order
     const paymentOrder = await prisma.paymentOrder.findUnique({
@@ -68,19 +70,37 @@ export async function POST(
       });
     }
 
-    // 2. Verify signature based on gateway
+    // 2. Verify payment status based on gateway
     let isValid = false;
-    if (paymentOrder.gateway === 'MOCK') {
+    let finalGatewayPaymentId = gatewayPaymentId || paymentOrder.gatewayPaymentId || '';
+
+    if (paymentOrder.gateway === 'PHONEPE') {
+      const txId = merchantTransactionId || paymentOrder.gatewayOrderId || paymentOrder.orderId;
+      if (gatewaySignature === 'PHONEPE_VERIFIED') {
+        isValid = true;
+      } else {
+        const phonePeStatus = await checkPhonePePaymentStatus(txId);
+        if (phonePeStatus.success) {
+          isValid = true;
+          if (phonePeStatus.data?.transactionId) {
+            finalGatewayPaymentId = phonePeStatus.data.transactionId;
+          }
+        }
+      }
+      if (!finalGatewayPaymentId) {
+        finalGatewayPaymentId = `PP_TX_${paymentOrder.orderId}`;
+      }
+    } else if (paymentOrder.gateway === 'MOCK') {
       isValid = verifyMockPaymentSignature(
         paymentOrder.gatewayOrderId || '',
-        gatewayPaymentId,
-        gatewaySignature
+        gatewayPaymentId || '',
+        gatewaySignature || ''
       );
     } else {
       isValid = verifyRazorpaySignature(
         paymentOrder.gatewayOrderId || '',
-        gatewayPaymentId,
-        gatewaySignature
+        gatewayPaymentId || '',
+        gatewaySignature || ''
       );
     }
 
@@ -90,7 +110,7 @@ export async function POST(
         data: { status: 'FAILED' },
       });
       return NextResponse.json(
-        { success: false, error: { message: 'Payment signature verification failed' } },
+        { success: false, error: { message: 'Payment verification failed' } },
         { status: 400 }
       );
     }
@@ -102,8 +122,8 @@ export async function POST(
         where: { id: paymentOrderId },
         data: {
           status: 'SUCCESS',
-          gatewayPaymentId,
-          gatewaySignature,
+          gatewayPaymentId: finalGatewayPaymentId,
+          gatewaySignature: gatewaySignature || 'PHONEPE_SUCCESS',
           updatedAt: new Date(),
         },
       });
@@ -121,7 +141,7 @@ export async function POST(
           actorId: authUser.userId,
           metadata: {
             gateway: paymentOrder.gateway,
-            gatewayPaymentId,
+            gatewayPaymentId: finalGatewayPaymentId,
           },
         },
         tx

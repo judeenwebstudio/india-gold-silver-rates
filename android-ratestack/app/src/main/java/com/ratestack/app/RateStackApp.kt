@@ -455,29 +455,47 @@ fun RateStackApp(
                         onPayInstallment = {
                             schemeViewModel.startPaymentFlow(
                                 enrollmentId = enrollmentId,
-                                onLaunchCheckout = { keyId, razorpayOrderId, amountInPaise, paymentOrderId, gateway ->
+                                onLaunchCheckout = { keyId, gatewayOrderId, amountInPaise, paymentOrderId, gateway ->
                                     if (activity != null) {
-                                        activity.startRazorpayPaymentSheet(
-                                            keyId = keyId,
-                                            razorpayOrderId = razorpayOrderId,
-                                            amountInPaise = amountInPaise,
-                                            userPhone = userPhone,
-                                            userEmail = null,
-                                            onSuccess = { paymentId, orderId, signature ->
-                                                schemeViewModel.handlePaymentSuccess(
-                                                    enrollmentId = enrollmentId,
-                                                    paymentOrderId = paymentOrderId,
-                                                    gatewayPaymentId = paymentId,
-                                                    gatewaySignature = signature
-                                                )
-                                            },
-                                            onCancelled = {
-                                                schemeViewModel.handlePaymentCancelled()
-                                            },
-                                            onError = { desc ->
-                                                schemeViewModel.handlePaymentFailed(desc)
-                                            }
-                                        )
+                                        if (gateway == "PHONEPE") {
+                                            activity.startPhonePePaymentSheet(
+                                                redirectUrl = keyId, // redirectUrl passed in keyId parameter if present
+                                                merchantTransactionId = gatewayOrderId,
+                                                onSuccess = { txId ->
+                                                    schemeViewModel.handlePaymentSuccess(
+                                                        enrollmentId = enrollmentId,
+                                                        paymentOrderId = paymentOrderId,
+                                                        gatewayPaymentId = txId,
+                                                        gatewaySignature = "PHONEPE_VERIFIED"
+                                                    )
+                                                },
+                                                onError = { desc ->
+                                                    schemeViewModel.handlePaymentFailed(desc)
+                                                }
+                                            )
+                                        } else {
+                                            activity.startRazorpayPaymentSheet(
+                                                keyId = keyId,
+                                                razorpayOrderId = gatewayOrderId,
+                                                amountInPaise = amountInPaise,
+                                                userPhone = userPhone,
+                                                userEmail = null,
+                                                onSuccess = { paymentId, orderId, signature ->
+                                                    schemeViewModel.handlePaymentSuccess(
+                                                        enrollmentId = enrollmentId,
+                                                        paymentOrderId = paymentOrderId,
+                                                        gatewayPaymentId = paymentId,
+                                                        gatewaySignature = signature
+                                                    )
+                                                },
+                                                onCancelled = {
+                                                    schemeViewModel.handlePaymentCancelled()
+                                                },
+                                                onError = { desc ->
+                                                    schemeViewModel.handlePaymentFailed(desc)
+                                                }
+                                            )
+                                        }
                                     } else {
                                         schemeViewModel.handlePaymentFailed("Activity context unavailable")
                                     }

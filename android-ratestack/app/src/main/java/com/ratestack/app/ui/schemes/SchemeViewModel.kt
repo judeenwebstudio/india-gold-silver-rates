@@ -327,7 +327,7 @@ class SchemeViewModel(
                 val res = ApiProvider.service.createPaymentOrder(
                     "Bearer $token",
                     enrollmentId,
-                    mapOf("gateway" to "RAZORPAY")
+                    emptyMap()
                 )
 
                 if (com.ratestack.app.BuildConfig.DEBUG) {
@@ -343,17 +343,32 @@ class SchemeViewModel(
                         val keyId = data.keyId ?: ""
                         val razorpayOrderId = data.gatewayOrderId ?: ""
                         val paymentOrderId = data.paymentOrderId ?: ""
-                        val gateway = data.gateway ?: "RAZORPAY"
+                        val gateway = data.gateway ?: "PHONEPE"
                         val amountInPaise = ((data.amount ?: 0.0) * 100).toLong()
+                        val redirectUrl = data.redirectUrl ?: ""
+                        val merchantTransactionId = data.merchantTransactionId ?: data.gatewayOrderId ?: ""
 
                         if (com.ratestack.app.BuildConfig.DEBUG) {
                             android.util.Log.d(
                                 "RateStackPayment",
-                                "Order Created | PaymentOrderId: $paymentOrderId | RazorpayOrderId: $razorpayOrderId | Gateway: $gateway | KeyID Present: ${keyId.isNotBlank()}"
+                                "Order Created | PaymentOrderId: $paymentOrderId | Gateway: $gateway | RedirectUrl Present: ${redirectUrl.isNotBlank()}"
                             )
                         }
 
-                        if (gateway == "RAZORPAY" && (keyId.isBlank() || keyId == "mock_key")) {
+                        if (gateway == "PHONEPE") {
+                            if (redirectUrl.isNotBlank()) {
+                                val state = com.ratestack.app.data.PaymentActionState.LaunchingPhonePeCheckout(
+                                    redirectUrl = redirectUrl,
+                                    merchantTransactionId = merchantTransactionId,
+                                    paymentOrderId = paymentOrderId,
+                                    enrollmentId = enrollmentId,
+                                )
+                                _paymentFlowState.value = state
+                                onLaunchCheckout(keyId, merchantTransactionId, amountInPaise, paymentOrderId, gateway)
+                            } else {
+                                handlePaymentSuccess(enrollmentId, paymentOrderId, merchantTransactionId, "PHONEPE_VERIFIED")
+                            }
+                        } else if (gateway == "RAZORPAY" && (keyId.isBlank() || keyId == "mock_key")) {
                             _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Payment service is not configured yet.")
                         } else {
                             val state = com.ratestack.app.data.PaymentActionState.LaunchingCheckout(

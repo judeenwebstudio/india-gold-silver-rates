@@ -120,7 +120,7 @@ export function HomeCustomerDashboardSection() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ gateway: "RAZORPAY" }),
+        body: JSON.stringify({}),
       });
 
       const orderData = await orderRes.json();

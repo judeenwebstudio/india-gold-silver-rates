@@ -1,6 +1,7 @@
 /**
  * RateStack Savings Scheme Module - Seeder
- * Populates default plans, coin denominations, and merchant configuration placeholder.
+ * Populates default plans (12M, 24M, 36M for Gold and Silver),
+ * coin denominations, and merchant configuration placeholder.
  */
 
 import { prisma } from '@/lib/prisma';
@@ -25,52 +26,134 @@ export async function seedSchemeData() {
     update: {},
   });
 
-  // 2. Default Plans
-  // Plan A: 22K (916) Gold Coin Savings Scheme - 12 Months
-  const gold12 = await prisma.schemePlan.upsert({
-    where: { id: 'plan-gold-22k-12m' },
-    create: {
+  // 2. Default Plans Definition (6 Public Plans)
+  const plansData = [
+    // GOLD PLANS
+    {
       id: 'plan-gold-22k-12m',
       name: '22K Gold Coin Savings Scheme (12 Months)',
-      metalType: 'GOLD',
-      purity: 'K22',
+      metalType: 'GOLD' as const,
+      purity: 'K22' as const,
       tenureMonths: 12,
       minMonthlyAmountPaise: inrToPaise(200),
       maxMonthlyAmountPaise: inrToPaise(100000),
-      presetAmountsJson: [20000, 50000, 100000, 200000, 500000], // in paise (₹200, ₹500, ₹1000, ₹2000, ₹5000)
+      presetAmountsJson: [20000, 50000, 100000, 200000, 500000], // ₹200, ₹500, ₹1,000, ₹2,000, ₹5,000
       gracePeriodDays: 7,
       termsVersion: 'v1.0-2026',
-      termsContent: 'Official RateStack 22K Gold Coin Savings Scheme Terms & Conditions.',
+      termsContent: 'Official RateStack 22K Gold Coin Savings Scheme Terms & Conditions (12 Months).',
       kycRequired: false,
       visibility: true,
       isActive: true,
       version: 1,
     },
-    update: {},
-  });
-
-  // Plan B: Silver 999 Coin Savings Scheme - 12 Months
-  const silver12 = await prisma.schemePlan.upsert({
-    where: { id: 'plan-silver-999-12m' },
-    create: {
+    {
+      id: 'plan-gold-22k-24m',
+      name: '22K Gold Coin Savings Scheme (24 Months)',
+      metalType: 'GOLD' as const,
+      purity: 'K22' as const,
+      tenureMonths: 24,
+      minMonthlyAmountPaise: inrToPaise(200),
+      maxMonthlyAmountPaise: inrToPaise(100000),
+      presetAmountsJson: [20000, 50000, 100000, 200000, 500000],
+      gracePeriodDays: 7,
+      termsVersion: 'v1.0-2026',
+      termsContent: 'Official RateStack 22K Gold Coin Savings Scheme Terms & Conditions (24 Months).',
+      kycRequired: false,
+      visibility: true,
+      isActive: true,
+      version: 1,
+    },
+    {
+      id: 'plan-gold-22k-36m',
+      name: '22K Gold Coin Savings Scheme (36 Months)',
+      metalType: 'GOLD' as const,
+      purity: 'K22' as const,
+      tenureMonths: 36,
+      minMonthlyAmountPaise: inrToPaise(200),
+      maxMonthlyAmountPaise: inrToPaise(100000),
+      presetAmountsJson: [20000, 50000, 100000, 200000, 500000],
+      gracePeriodDays: 7,
+      termsVersion: 'v1.0-2026',
+      termsContent: 'Official RateStack 22K Gold Coin Savings Scheme Terms & Conditions (36 Months).',
+      kycRequired: false,
+      visibility: true,
+      isActive: true,
+      version: 1,
+    },
+    // SILVER PLANS
+    {
       id: 'plan-silver-999-12m',
       name: 'Silver 999 Coin Savings Scheme (12 Months)',
-      metalType: 'SILVER',
-      purity: 'P999',
+      metalType: 'SILVER' as const,
+      purity: 'P999' as const,
       tenureMonths: 12,
       minMonthlyAmountPaise: inrToPaise(200),
       maxMonthlyAmountPaise: inrToPaise(50000),
       presetAmountsJson: [20000, 50000, 100000, 200000, 500000],
       gracePeriodDays: 7,
       termsVersion: 'v1.0-2026',
-      termsContent: 'Official RateStack Silver 999 Coin Savings Scheme Terms & Conditions.',
+      termsContent: 'Official RateStack Silver 999 Coin Savings Scheme Terms & Conditions (12 Months).',
       kycRequired: false,
       visibility: true,
       isActive: true,
       version: 1,
     },
-    update: {},
-  });
+    {
+      id: 'plan-silver-999-24m',
+      name: 'Silver 999 Coin Savings Scheme (24 Months)',
+      metalType: 'SILVER' as const,
+      purity: 'P999' as const,
+      tenureMonths: 24,
+      minMonthlyAmountPaise: inrToPaise(200),
+      maxMonthlyAmountPaise: inrToPaise(50000),
+      presetAmountsJson: [20000, 50000, 100000, 200000, 500000],
+      gracePeriodDays: 7,
+      termsVersion: 'v1.0-2026',
+      termsContent: 'Official RateStack Silver 999 Coin Savings Scheme Terms & Conditions (24 Months).',
+      kycRequired: false,
+      visibility: true,
+      isActive: true,
+      version: 1,
+    },
+    {
+      id: 'plan-silver-999-36m',
+      name: 'Silver 999 Coin Savings Scheme (36 Months)',
+      metalType: 'SILVER' as const,
+      purity: 'P999' as const,
+      tenureMonths: 36,
+      minMonthlyAmountPaise: inrToPaise(200),
+      maxMonthlyAmountPaise: inrToPaise(50000),
+      presetAmountsJson: [20000, 50000, 100000, 200000, 500000],
+      gracePeriodDays: 7,
+      termsVersion: 'v1.0-2026',
+      termsContent: 'Official RateStack Silver 999 Coin Savings Scheme Terms & Conditions (36 Months).',
+      kycRequired: false,
+      visibility: true,
+      isActive: true,
+      version: 1,
+    },
+  ];
+
+  const seededPlans: Record<string, any> = {};
+
+  for (const plan of plansData) {
+    const upserted = await prisma.schemePlan.upsert({
+      where: { id: plan.id },
+      create: plan,
+      update: {
+        name: plan.name,
+        metalType: plan.metalType,
+        purity: plan.purity,
+        tenureMonths: plan.tenureMonths,
+        minMonthlyAmountPaise: plan.minMonthlyAmountPaise,
+        maxMonthlyAmountPaise: plan.maxMonthlyAmountPaise,
+        presetAmountsJson: plan.presetAmountsJson,
+        visibility: true,
+        isActive: true,
+      },
+    });
+    seededPlans[plan.id] = upserted;
+  }
 
   // 3. Coin Denominations for 22K Gold
   const goldDenominations = [
@@ -84,23 +167,26 @@ export async function seedSchemeData() {
     { weightGrams: 50.0, title: '50 Gram 22K Gold Coin (916 Hallmarked)', mintingFee: 2500 },
   ];
 
-  for (const item of goldDenominations) {
-    const denomId = `denom-gold-${item.weightGrams}g`;
-    await prisma.coinProductDenomination.upsert({
-      where: { id: denomId },
-      create: {
-        id: denomId,
-        planId: gold12.id,
-        metalType: 'GOLD',
-        purity: 'K22',
-        weightMilligrams: gramsToMilligrams(item.weightGrams),
-        title: item.title,
-        mintingFeePaise: inrToPaise(item.mintingFee),
-        packagingFeePaise: inrToPaise(50),
-        inStock: true,
-      },
-      update: {},
-    });
+  const goldPlanIds = ['plan-gold-22k-12m', 'plan-gold-22k-24m', 'plan-gold-22k-36m'];
+  for (const planId of goldPlanIds) {
+    for (const item of goldDenominations) {
+      const denomId = `denom-gold-${item.weightGrams}g-${planId}`;
+      await prisma.coinProductDenomination.upsert({
+        where: { id: denomId },
+        create: {
+          id: denomId,
+          planId,
+          metalType: 'GOLD',
+          purity: 'K22',
+          weightMilligrams: gramsToMilligrams(item.weightGrams),
+          title: item.title,
+          mintingFeePaise: inrToPaise(item.mintingFee),
+          packagingFeePaise: inrToPaise(50),
+          inStock: true,
+        },
+        update: {},
+      });
+    }
   }
 
   // 4. Coin Denominations for Silver 999
@@ -114,24 +200,27 @@ export async function seedSchemeData() {
     { weightGrams: 1000.0, title: '1000 Gram (1 kg) Silver 999 Bar', mintingFee: 1000 },
   ];
 
-  for (const item of silverDenominations) {
-    const denomId = `denom-silver-${item.weightGrams}g`;
-    await prisma.coinProductDenomination.upsert({
-      where: { id: denomId },
-      create: {
-        id: denomId,
-        planId: silver12.id,
-        metalType: 'SILVER',
-        purity: 'P999',
-        weightMilligrams: gramsToMilligrams(item.weightGrams),
-        title: item.title,
-        mintingFeePaise: inrToPaise(item.mintingFee),
-        packagingFeePaise: inrToPaise(30),
-        inStock: true,
-      },
-      update: {},
-    });
+  const silverPlanIds = ['plan-silver-999-12m', 'plan-silver-999-24m', 'plan-silver-999-36m'];
+  for (const planId of silverPlanIds) {
+    for (const item of silverDenominations) {
+      const denomId = `denom-silver-${item.weightGrams}g-${planId}`;
+      await prisma.coinProductDenomination.upsert({
+        where: { id: denomId },
+        create: {
+          id: denomId,
+          planId,
+          metalType: 'SILVER',
+          purity: 'P999',
+          weightMilligrams: gramsToMilligrams(item.weightGrams),
+          title: item.title,
+          mintingFeePaise: inrToPaise(item.mintingFee),
+          packagingFeePaise: inrToPaise(30),
+          inStock: true,
+        },
+        update: {},
+      });
+    }
   }
 
-  return { merchantConfig, gold12, silver12 };
+  return { merchantConfig, ...seededPlans };
 }

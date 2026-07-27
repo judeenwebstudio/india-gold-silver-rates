@@ -35,6 +35,10 @@ fun SchemesListingScreen(
     onProfileClick: () -> Unit = {},
     onLogoutClick: () -> Unit,
 ) {
+    var selectedMetal by remember { mutableStateOf("GOLD") }
+    var selectedGoldTenure by remember { mutableStateOf(12) }
+    var selectedSilverTenure by remember { mutableStateOf(12) }
+
     var selectedAmounts by remember { mutableStateOf(mapOf<String, Double>()) }
 
     Surface(
@@ -129,7 +133,7 @@ fun SchemesListingScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "Accumulate physical 22K Gold and 999 Fine Silver coins with fixed monthly installments. Get 100% bonus on your 12th installment.",
+                                text = "Accumulate physical 22K Gold and 999 Fine Silver coins with disciplined monthly savings over 12, 24, or 36 months.",
                                 fontSize = 12.sp,
                                 color = Color(0xFFD6D3D1),
                                 lineHeight = 16.sp,
@@ -138,10 +142,9 @@ fun SchemesListingScreen(
                     }
                 }
 
-                // 2. Logged-In User Experience (Above Public Plans)
+                // 2. Logged-In User Dashboard (Above Public Plans)
                 if (isLoggedIn) {
                     if (userSchemes.isNotEmpty()) {
-                        // Summary Bar
                         item {
                             val totalBalance = userSchemes.sumOf { it.schemePurchaseBalance ?: 0.0 }
                             val totalRemaining = userSchemes.sumOf { it.remainingAmount ?: 0.0 }
@@ -206,7 +209,7 @@ fun SchemesListingScreen(
                             )
                         }
 
-                        items(userSchemes) { scheme ->
+                        items(userSchemes, key = { it.id ?: "" }) { scheme ->
                             val isGold = scheme.metalType == "GOLD"
                             val tenure = scheme.tenureMonths ?: 12
                             val paid = scheme.paidInstallmentCount ?: 0
@@ -242,7 +245,7 @@ fun SchemesListingScreen(
                                                 overflow = TextOverflow.Ellipsis,
                                             )
                                             Text(
-                                                text = "Account #${scheme.accountNumber}",
+                                                text = "Account #${scheme.accountNumber} • ${tenure}M Plan",
                                                 fontSize = 11.sp,
                                                 color = Color(0xFFF59E0B),
                                                 fontWeight = FontWeight.Bold,
@@ -323,7 +326,6 @@ fun SchemesListingScreen(
 
                         item { Spacer(modifier = Modifier.height(4.dp)) }
                     } else {
-                        // Clean No-Scheme Message for Logged-In User
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -353,188 +355,271 @@ fun SchemesListingScreen(
                     }
                 }
 
-                // 3. Available Public Schemes Header
+                // 3. Public Schemes Section Header & Metal Selector
                 item {
-                    Text(
-                        text = "AVAILABLE SAVINGS SCHEMES",
-                        color = Color(0xFFFBBF24),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp,
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "AVAILABLE SAVINGS SCHEMES",
+                            color = Color(0xFFFBBF24),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp,
+                        )
+
+                        // Metal Category Selector (Gold / Silver)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedMetal = "GOLD" },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (selectedMetal == "GOLD") Color(0xFFB45309) else Color(0xFF1C1917),
+                                border = BorderStroke(1.dp, if (selectedMetal == "GOLD") Color(0xFFFBBF24) else Color(0xFF44403C))
+                            ) {
+                                Text(
+                                    text = "🪙 22K Gold Schemes",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedMetal = "SILVER" },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (selectedMetal == "SILVER") Color(0xFF334155) else Color(0xFF1C1917),
+                                border = BorderStroke(1.dp, if (selectedMetal == "SILVER") Color(0xFF94A3B8) else Color(0xFF44403C))
+                            ) {
+                                Text(
+                                    text = "⚪ 999 Silver Schemes",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
 
-                // 4. Public Scheme Plans List (Visible to Guests & Logged-In Users)
-                items(plans, key = { it.id ?: "" }) { plan ->
-                    val isGold = plan.metalType == "GOLD"
-                    val minAmount = plan.minMonthlyAmount ?: 200.0
-                    val currentSelectedAmount = selectedAmounts[plan.id] ?: minAmount
+                // Filter plans by active metal
+                val metalPlans = plans.filter { (it.metalType ?: "GOLD") == selectedMetal }
+                val currentTenure = if (selectedMetal == "GOLD") selectedGoldTenure else selectedSilverTenure
+                val activePlan = metalPlans.find { it.tenureMonths == currentTenure } ?: metalPlans.firstOrNull()
 
-                    val presetAmounts = (plan.presetAmounts ?: listOf(500.0, 1000.0, 2000.0, 5000.0, 10000.0)).filter { it >= minAmount }
+                if (activePlan != null) {
+                    item {
+                        val isGold = activePlan.metalType == "GOLD"
+                        val minAmount = activePlan.minMonthlyAmount ?: 200.0
+                        val currentSelectedAmount = selectedAmounts[activePlan.id.orEmpty()] ?: minAmount
+                        val tenure = activePlan.tenureMonths ?: 12
+                        val presetAmounts = (activePlan.presetAmounts ?: listOf(200.0, 500.0, 1000.0, 2000.0, 5000.0)).filter { it >= minAmount }
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onJoinScheme(plan, currentSelectedAmount)
-                            },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isGold) Color(0xFF181512) else Color(0xFF141619)
-                        ),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isGold) Color(0xFFD97706) else Color(0xFF475569)
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            // Header Row with Strict Single-Line Horizontal Tenure Badge
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = plan.name ?: if (isGold) "22K Gold Coin Savings Scheme" else "Silver 999 Coin Savings Scheme",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        color = Color.White,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        text = if (isGold) "Gold Purity: 22K (916 Hallmarked)" else "Silver Purity: 999 (Fine Silver)",
-                                        fontSize = 11.sp,
-                                        color = if (isGold) Color(0xFFF59E0B) else Color(0xFF94A3B8),
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(6.dp))
-
-                                // FIXED UI: Strict Horizontal Single-Line Tenure Badge
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isGold) Color(0xFF78350F) else Color(0xFF334155),
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isGold) Color(0xFF181512) else Color(0xFF141619)
+                            ),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isGold) Color(0xFFD97706) else Color(0xFF475569)
+                            ),
+                            shape = RoundedCornerShape(18.dp),
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                // Title & Metal Header
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(
-                                        text = "${plan.tenureMonths ?: 12} Months",
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Highlights / Badges Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF292524),
-                                ) {
-                                    Text(
-                                        text = "Min ₹${minAmount.toInt()}/mo",
-                                        color = Color.LightGray,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                    )
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF065F46),
-                                ) {
-                                    Text(
-                                        text = "100% 12th Month Bonus",
-                                        color = Color(0xFF34D399),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Monthly Contribution Selector Chips
-                            Text(
-                                text = "Select Monthly Installment Amount:",
-                                fontSize = 11.sp,
-                                color = Color.Gray,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                items(presetAmounts) { amt ->
-                                    val isAmtSelected = amt == currentSelectedAmount
-                                    Surface(
-                                        modifier = Modifier.clickable {
-                                            selectedAmounts = selectedAmounts + (plan.id.orEmpty() to amt)
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isAmtSelected) (if (isGold) Color(0xFFD97706) else Color(0xFF475569)) else Color(0xFF262320),
-                                        border = BorderStroke(
-                                            1.dp,
-                                            if (isAmtSelected) Color.White else Color(0xFF44403C)
-                                        ),
-                                    ) {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "₹${amt.toInt()}",
-                                            color = if (isAmtSelected) (if (isGold) Color.Black else Color.White) else Color.LightGray,
-                                            fontSize = 11.sp,
+                                            text = activePlan.name ?: if (isGold) "22K Gold Coin Scheme" else "Silver 999 Coin Scheme",
                                             fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            fontSize = 16.sp,
+                                            color = Color.White,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            text = if (isGold) "Gold Purity: 22K (916 Hallmarked)" else "Silver Purity: 999 (Fine Silver)",
+                                            fontSize = 11.sp,
+                                            color = if (isGold) Color(0xFFF59E0B) else Color(0xFF94A3B8),
                                         )
                                     }
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
 
-                            // Key Scheme Terms & Benefits List
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color(0xFF0F0D0B), RoundedCornerShape(10.dp))
-                                    .padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                Text("• Tenure: Pay 11 installments, RateStack pays the 12th installment bonus.", fontSize = 11.sp, color = Color(0xFFD6D3D1))
-                                Text("• Maturity: Redeem for physical ${if (isGold) "22K BIS Hallmarked Gold" else "999 Fine Silver"} coins.", fontSize = 11.sp, color = Color(0xFFD6D3D1))
-                                Text("• Purchase Balance: 100% of payments credited with 0% deduction.", fontSize = 11.sp, color = Color(0xFFD6D3D1))
-                                Text("• GST & Charges: 3% GST + minting/delivery calculated at redemption.", fontSize = 11.sp, color = Color(0xFFA8A29E))
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Join Scheme Button CTA
-                            Button(
-                                onClick = {
-                                    onJoinScheme(plan, currentSelectedAmount)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isGold) Color(0xFFD97706) else Color(0xFF475569)
-                                ),
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(vertical = 10.dp),
-                            ) {
+                                // TENURE SELECTOR CHIPS (12 Months | 24 Months | 36 Months)
                                 Text(
-                                    text = if (isLoggedIn) "Join Scheme (₹${currentSelectedAmount.toInt()}/mo) →" else "Login to Join Scheme →",
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isGold) Color.Black else Color.White,
-                                    fontSize = 13.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                                    text = "Select Scheme Tenure Duration:",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.SemiBold,
                                 )
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val tenures = listOf(12, 24, 36)
+                                    for (t in tenures) {
+                                        val isTenureSelected = t == tenure
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable {
+                                                    if (isGold) selectedGoldTenure = t
+                                                    else selectedSilverTenure = t
+                                                },
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isTenureSelected) (if (isGold) Color(0xFF78350F) else Color(0xFF1E293B)) else Color(0xFF262320),
+                                            border = BorderStroke(
+                                                1.dp,
+                                                if (isTenureSelected) (if (isGold) Color(0xFFFBBF24) else Color(0xFF38BDF8)) else Color(0xFF44403C)
+                                            )
+                                        ) {
+                                            Text(
+                                                text = "$t Months",
+                                                color = if (isTenureSelected) Color.White else Color.LightGray,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                modifier = Modifier.padding(vertical = 8.dp),
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Monthly Contribution Selector Chips
+                                Text(
+                                    text = "Select Monthly Installment Amount:",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(presetAmounts) { amt ->
+                                        val isAmtSelected = amt == currentSelectedAmount
+                                        Surface(
+                                            modifier = Modifier.clickable {
+                                                selectedAmounts = selectedAmounts + (activePlan.id.orEmpty() to amt)
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isAmtSelected) (if (isGold) Color(0xFFD97706) else Color(0xFF475569)) else Color(0xFF262320),
+                                            border = BorderStroke(
+                                                1.dp,
+                                                if (isAmtSelected) Color.White else Color(0xFF44403C)
+                                            ),
+                                        ) {
+                                            Text(
+                                                text = "₹${amt.toInt()}",
+                                                color = if (isAmtSelected) (if (isGold) Color.Black else Color.White) else Color.LightGray,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Scheduled Total Calculation Card
+                                val scheduledTotal = currentSelectedAmount * tenure
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFF0F0D0B),
+                                    border = BorderStroke(1.dp, Color(0xFF262320)),
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text("Total Scheduled Amount", fontSize = 10.sp, color = Color.Gray)
+                                            Text(
+                                                "₹${String.format(Locale.US, "%,.0f", scheduledTotal)}",
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isGold) Color(0xFFFEF3C7) else Color.White
+                                            )
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text("Duration", fontSize = 10.sp, color = Color.Gray)
+                                            Text(
+                                                "$tenure Installments",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFF59E0B)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Key Terms Summary
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF0F0D0B), RoundedCornerShape(10.dp))
+                                        .padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text("• Tenure: $tenure Months fixed monthly coin purchase plan.", fontSize = 11.sp, color = Color(0xFFD6D3D1))
+                                    Text("• Maturity: Redeem for physical ${if (isGold) "22K BIS Hallmarked Gold" else "999 Fine Silver"} coins.", fontSize = 11.sp, color = Color(0xFFD6D3D1))
+                                    Text("• Purchase Balance: 100% of payments credited with 0% deduction.", fontSize = 11.sp, color = Color(0xFFD6D3D1))
+                                    Text("• Non-Interest Bearing: Amount-wallet plan without financial returns.", fontSize = 11.sp, color = Color(0xFFA8A29E))
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Join Scheme Button CTA
+                                Button(
+                                    onClick = {
+                                        onJoinScheme(activePlan, currentSelectedAmount)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isGold) Color(0xFFD97706) else Color(0xFF475569)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(vertical = 12.dp),
+                                ) {
+                                    Text(
+                                        text = if (isLoggedIn) "Join ${tenure}M Scheme (₹${currentSelectedAmount.toInt()}/mo) →" else "Login to Join ${tenure}M Scheme →",
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isGold) Color.Black else Color.White,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                             }
                         }
                     }

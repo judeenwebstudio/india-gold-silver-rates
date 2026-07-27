@@ -12,7 +12,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -78,7 +77,7 @@ fun JoinSchemeScreen(
     val maxAmount = plan.maxMonthlyAmount ?: 100000.0
     val tenureMonths = plan.tenureMonths ?: 12
 
-    val presetAmounts = (plan.presetAmounts ?: listOf(500.0, 1000.0, 2000.0, 5000.0, 10000.0))
+    val presetAmounts = (plan.presetAmounts ?: listOf(200.0, 500.0, 1000.0, 2000.0, 5000.0))
         .filter { it >= minAmount && it <= maxAmount }
 
     var selectedAmount by remember(plan.id, initialMonthlyAmount) {
@@ -113,7 +112,7 @@ fun JoinSchemeScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = if (isGold) "22K Gold Coin Scheme" else "Silver 999 Coin Scheme",
+                            text = if (isGold) "22K Gold Coin Scheme • ${tenureMonths}M Plan" else "Silver 999 Coin Scheme • ${tenureMonths}M Plan",
                             fontSize = 11.sp,
                             color = if (isGold) Color(0xFFFBBF24) else Color(0xFF38BDF8)
                         )
@@ -137,7 +136,7 @@ fun JoinSchemeScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Scheme Summary Card
+            // 1. Dynamic Scheme Summary Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -154,14 +153,14 @@ fun JoinSchemeScreen(
                     ) {
                         Column {
                             Text(
-                                text = "TENURE & BONUS",
+                                text = "TENURE & DURATION",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Black,
                                 color = Color.Gray,
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = "$tenureMonths Months (11 Paid + 1 Bonus)",
+                                text = "$tenureMonths Months ($tenureMonths Installments)",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -172,7 +171,7 @@ fun JoinSchemeScreen(
                             color = Color(0xFF065F46)
                         ) {
                             Text(
-                                text = "100% 12th Bonus",
+                                text = "${tenureMonths}M Fixed Term",
                                 color = Color(0xFF34D399),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -431,7 +430,7 @@ fun JoinSchemeScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "I accept the RateStack ${plan.name} Scheme Terms & Conditions (v1.0-2026). I understand 100% of my monthly contributions will be credited with 0% deduction, and physical coin delivery with GST applies at maturity.",
+                        text = "I accept the RateStack ${plan.name} Scheme Terms & Conditions (${plan.termsVersion ?: "v1.0-2026"}). I confirm that 100% of my monthly contributions will be credited with 0% deduction over $tenureMonths months, and physical coin delivery with GST applies at maturity.",
                         fontSize = 11.sp,
                         color = Color.LightGray,
                         lineHeight = 16.sp
@@ -508,7 +507,7 @@ fun JoinSchemeScreen(
                     )
                 } else {
                     Text(
-                        text = "Confirm & Open Scheme Account →",
+                        text = "Confirm & Open ${tenureMonths}M Scheme Account →",
                         fontWeight = FontWeight.Bold,
                         color = Color.Black,
                         fontSize = 14.sp

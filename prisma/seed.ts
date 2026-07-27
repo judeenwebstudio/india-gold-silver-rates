@@ -161,8 +161,11 @@ async function main() {
     },
   });
 
+  const { seedSchemeData } = await import('../lib/schemes/seed-data.js');
+  await seedSchemeData();
+
   console.info(
-    `Database seeded with one administrator, ${states.length} states, ${seededCities.length} cities, and no duplicated city rates.`,
+    `Database seeded with one administrator, ${states.length} states, ${seededCities.length} cities, 6 scheme plans, and no duplicated city rates.`,
   );
 }
 

@@ -14,6 +14,16 @@ const joinSchema = z.object({
   acceptedTermsVersion: z.string().min(1, 'Terms acceptance is required'),
 });
 
+function calculateMonthlyDueDate(baseDate: Date, monthOffset: number): Date {
+  const target = new Date(baseDate);
+  const originalDay = baseDate.getDate();
+  target.setMonth(target.getMonth() + monthOffset);
+  if (target.getDate() !== originalDay) {
+    target.setDate(0); // Safely clamp month-end dates (e.g. Jan 31 -> Feb 28)
+  }
+  return target;
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -88,8 +98,7 @@ export async function POST(
     const accountNumber = `RS-SCH-${year}-${(count + 1).toString().padStart(5, '0')}`;
 
     const startDate = new Date();
-    const maturityDate = new Date(startDate);
-    maturityDate.setMonth(maturityDate.getMonth() + plan.tenureMonths);
+    const maturityDate = calculateMonthlyDueDate(startDate, plan.tenureMonths);
 
     // 5. Create Enrollment, Nominee, and Installment Schedule in Transaction
     const enrollment = await prisma.$transaction(async (tx) => {
@@ -127,8 +136,7 @@ export async function POST(
       // Generate Installment Schedule
       const scheduleData = [];
       for (let i = 1; i <= plan.tenureMonths; i++) {
-        const dueDate = new Date(startDate);
-        dueDate.setMonth(dueDate.getMonth() + (i - 1));
+        const dueDate = calculateMonthlyDueDate(startDate, i - 1);
         scheduleData.push({
           enrollmentId: created.id,
           installmentNo: i,

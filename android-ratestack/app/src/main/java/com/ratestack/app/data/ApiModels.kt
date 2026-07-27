@@ -395,7 +395,24 @@ data class PaymentOrderResponseDto(
     val amount: Double?,
     val currency: String?,
     val gateway: String?,
+    val keyId: String? = null,
 )
+
+sealed interface PaymentActionState {
+    object Idle : PaymentActionState
+    object CreatingOrder : PaymentActionState
+    data class LaunchingCheckout(
+        val keyId: String,
+        val razorpayOrderId: String,
+        val amountInPaise: Long,
+        val enrollmentId: String,
+        val paymentOrderId: String,
+        val gateway: String,
+    ) : PaymentActionState
+    object Verifying : PaymentActionState
+    data class Success(val message: String, val receiptNumber: String? = null) : PaymentActionState
+    data class Error(val message: String) : PaymentActionState
+}
 
 data class AuthResponseDto(
     val token: String?,

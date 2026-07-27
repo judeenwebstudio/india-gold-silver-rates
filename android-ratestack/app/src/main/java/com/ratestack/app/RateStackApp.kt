@@ -438,7 +438,11 @@ fun RateStackApp(
                         schemeViewModel.loadSchemeDashboard(enrollmentId)
                     }
 
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val activity = context as? MainActivity
+                    val userPhone by schemeViewModel.userPhone.collectAsState()
                     val dashboardState by schemeViewModel.schemeDashboard.collectAsState()
+                    val paymentFlowState by schemeViewModel.paymentFlowState.collectAsState()
                     val isLoading = dashboardState is LoadState.Loading
                     val dashboardData = (dashboardState as? LoadState.Ready)?.data
                     val isOffline = (dashboardState as? LoadState.Ready)?.fromCache ?: false
@@ -446,21 +450,38 @@ fun RateStackApp(
                     com.ratestack.app.ui.schemes.SchemeDashboardScreen(
                         dashboard = dashboardData,
                         isLoading = isLoading,
+                        paymentActionState = paymentFlowState,
+                        onDismissPaymentBanner = { schemeViewModel.resetPaymentFlowState() },
                         onPayInstallment = {
-                            schemeViewModel.createPaymentOrder(
-                                enrollmentId,
-                                onSuccess = { order ->
-                                    // Simulated Sandbox verification for Android flow
-                                    schemeViewModel.verifyPayment(
-                                        enrollmentId,
-                                        order.paymentOrderId ?: "",
-                                        "pay_android_sandbox_${System.currentTimeMillis()}",
-                                        "mock_valid_signature",
-                                        onSuccess = { },
-                                        onError = { }
-                                    )
-                                },
-                                onError = { }
+                            schemeViewModel.startPaymentFlow(
+                                enrollmentId = enrollmentId,
+                                onLaunchCheckout = { keyId, razorpayOrderId, amountInPaise, paymentOrderId, gateway ->
+                                    if (activity != null) {
+                                        activity.startRazorpayPaymentSheet(
+                                            keyId = keyId,
+                                            razorpayOrderId = razorpayOrderId,
+                                            amountInPaise = amountInPaise,
+                                            userPhone = userPhone,
+                                            userEmail = null,
+                                            onSuccess = { paymentId, orderId, signature ->
+                                                schemeViewModel.handlePaymentSuccess(
+                                                    enrollmentId = enrollmentId,
+                                                    paymentOrderId = paymentOrderId,
+                                                    gatewayPaymentId = paymentId,
+                                                    gatewaySignature = signature
+                                                )
+                                            },
+                                            onCancelled = {
+                                                schemeViewModel.handlePaymentCancelled()
+                                            },
+                                            onError = { desc ->
+                                                schemeViewModel.handlePaymentFailed(desc)
+                                            }
+                                        )
+                                    } else {
+                                        schemeViewModel.handlePaymentFailed("Activity context unavailable")
+                                    }
+                                }
                             )
                         },
                         onRequestRedemption = { },

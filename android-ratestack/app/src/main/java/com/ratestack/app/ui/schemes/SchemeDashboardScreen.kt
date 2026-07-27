@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ratestack.app.data.SchemeDashboardDto
+import com.ratestack.app.data.PaymentActionState
 import java.util.Locale
 
 @Composable
@@ -26,6 +27,8 @@ fun SchemeDashboardScreen(
     onViewReceipt: (String) -> Unit = {},
     onRetryPayment: (String) -> Unit = {},
     isOffline: Boolean = false,
+    paymentActionState: PaymentActionState = PaymentActionState.Idle,
+    onDismissPaymentBanner: () -> Unit = {},
 ) {
     if (isLoading) {
         Box(
@@ -63,6 +66,9 @@ fun SchemeDashboardScreen(
     val rateInfo = dashboard.relevantCurrentMetalRate
     val isEligibleRedemption = dashboard.redemptionEligibility?.isEligible == true
 
+    val isPaymentProcessing = paymentActionState is PaymentActionState.CreatingOrder || paymentActionState is PaymentActionState.Verifying
+    val canPay = enrollment?.status == "ACTIVE" && !isOffline && !isPaymentProcessing
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -70,6 +76,60 @@ fun SchemeDashboardScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        // Payment Error / Success Feedback Banners
+        if (paymentActionState is PaymentActionState.Error) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF451A03),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = paymentActionState.message,
+                            color = Color(0xFFFCA5A5),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onDismissPaymentBanner) {
+                            Text("Dismiss", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        } else if (paymentActionState is PaymentActionState.Success) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF064E3B),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "✓ " + paymentActionState.message + (if (paymentActionState.receiptNumber != null) " (Receipt #${paymentActionState.receiptNumber})" else ""),
+                            color = Color(0xFFA7F3D0),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onDismissPaymentBanner) {
+                            Text("OK", color = Color.White, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
         // Offline Cache Warning Banner
         if (isOffline) {
             item {
@@ -306,16 +366,39 @@ fun SchemeDashboardScreen(
                 if (enrollment?.status == "ACTIVE" && !isOffline) {
                     Button(
                         onClick = onPayInstallment,
+                        enabled = canPay,
                         modifier = Modifier.fillMaxWidth().height(50.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFD97706),
+                            disabledContainerColor = Color(0xFF57390B)
+                        ),
                         shape = RoundedCornerShape(14.dp),
                     ) {
-                        Text(
-                            text = "Pay Installment (₹${enrollment.monthlyAmount?.toInt() ?: 0})",
-                            color = Color.Black,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
+                        if (isPaymentProcessing) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Text(
+                                    text = if (paymentActionState is PaymentActionState.CreatingOrder) "Creating payment order..." else "Verifying payment...",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "Pay Installment (₹${enrollment.monthlyAmount?.toInt() ?: 0})",
+                                color = if (canPay) Color.Black else Color.Gray,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     }
                 }
 

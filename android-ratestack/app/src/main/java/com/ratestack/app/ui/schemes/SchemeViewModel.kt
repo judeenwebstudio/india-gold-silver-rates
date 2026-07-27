@@ -300,56 +300,112 @@ class SchemeViewModel(
         }
     }
 
-    fun createPaymentOrder(enrollmentId: String, onSuccess: (PaymentOrderResponseDto) -> Unit, onError: (String) -> Unit) {
+    private val _paymentFlowState = MutableStateFlow<com.ratestack.app.data.PaymentActionState>(com.ratestack.app.data.PaymentActionState.Idle)
+    val paymentFlowState: StateFlow<com.ratestack.app.data.PaymentActionState> = _paymentFlowState.asStateFlow()
+
+    fun resetPaymentFlowState() {
+        _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Idle
+    }
+
+    fun startPaymentFlow(
+        enrollmentId: String,
+        onLaunchCheckout: (keyId: String, razorpayOrderId: String, amountInPaise: Long, paymentOrderId: String, gateway: String) -> Unit,
+    ) {
         val token = repository.getUserToken()
         if (token.isNull_or_empty()) {
-            onError("Authentication required")
+            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Authentication required")
             return
         }
+
         viewModelScope.launch {
-            _paymentOrderState.value = LoadState.Loading
+            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.CreatingOrder
+            if (com.ratestack.app.BuildConfig.DEBUG) {
+                android.util.Log.d("RateStackPayment", "Pay Installment Clicked | EnrollmentId: $enrollmentId")
+            }
+
             try {
                 val res = ApiProvider.service.createPaymentOrder(
                     "Bearer $token",
                     enrollmentId,
                     mapOf("gateway" to "RAZORPAY")
                 )
+
+                if (com.ratestack.app.BuildConfig.DEBUG) {
+                    android.util.Log.d(
+                        "RateStackPayment",
+                        "Order API HTTP Code: ${res.code()} | Success: ${res.body()?.success} | Error: ${res.body()?.error?.message}"
+                    )
+                }
+
                 if (res.isSuccessful && res.body()?.success == true) {
                     val data = res.body()?.data
                     if (data != null) {
-                        _paymentOrderState.value = LoadState.Ready(data)
-                        onSuccess(data)
+                        val keyId = data.keyId ?: ""
+                        val razorpayOrderId = data.gatewayOrderId ?: ""
+                        val paymentOrderId = data.paymentOrderId ?: ""
+                        val gateway = data.gateway ?: "RAZORPAY"
+                        val amountInPaise = ((data.amount ?: 0.0) * 100).toLong()
+
+                        if (com.ratestack.app.BuildConfig.DEBUG) {
+                            android.util.Log.d(
+                                "RateStackPayment",
+                                "Order Created | PaymentOrderId: $paymentOrderId | RazorpayOrderId: $razorpayOrderId | Gateway: $gateway | KeyID Present: ${keyId.isNotBlank()}"
+                            )
+                        }
+
+                        if (gateway == "RAZORPAY" && (keyId.isBlank() || keyId == "mock_key")) {
+                            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Payment service is not configured yet.")
+                        } else {
+                            val state = com.ratestack.app.data.PaymentActionState.LaunchingCheckout(
+                                keyId = keyId,
+                                razorpayOrderId = razorpayOrderId,
+                                amountInPaise = amountInPaise,
+                                enrollmentId = enrollmentId,
+                                paymentOrderId = paymentOrderId,
+                                gateway = gateway,
+                            )
+                            _paymentFlowState.value = state
+                            onLaunchCheckout(keyId, razorpayOrderId, amountInPaise, paymentOrderId, gateway)
+                        }
                     } else {
-                        _paymentOrderState.value = LoadState.Error("Order data empty")
-                        onError("Failed to generate payment order")
+                        _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Unable to create payment order.")
                     }
                 } else {
-                    val err = res.body()?.error?.message ?: "Payment order creation failed"
-                    _paymentOrderState.value = LoadState.Error(err)
-                    onError(err)
+                    val rawErr = res.body()?.error?.message ?: ""
+                    val msg = if (rawErr.contains("credentials", ignoreCase = true) || rawErr.contains("configured", ignoreCase = true)) {
+                        "Payment service is not configured yet."
+                    } else {
+                        "Unable to create payment order."
+                    }
+                    _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error(msg)
                 }
             } catch (e: Exception) {
-                val err = e.message ?: "Network error creating payment order"
-                _paymentOrderState.value = LoadState.Error(err)
-                onError(err)
+                if (com.ratestack.app.BuildConfig.DEBUG) {
+                    android.util.Log.e("RateStackPayment", "Order API Exception: ${e.javaClass.simpleName}: ${e.message}")
+                }
+                _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Unable to create payment order.")
             }
         }
     }
 
-    fun verifyPayment(
+    fun handlePaymentSuccess(
         enrollmentId: String,
         paymentOrderId: String,
         gatewayPaymentId: String,
         gatewaySignature: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit,
     ) {
         val token = repository.getUserToken()
         if (token.isNull_or_empty()) {
-            onError("Authentication required")
+            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Authentication required")
             return
         }
+
         viewModelScope.launch {
+            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Verifying
+            if (com.ratestack.app.BuildConfig.DEBUG) {
+                android.util.Log.d("RateStackPayment", "Verifying Payment | EnrollmentId: $enrollmentId | PaymentOrderId: $paymentOrderId")
+            }
+
             try {
                 val res = ApiProvider.service.verifyPayment(
                     "Bearer $token",
@@ -360,17 +416,38 @@ class SchemeViewModel(
                         "gatewaySignature" to gatewaySignature
                     )
                 )
+
+                if (com.ratestack.app.BuildConfig.DEBUG) {
+                    android.util.Log.d(
+                        "RateStackPayment",
+                        "Verify API HTTP Code: ${res.code()} | Success: ${res.body()?.success}"
+                    )
+                }
+
                 if (res.isSuccessful && res.body()?.success == true) {
+                    val receiptNo = res.body()?.data?.get("receiptNumber")
+                    _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Success("Payment completed successfully.", receiptNo)
                     loadSchemeDashboard(enrollmentId)
                     loadMySchemes()
-                    onSuccess()
                 } else {
-                    onError(res.body()?.error?.message ?: "Payment verification failed")
+                    val errMsg = res.body()?.error?.message ?: "Payment received but verification is pending."
+                    _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error(errMsg)
                 }
             } catch (e: Exception) {
-                onError(e.message ?: "Network error verifying payment")
+                if (com.ratestack.app.BuildConfig.DEBUG) {
+                    android.util.Log.e("RateStackPayment", "Verify API Exception: ${e.javaClass.simpleName}: ${e.message}")
+                }
+                _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Payment received but verification is pending.")
             }
         }
+    }
+
+    fun handlePaymentCancelled() {
+        _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Payment was cancelled.")
+    }
+
+    fun handlePaymentFailed(description: String? = null) {
+        _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Payment failed. Please try again.")
     }
 
     private val _forgotMobile = MutableStateFlow("")

@@ -74,6 +74,41 @@ type RateSnapshotSource = {
   deletedAt: Date | null;
 };
 
+function parsedRateSummary(result: ScrapedRateResult) {
+  return result.quotes
+    .filter((quote) => quote.mappedPurity)
+    .map((quote) => {
+      const selected = result.preferredSession === "PM" ? quote.pm : quote.am;
+      return {
+        label: quote.label,
+        metalType: quote.metalType,
+        purity: quote.mappedPurity,
+        sourceUnit: quote.sourceUnit,
+        sourceValue: selected?.sourceValue ?? null,
+        pricePerGram: selected?.pricePerGram ?? null,
+        pricePerKilogram: selected?.pricePerKilogram ?? null,
+      };
+    });
+}
+
+function logParsedRates(
+  executionType: ScraperMode,
+  result: ScrapedRateResult,
+  attempt: number,
+) {
+  console.info("[rate-sync] parsed rates", {
+    executionType,
+    attempt,
+    provider: result.provider,
+    sourceUrl: result.sourceUrl,
+    sourceDate: result.sourceDate,
+    sourceTime: result.sourceTime,
+    preferredSession: result.preferredSession,
+    fetchedAt: result.fetchedAt,
+    rates: parsedRateSummary(result),
+  });
+}
+
 function toMetalType(value: ScraperMetalType) {
   return value === "GOLD" ? MetalType.GOLD : MetalType.SILVER;
 }
@@ -101,6 +136,22 @@ function selectedMappedRates(result: ScrapedRateResult): SelectedMappedRate[] {
     if (!selected) {
       throw new ScraperRejectedError(
         `${quote.label} is missing the preferred ${result.preferredSession} value.`,
+      );
+    }
+
+    const pricePerGram = Number(selected.pricePerGram);
+    const pricePerKilogram = selected.pricePerKilogram
+      ? Number(selected.pricePerKilogram)
+      : null;
+    if (
+      !Number.isFinite(pricePerGram) ||
+      pricePerGram <= 0 ||
+      (pricePerKilogram !== null &&
+        (!Number.isFinite(pricePerKilogram) || pricePerKilogram <= 0))
+    ) {
+      throw new ScraperRejectedError(
+        `${quote.label} contains an invalid normalized value; stored rates were preserved.`,
+        { label: quote.label, pricePerGram: selected.pricePerGram },
       );
     }
 
@@ -193,7 +244,7 @@ async function writeSynchronizedRates(
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await prisma.$transaction(
+      const synchronized = await prisma.$transaction(
         async (transaction) => {
           const summary: ScraperDatabaseSummary = {
             created: 0,
@@ -316,6 +367,20 @@ async function writeSynchronizedRates(
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
+
+      console.info("[rate-sync] database update", {
+        executionType,
+        source: config.name,
+        sourceUrl: config.url,
+        sourceDate: parsed.sourceDate,
+        preferredSession: parsed.preferredSession,
+        attemptCount,
+        ...synchronized.summary,
+        status: synchronized.status,
+        logId: synchronized.logId,
+      });
+
+      return synchronized;
     } catch (error) {
       if (attempt < 2 && isRetryableTransactionError(error)) continue;
       throw error;
@@ -327,7 +392,6 @@ async function writeSynchronizedRates(
 
 function errorMessage(error: unknown) {
   if (error instanceof ScraperError) return error.message;
-  console.error("Scraper execution failed.", error);
   return "The scraping attempt failed unexpectedly.";
 }
 
@@ -345,6 +409,19 @@ async function recordUnsuccessfulAttempt(
   const source = config?.name ?? process.env.RATE_SOURCE_NAME?.trim() ?? "UNCONFIGURED";
   const sourceUrl = config?.url ?? process.env.RATE_SOURCE_URL?.trim() ?? null;
   const details = error instanceof ScraperError ? error.details : undefined;
+
+  console.error("[rate-sync] failure", {
+    executionType,
+    status,
+    source,
+    sourceUrl,
+    message,
+    attemptCount,
+    durationMs,
+    sourceDate: parsed?.sourceDate ?? null,
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    details,
+  });
 
   return prisma.rateUpdateLog.create({
     data: {
@@ -385,6 +462,7 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
 
     if (mode === "MANUAL_TEST") {
       parsed = await provider.scrape();
+      logParsedRates(mode, parsed, 1);
       await validateChangeThreshold(scraperConfig, parsed);
 
       const log = await prisma.rateUpdateLog.create({
@@ -431,8 +509,9 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
           }
         },
       },
-      prepare: async () => {
+      prepare: async (attempt) => {
         parsed = await provider.scrape();
+        logParsedRates(mode, parsed, attempt);
         await validateChangeThreshold(scraperConfig, parsed);
         return parsed;
       },

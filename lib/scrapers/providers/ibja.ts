@@ -24,6 +24,16 @@ export class IbjaRateProvider implements RateScraperProvider {
       this.userAgent,
       this.requestTimeoutMs,
     );
+
+    console.info("[rate-source] response", {
+      provider: this.name,
+      sourceUrl: this.sourceUrl,
+      responseUrl: response.responseUrl,
+      status: response.status,
+      fromCache: response.fromCache,
+      fetchedAt: response.fetchedAt,
+    });
+
     return parseIbjaRates(response.html, {
       provider: this.name,
       sourceUrl: this.sourceUrl,

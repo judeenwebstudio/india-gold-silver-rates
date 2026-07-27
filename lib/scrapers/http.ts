@@ -154,7 +154,13 @@ export async function fetchPublicHtml(
   const cached = htmlCache.get(sourceUrl.toString());
 
   if (cached && cached.expiresAt > Date.now()) {
-    return { html: cached.html, fetchedAt: cached.fetchedAt, fromCache: true };
+    return {
+      html: cached.html,
+      fetchedAt: cached.fetchedAt,
+      fromCache: true,
+      status: null,
+      responseUrl: sourceUrl.toString(),
+    };
   }
 
   await assertRobotsAllowed(sourceUrl, userAgent, requestTimeoutMs);
@@ -163,6 +169,12 @@ export async function fetchPublicHtml(
     userAgent,
     requestTimeoutMs,
   );
+  console.info("[rate-source] HTTP response", {
+    sourceUrl: sourceUrl.toString(),
+    responseUrl: response.url,
+    status: response.status,
+    contentType: response.headers.get("content-type") ?? null,
+  });
 
   if (response.status === 401 || response.status === 403 || response.status === 429) {
     throw new ScraperFetchError(
@@ -206,5 +218,11 @@ export async function fetchPublicHtml(
     expiresAt: Date.now() + HTML_CACHE_TTL_MS,
   });
 
-  return { html, fetchedAt, fromCache: false };
+  return {
+    html,
+    fetchedAt,
+    fromCache: false,
+    status: response.status,
+    responseUrl: response.url,
+  };
 }

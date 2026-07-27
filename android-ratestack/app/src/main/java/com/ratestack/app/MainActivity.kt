@@ -19,20 +19,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.google.android.material.snackbar.Snackbar
 
-import com.razorpay.Checkout
-import com.razorpay.PaymentData
-import com.razorpay.PaymentResultWithDataListener
-import org.json.JSONObject
-
-class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
+class MainActivity : ComponentActivity() {
     private var incomingUrl by mutableStateOf<String?>(null)
     private var notificationPermissionChecked = false
     private var successfulSessionRecorded = false
     private lateinit var playUpdateCoordinator: PlayUpdateCoordinator
-
-    private var activePaymentSuccessCallback: ((paymentId: String, orderId: String, signature: String) -> Unit)? = null
-    private var activePaymentCancelledCallback: (() -> Unit)? = null
-    private var activePaymentErrorCallback: ((description: String?) -> Unit)? = null
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -41,7 +32,6 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_RateStack)
         super.onCreate(savedInstanceState)
-        Checkout.preload(applicationContext)
         enableEdgeToEdge()
         incomingUrl = resolveIncomingUrl(intent)
         setContent {
@@ -64,98 +54,17 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         onError: (description: String?) -> Unit,
     ) {
         try {
-            if (redirectUrl.isNotBlank() && redirectUrl.startsWith("http")) {
+            if (redirectUrl.isNotBlank() && redirectUrl.startsWith("https://")) {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(redirectUrl))
                 startActivity(intent)
+            } else {
+                onError("PhonePe checkout URL is unavailable.")
+                return
             }
             onSuccess(merchantTransactionId)
         } catch (e: Exception) {
             onError(e.message ?: "Unable to launch PhonePe checkout.")
         }
-    }
-
-    fun startRazorpayPaymentSheet(
-        keyId: String,
-        razorpayOrderId: String,
-        amountInPaise: Long,
-        userPhone: String?,
-        userEmail: String?,
-        onSuccess: (paymentId: String, orderId: String, signature: String) -> Unit,
-        onCancelled: () -> Unit,
-        onError: (description: String?) -> Unit,
-    ) {
-        activePaymentSuccessCallback = onSuccess
-        activePaymentCancelledCallback = onCancelled
-        activePaymentErrorCallback = onError
-
-        val checkout = Checkout()
-        checkout.setKeyID(keyId)
-
-        try {
-            val options = JSONObject().apply {
-                put("name", "RateStack")
-                put("description", "Gold & Silver Scheme Installment")
-                put("image", "https://india-gold-silver-rates.vercel.app/logo.png")
-                put("order_id", razorpayOrderId)
-                put("currency", "INR")
-                put("amount", amountInPaise)
-
-                val prefill = JSONObject().apply {
-                    if (!userPhone.isNullOrEmpty()) put("contact", userPhone)
-                    if (!userEmail.isNullOrEmpty()) put("email", userEmail)
-                }
-                put("prefill", prefill)
-
-                val theme = JSONObject().apply {
-                    put("color", "#D97706")
-                }
-                put("theme", theme)
-
-                val retry = JSONObject().apply {
-                    put("enabled", true)
-                    put("max_count", 2)
-                }
-                put("retry", retry)
-            }
-            checkout.open(this, options)
-        } catch (e: Exception) {
-            if (BuildConfig.DEBUG) {
-                android.util.Log.e("RateStackRazorpay", "Error launching Razorpay checkout: ${e.message}", e)
-            }
-            onError("Unable to launch payment checkout sheet.")
-        }
-    }
-
-    override fun onPaymentSuccess(razorpayPaymentId: String?, paymentData: PaymentData?) {
-        val paymentId = razorpayPaymentId ?: paymentData?.paymentId ?: ""
-        val orderId = paymentData?.orderId ?: ""
-        val signature = paymentData?.signature ?: ""
-
-        if (BuildConfig.DEBUG) {
-            android.util.Log.d("RateStackRazorpay", "onPaymentSuccess Callback | PaymentId: $paymentId | OrderId: $orderId")
-        }
-
-        activePaymentSuccessCallback?.invoke(paymentId, orderId, signature)
-        clearPaymentCallbacks()
-    }
-
-    override fun onPaymentError(code: Int, description: String?, paymentData: PaymentData?) {
-        if (BuildConfig.DEBUG) {
-            android.util.Log.d("RateStackRazorpay", "onPaymentError Callback | Code: $code | Desc: $description")
-        }
-
-        if (code == Checkout.PAYMENT_CANCELED) {
-            activePaymentCancelledCallback?.invoke()
-        } else {
-            activePaymentErrorCallback?.invoke(description ?: "Payment failed. Please try again.")
-        }
-        clearPaymentCallbacks()
-    }
-
-    private fun clearPaymentCallbacks() {
-        activePaymentSuccessCallback = null
-        activePaymentCancelledCallback = null
-        activePaymentErrorCallback = null
     }
 
     override fun onNewIntent(intent: Intent) {

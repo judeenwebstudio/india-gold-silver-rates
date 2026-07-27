@@ -4,7 +4,7 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { RazorpayCheckoutModal } from "@/components/RazorpayCheckoutModal";
+import { PaymentCheckoutModal } from "@/components/PaymentCheckoutModal";
 
 export default function UserSchemeDashboardPage({
   params,
@@ -684,9 +684,9 @@ export default function UserSchemeDashboardPage({
         </div>
       </main>
 
-       {/* Razorpay Sandbox Checkout Modal */}
+      {/* Payment Checkout Modal */}
       {showPaymentModal && data?.enrollment && (
-        <RazorpayCheckoutModal
+        <PaymentCheckoutModal
           enrollment={data.enrollment}
           dashboardData={data}
           userName={userName}

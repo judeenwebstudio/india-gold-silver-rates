@@ -404,14 +404,6 @@ data class PaymentOrderResponseDto(
 sealed interface PaymentActionState {
     object Idle : PaymentActionState
     object CreatingOrder : PaymentActionState
-    data class LaunchingCheckout(
-        val keyId: String,
-        val razorpayOrderId: String,
-        val amountInPaise: Long,
-        val enrollmentId: String,
-        val paymentOrderId: String,
-        val gateway: String,
-    ) : PaymentActionState
     data class LaunchingPhonePeCheckout(
         val redirectUrl: String,
         val merchantTransactionId: String,

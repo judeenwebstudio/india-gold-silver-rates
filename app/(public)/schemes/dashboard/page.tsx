@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { RazorpayCheckoutModal } from "@/components/RazorpayCheckoutModal";
+import { PaymentCheckoutModal } from "@/components/PaymentCheckoutModal";
 
 export default function CustomerSchemesDashboardPage() {
   const [schemes, setSchemes] = useState<any[]>([]);
@@ -500,7 +500,7 @@ export default function CustomerSchemesDashboardPage() {
                         onClick={handleOpenPaymentModal}
                         className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all"
                       >
-                        Pay Now (Sandbox) →
+                        Pay Now →
                       </button>
                     </div>
                   )}
@@ -749,9 +749,9 @@ export default function CustomerSchemesDashboardPage() {
         )}
       </main>
 
-      {/* Razorpay Sandbox Checkout Modal */}
+      {/* Payment Checkout Modal */}
       {showPaymentModal && activeScheme && (
-        <RazorpayCheckoutModal
+        <PaymentCheckoutModal
           enrollment={activeScheme}
           dashboardData={dashboardData}
           userName={userName}

@@ -4,14 +4,11 @@ import { authenticateSchemeUserFromRequest } from '@/lib/schemes/user-auth';
 import { enforceMerchantGuardForLivePayments } from '@/lib/schemes/merchant-guard';
 import { getActivePaymentGateway } from '@/lib/schemes/gateway';
 import { createPhonePeOrder } from '@/lib/schemes/phonepe';
-import { createRazorpayOrder } from '@/lib/schemes/razorpay';
-import { createMockPaymentOrder } from '@/lib/schemes/mock-gateway';
 import { paiseToInrNumber } from '@/lib/schemes/precision';
 import { z } from 'zod';
 
 const paymentOrderSchema = z.object({
   idempotencyKey: z.string().optional(),
-  gateway: z.enum(['PHONEPE', 'RAZORPAY', 'MOCK']).optional(),
 });
 
 export async function POST(
@@ -35,7 +32,19 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
     const parsed = paymentOrderSchema.safeParse(body);
-    const requestedGateway = parsed.success && parsed.data.gateway ? parsed.data.gateway : getActivePaymentGateway();
+    const activeGateway = getActivePaymentGateway();
+    console.log({
+      activeGateway,
+      paymentGatewayEnv: process.env.PAYMENT_GATEWAY,
+      phonePeEnv: process.env.PHONEPE_ENV,
+    });
+
+    if (activeGateway !== 'PHONEPE') {
+      return NextResponse.json(
+        { success: false, error: { message: 'PhonePe is the only supported payment gateway.' } },
+        { status: 503 }
+      );
+    }
 
     // 3. Fetch Enrollment & Next Installment
     const enrollment = await prisma.schemeEnrollment.findUnique({
@@ -81,65 +90,30 @@ export async function POST(
     const amountPaise = enrollment.monthlyAmountPaise;
 
     let gatewayOrderId = '';
-    let usedGateway = requestedGateway;
+    const usedGateway = activeGateway;
     let redirectUrl = '';
     let merchantId = '';
 
-    if (requestedGateway === 'PHONEPE') {
-      try {
-        const phonePeOrder = await createPhonePeOrder({
-          orderId,
-          amountPaise,
-          receiptNumber: orderId,
-          userId: authUser.userId,
-          mobileNumber: authUser.phone,
-          enrollmentId: enrollment.id,
-        });
-        gatewayOrderId = phonePeOrder.merchantTransactionId;
-        redirectUrl = phonePeOrder.redirectUrl;
-        merchantId = phonePeOrder.merchantId;
-        usedGateway = 'PHONEPE';
-      } catch (err: any) {
-        if (err.message?.includes('credentials')) {
-          return NextResponse.json(
-            { success: false, error: { message: 'Payment service is not configured yet.' } },
-            { status: 503 }
-          );
-        }
-        throw err;
-      }
-    } else if (requestedGateway === 'MOCK' || ((process.env.NODE_ENV === 'development' || process.env.ALLOW_DEV_SCHEME_TESTING === 'true' || process.env.ALLOW_SANDBOX_SCHEMES === 'true') && !process.env.RAZORPAY_KEY_ID)) {
-      if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_SCHEME_TESTING !== 'true' && process.env.ALLOW_SANDBOX_SCHEMES !== 'true') {
+    try {
+      const phonePeOrder = await createPhonePeOrder({
+        orderId,
+        amountPaise,
+        receiptNumber: orderId,
+        userId: authUser.userId,
+        mobileNumber: authUser.phone,
+        enrollmentId: enrollment.id,
+      });
+      gatewayOrderId = phonePeOrder.merchantTransactionId;
+      redirectUrl = phonePeOrder.redirectUrl;
+      merchantId = phonePeOrder.merchantId;
+    } catch (err: any) {
+      if (err.message?.includes('credentials')) {
         return NextResponse.json(
           { success: false, error: { message: 'Payment service is not configured yet.' } },
           { status: 503 }
         );
       }
-      const mockOrder = createMockPaymentOrder({
-        orderId,
-        amountPaise,
-        idempotencyKey,
-      });
-      gatewayOrderId = mockOrder.gatewayOrderId;
-      usedGateway = 'MOCK';
-    } else {
-      try {
-        const razorpayOrder = await createRazorpayOrder({
-          orderId,
-          amountPaise,
-          receiptNumber: orderId,
-        });
-        gatewayOrderId = razorpayOrder.gatewayOrderId;
-        usedGateway = 'RAZORPAY';
-      } catch (err: any) {
-        if (err.message?.includes('credentials')) {
-          return NextResponse.json(
-            { success: false, error: { message: 'Payment service is not configured yet.' } },
-            { status: 503 }
-          );
-        }
-        throw err;
-      }
+      throw err;
     }
 
     // Save PaymentOrder in DB
@@ -169,7 +143,6 @@ export async function POST(
         redirectUrl: redirectUrl || undefined,
         merchantTransactionId: paymentOrder.gatewayOrderId || paymentOrder.orderId,
         merchantId: merchantId || undefined,
-        keyId: usedGateway === 'RAZORPAY' ? (process.env.RAZORPAY_KEY_ID || 'rzp_test_mock_key') : undefined,
       },
     });
   } catch (error: any) {

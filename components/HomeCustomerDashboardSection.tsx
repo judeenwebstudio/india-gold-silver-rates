@@ -128,28 +128,16 @@ export function HomeCustomerDashboardSection() {
         throw new Error(orderData.error?.message || "Failed to initiate payment");
       }
 
-      // 2. Verify Payment (Sandbox)
-      const verifyRes = await fetch(`/api/v1/me/schemes/${selectedSchemeId}/payments/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          paymentOrderId: orderData.data.paymentOrderId,
-          gatewayPaymentId: `pay_sandbox_${Date.now()}`,
-          gatewaySignature: "mock_valid_signature",
-        }),
-      });
-
-      const verifyData = await verifyRes.json();
-      if (!verifyData.success) {
-        throw new Error(verifyData.error?.message || "Payment verification failed");
+      const { gateway, redirectUrl } = orderData.data || {};
+      console.log({ gateway, redirectUrl });
+      if (gateway !== "PHONEPE") {
+        throw new Error("PhonePe is the only supported payment gateway.");
+      }
+      if (!redirectUrl || !redirectUrl.startsWith("https://")) {
+        throw new Error("PhonePe checkout URL was not returned.");
       }
 
-      // Reload schemes & active dashboard
-      loadUserSchemes(token);
-      loadSchemeDashboard(token, selectedSchemeId);
+      window.location.assign(redirectUrl);
     } catch (err: any) {
       setError(err.message);
     } finally {

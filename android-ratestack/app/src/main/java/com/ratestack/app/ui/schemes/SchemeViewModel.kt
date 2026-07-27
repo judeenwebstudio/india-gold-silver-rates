@@ -309,7 +309,7 @@ class SchemeViewModel(
 
     fun startPaymentFlow(
         enrollmentId: String,
-        onLaunchCheckout: (keyId: String, razorpayOrderId: String, amountInPaise: Long, paymentOrderId: String, gateway: String) -> Unit,
+        onLaunchCheckout: (redirectUrl: String, merchantTransactionId: String, paymentOrderId: String, gateway: String) -> Unit,
     ) {
         val token = repository.getUserToken()
         if (token.isNull_or_empty()) {
@@ -340,11 +340,8 @@ class SchemeViewModel(
                 if (res.isSuccessful && res.body()?.success == true) {
                     val data = res.body()?.data
                     if (data != null) {
-                        val keyId = data.keyId ?: ""
-                        val razorpayOrderId = data.gatewayOrderId ?: ""
                         val paymentOrderId = data.paymentOrderId ?: ""
                         val gateway = data.gateway ?: "PHONEPE"
-                        val amountInPaise = ((data.amount ?: 0.0) * 100).toLong()
                         val redirectUrl = data.redirectUrl ?: ""
                         val merchantTransactionId = data.merchantTransactionId ?: data.gatewayOrderId ?: ""
 
@@ -364,23 +361,12 @@ class SchemeViewModel(
                                     enrollmentId = enrollmentId,
                                 )
                                 _paymentFlowState.value = state
-                                onLaunchCheckout(keyId, merchantTransactionId, amountInPaise, paymentOrderId, gateway)
+                                onLaunchCheckout(redirectUrl, merchantTransactionId, paymentOrderId, gateway)
                             } else {
-                                handlePaymentSuccess(enrollmentId, paymentOrderId, merchantTransactionId, "PHONEPE_VERIFIED")
+                                _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("PhonePe checkout URL is unavailable.")
                             }
-                        } else if (gateway == "RAZORPAY" && (keyId.isBlank() || keyId == "mock_key")) {
-                            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Payment service is not configured yet.")
                         } else {
-                            val state = com.ratestack.app.data.PaymentActionState.LaunchingCheckout(
-                                keyId = keyId,
-                                razorpayOrderId = razorpayOrderId,
-                                amountInPaise = amountInPaise,
-                                enrollmentId = enrollmentId,
-                                paymentOrderId = paymentOrderId,
-                                gateway = gateway,
-                            )
-                            _paymentFlowState.value = state
-                            onLaunchCheckout(keyId, razorpayOrderId, amountInPaise, paymentOrderId, gateway)
+                            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("PhonePe is the only supported payment gateway.")
                         }
                     } else {
                         _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Unable to create payment order.")

@@ -76,7 +76,7 @@ export async function POST(
 
     if (paymentOrder.gateway === 'PHONEPE') {
       const txId = merchantTransactionId || paymentOrder.gatewayOrderId || paymentOrder.orderId;
-      if (gatewaySignature === 'PHONEPE_VERIFIED') {
+      if (gatewaySignature === 'PHONEPE_VERIFIED' && process.env.NODE_ENV !== 'production') {
         isValid = true;
       } else {
         const phonePeStatus = await checkPhonePePaymentStatus(txId);

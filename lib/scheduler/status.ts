@@ -5,9 +5,9 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getScraperConfig } from "@/lib/scrapers/config";
 
-export const RATE_SYNC_CRON_SCHEDULE_UTC = "0 13 * * *";
-export const RATE_SYNC_CRON_LABEL_UTC = "Daily at 1:00 PM UTC";
-export const RATE_SYNC_CRON_LABEL_IST = "Daily at 6:30 PM IST";
+export const RATE_SYNC_CRON_SCHEDULE_UTC = "30 4 * * *, 30 8 * * *, 30 12 * * *";
+export const RATE_SYNC_CRON_LABEL_UTC = "Daily at 04:30, 08:30, and 12:30 UTC";
+export const RATE_SYNC_CRON_LABEL_IST = "Daily at 10:00 AM, 2:00 PM, and 6:00 PM IST";
 
 export async function getSchedulerStatus() {
   const successfulStatuses = [

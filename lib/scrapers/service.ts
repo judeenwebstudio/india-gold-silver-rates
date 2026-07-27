@@ -16,13 +16,19 @@ import {
   releaseRateSyncLease,
 } from "@/lib/scheduler/lock";
 import { rateValuesAreEqual } from "@/lib/scheduler/rate-values";
+import type { CronSlot } from "@/lib/scheduler/cron-slot";
 import { getScraperConfig } from "@/lib/scrapers/config";
 import {
   RateSyncLockUnavailableError,
   ScraperError,
   ScraperRejectedError,
 } from "@/lib/scrapers/errors";
-import { createRateScraperProvider } from "@/lib/scrapers/registry";
+import { createRateScraperProviders } from "@/lib/scrapers/registry";
+import {
+  assertCrossSourceVariance,
+  assertSourceTimestampNotOlder,
+  assertValidScrapedResult,
+} from "@/lib/scrapers/validation";
 import type {
   NormalizedSessionRate,
   ScrapedRateQuote,
@@ -30,6 +36,8 @@ import type {
   ScraperMappedPurity,
   ScraperMetalType,
   ScraperProviderConfig,
+  ScraperSourceAttempt,
+  RateScraperProvider,
 } from "@/lib/scrapers/types";
 
 export type ScraperMode =
@@ -42,6 +50,7 @@ export type ScraperDatabaseSummary = {
   updated: number;
   unchanged: number;
   historyEntries: number;
+  metadataUpdated: number;
 };
 
 export type ScraperExecutionResult = {
@@ -53,6 +62,7 @@ export type ScraperExecutionResult = {
   database?: ScraperDatabaseSummary;
   attemptCount?: number;
   locked?: boolean;
+  cronSlot?: CronSlot;
 };
 
 type SelectedMappedRate = {
@@ -84,6 +94,12 @@ function parsedRateSummary(result: ScrapedRateResult) {
         metalType: quote.metalType,
         purity: quote.mappedPurity,
         sourceUnit: quote.sourceUnit,
+        conversion:
+          quote.sourceUnit === "PER_10_GRAMS"
+            ? "divide by 10"
+            : quote.sourceUnit === "PER_KILOGRAM"
+              ? "divide by 1000"
+              : "none (already per gram)",
         sourceValue: selected?.sourceValue ?? null,
         pricePerGram: selected?.pricePerGram ?? null,
         pricePerKilogram: selected?.pricePerKilogram ?? null,
@@ -163,6 +179,7 @@ async function validateChangeThreshold(
   config: ScraperProviderConfig,
   result: ScrapedRateResult,
 ) {
+  assertValidScrapedResult(result);
   const selectedRates = selectedMappedRates(result);
   const violations: Array<Record<string, unknown>> = [];
   const stale: string[] = [];
@@ -171,7 +188,6 @@ async function validateChangeThreshold(
     selectedRates.map(async ({ quote, selected, purity }) => {
       const baseline = await prisma.metalRate.findFirst({
         where: {
-          source: config.name,
           cityId: null,
           isActive: true,
           metalType: toMetalType(quote.metalType),
@@ -184,7 +200,18 @@ async function validateChangeThreshold(
       if (!baseline) return;
 
       const incomingRecordedAt = new Date(result.recordedAt);
-      if (incomingRecordedAt.getTime() < baseline.recordedAt.getTime()) {
+      console.info("[rate-sync] source variance", {
+        source: config.name,
+        sourceUrl: config.url,
+        rate: quote.label,
+        existingSourceTimestamp: baseline.recordedAt.toISOString(),
+        incomingSourceTimestamp: incomingRecordedAt.toISOString(),
+        existingPricePerGram: baseline.pricePerGram.toString(),
+        incomingPricePerGram: selected.pricePerGram,
+      });
+      try {
+        assertSourceTimestampNotOlder(incomingRecordedAt, baseline.recordedAt);
+      } catch {
         stale.push(quote.label);
         return;
       }
@@ -221,6 +248,93 @@ async function validateChangeThreshold(
   }
 }
 
+type PreparedScrape = {
+  parsed: ScrapedRateResult;
+  config: ScraperProviderConfig;
+  sourceAttempts: ScraperSourceAttempt[];
+};
+
+export async function scrapeWithFallback(
+  providers: RateScraperProvider[],
+  maxChangePercent: number,
+  validate: (
+    config: ScraperProviderConfig,
+    result: ScrapedRateResult,
+  ) => Promise<void> = validateChangeThreshold,
+): Promise<PreparedScrape> {
+  const sourceAttempts: ScraperSourceAttempt[] = [];
+  let lastError: unknown;
+  let retryableError: unknown;
+  let validPrimary: { parsed: ScrapedRateResult; config: ScraperProviderConfig } | null = null;
+
+  for (const provider of providers) {
+    const attemptedAt = new Date().toISOString();
+    let parsedForAttempt: ScrapedRateResult | undefined;
+    let parsedValidated = false;
+    console.info("[rate-sync] source attempted", {
+      provider: provider.name,
+      sourceUrl: provider.sourceUrl,
+      attemptedAt,
+    });
+
+    try {
+      const parsed = await provider.scrape();
+      parsedForAttempt = parsed;
+      assertValidScrapedResult(parsed);
+      parsedValidated = true;
+
+      if (validPrimary) {
+        assertCrossSourceVariance(validPrimary.parsed, parsed, maxChangePercent);
+      }
+
+      await validate(provider.config, parsed);
+      sourceAttempts.push({
+        provider: provider.name,
+        sourceUrl: provider.sourceUrl,
+        status: "SUCCESS",
+        sourceDate: parsed.sourceDate,
+        sourceRecordedAt: parsed.recordedAt,
+        preferredSession: parsed.preferredSession,
+        attemptedAt,
+      });
+      console.info("[rate-sync] source selected", {
+        provider: provider.name,
+        sourceUrl: provider.sourceUrl,
+        sourceDate: parsed.sourceDate,
+        sourceRecordedAt: parsed.recordedAt,
+        preferredSession: parsed.preferredSession,
+      });
+      return { parsed, config: provider.config, sourceAttempts };
+    } catch (error) {
+      lastError = error;
+      if (!(error instanceof ScraperRejectedError)) retryableError = error;
+      sourceAttempts.push({
+        provider: provider.name,
+        sourceUrl: provider.sourceUrl,
+        status: error instanceof ScraperRejectedError ? "REJECTED" : "FAILED",
+        message: error instanceof Error ? error.message : "Unknown source failure",
+        sourceDate: parsedForAttempt?.sourceDate,
+        sourceRecordedAt: parsedForAttempt?.recordedAt,
+        preferredSession: parsedForAttempt?.preferredSession,
+        attemptedAt,
+      });
+      console.error("[rate-sync] source failed", {
+        provider: provider.name,
+        sourceUrl: provider.sourceUrl,
+        status: error instanceof ScraperRejectedError ? "REJECTED" : "FAILED",
+        reason: error instanceof Error ? error.message : "Unknown source failure",
+      });
+
+      if (parsedValidated && parsedForAttempt) {
+        validPrimary = { parsed: parsedForAttempt, config: provider.config };
+      }
+    }
+  }
+
+  throw retryableError ?? lastError ?? new ScraperRejectedError("All configured rate sources failed.");
+}
+
+
 function isRetryableTransactionError(error: unknown) {
   return (
     typeof error === "object" &&
@@ -237,6 +351,8 @@ async function writeSynchronizedRates(
   executionType: ScraperMode,
   attemptCount: number,
   startedAtMs: number,
+  cronSlot: CronSlot | undefined,
+  sourceAttempts: ScraperSourceAttempt[],
 ) {
   const rates = selectedMappedRates(parsed);
   const recordedAt = new Date(parsed.recordedAt);
@@ -251,13 +367,14 @@ async function writeSynchronizedRates(
             updated: 0,
             unchanged: 0,
             historyEntries: 0,
+            metadataUpdated: 0,
           };
+          const decisions: Array<Record<string, unknown>> = [];
 
           for (const { quote, selected, purity } of rates) {
             const metalType = toMetalType(quote.metalType);
             const existing = await transaction.metalRate.findFirst({
               where: {
-                source: config.name,
                 cityId: null,
                 isActive: true,
                 metalType,
@@ -275,6 +392,16 @@ async function writeSynchronizedRates(
               });
 
             if (valuesUnchanged) {
+              if (existing && recordedAt.getTime() > existing.recordedAt.getTime()) {
+                await transaction.metalRate.update({
+                  where: { id: existing.id },
+                  data: { recordedAt, source: config.name },
+                });
+                summary.metadataUpdated += 1;
+                decisions.push({ rate: quote.label, decision: "METADATA_UPDATED" });
+              } else {
+                decisions.push({ rate: quote.label, decision: "DUPLICATE_SKIPPED" });
+              }
               summary.unchanged += 1;
               continue;
             }
@@ -302,6 +429,7 @@ async function writeSynchronizedRates(
               });
               summary.updated += 1;
               summary.historyEntries += 1;
+              decisions.push({ rate: quote.label, decision: "UPDATED" });
             } else {
               const created = await transaction.metalRate.create({
                 data: {
@@ -326,6 +454,7 @@ async function writeSynchronizedRates(
               });
               summary.created += 1;
               summary.historyEntries += 1;
+              decisions.push({ rate: quote.label, decision: "UPDATED" });
             }
           }
 
@@ -357,7 +486,10 @@ async function writeSynchronizedRates(
               rawData: {
                 executionType,
                 attemptedAt,
+                cronSlot: cronSlot ?? "UNSPECIFIED",
                 parsed,
+                sourceAttempts,
+                decisions,
                 database: summary,
               } as Prisma.InputJsonObject,
             },
@@ -374,6 +506,7 @@ async function writeSynchronizedRates(
         sourceUrl: config.url,
         sourceDate: parsed.sourceDate,
         preferredSession: parsed.preferredSession,
+        cronSlot: cronSlot ?? "UNSPECIFIED",
         attemptCount,
         ...synchronized.summary,
         status: synchronized.status,
@@ -405,6 +538,8 @@ async function recordUnsuccessfulAttempt(
   config: ScraperProviderConfig | null,
   error: unknown,
   parsed?: ScrapedRateResult,
+  cronSlot?: CronSlot,
+  sourceAttempts: ScraperSourceAttempt[] = [],
 ) {
   const source = config?.name ?? process.env.RATE_SOURCE_NAME?.trim() ?? "UNCONFIGURED";
   const sourceUrl = config?.url ?? process.env.RATE_SOURCE_URL?.trim() ?? null;
@@ -419,6 +554,8 @@ async function recordUnsuccessfulAttempt(
     attemptCount,
     durationMs,
     sourceDate: parsed?.sourceDate ?? null,
+    cronSlot: cronSlot ?? "UNSPECIFIED",
+    sourceAttempts,
     errorName: error instanceof Error ? error.name : "UnknownError",
     details,
   });
@@ -436,6 +573,8 @@ async function recordUnsuccessfulAttempt(
       rawData: {
         executionType,
         attemptedAt,
+        cronSlot: cronSlot ?? "UNSPECIFIED",
+        sourceAttempts,
         ...(parsed ? { parsed } : {}),
         ...(details ? { errorDetails: details } : {}),
       } as Prisma.InputJsonObject,
@@ -444,12 +583,17 @@ async function recordUnsuccessfulAttempt(
   });
 }
 
-export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutionResult> {
+export async function executeScraper(
+  mode: ScraperMode,
+  options: { cronSlot?: CronSlot } = {},
+): Promise<ScraperExecutionResult> {
   const startedAtMs = Date.now();
   const attemptedAt = new Date().toISOString();
   let config: ScraperProviderConfig | null = null;
   let parsed: ScrapedRateResult | undefined;
+  let sourceAttempts: ScraperSourceAttempt[] = [];
   let attemptCount = 1;
+  const cronSlot = options.cronSlot;
 
   try {
     const scraperConfig = getScraperConfig();
@@ -458,17 +602,19 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
       throw new ScraperRejectedError("The configured rate source is disabled.");
     }
 
-    const provider = createRateScraperProvider(scraperConfig);
+    const providers = createRateScraperProviders(scraperConfig);
 
     if (mode === "MANUAL_TEST") {
-      parsed = await provider.scrape();
+      const prepared = await scrapeWithFallback(providers, scraperConfig.maxChangePercent);
+      parsed = prepared.parsed;
+      config = prepared.config;
+      sourceAttempts = prepared.sourceAttempts;
       logParsedRates(mode, parsed, 1);
-      await validateChangeThreshold(scraperConfig, parsed);
 
       const log = await prisma.rateUpdateLog.create({
         data: {
-          source: scraperConfig.name,
-          sourceUrl: scraperConfig.url,
+          source: prepared.config.name,
+          sourceUrl: prepared.config.url,
           status: RateUpdateStatus.SUCCESS,
           executionType: RateSyncExecutionType.MANUAL_TEST,
           message: `Test scrape parsed ${parsed.quotes.length} source rates; no metal rates were changed.`,
@@ -479,7 +625,9 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
           rawData: {
             executionType: mode,
             attemptedAt,
+            cronSlot: cronSlot ?? "UNSPECIFIED",
             parsed,
+            sourceAttempts,
           } as Prisma.InputJsonObject,
         },
         select: { id: true },
@@ -492,6 +640,7 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
         logId: log.id,
         parsed,
         attemptCount,
+        cronSlot,
       };
     }
 
@@ -510,19 +659,23 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
         },
       },
       prepare: async (attempt) => {
-        parsed = await provider.scrape();
+        const prepared = await scrapeWithFallback(providers, scraperConfig.maxChangePercent);
+        parsed = prepared.parsed;
+        config = prepared.config;
+        sourceAttempts = prepared.sourceAttempts;
         logParsedRates(mode, parsed, attempt);
-        await validateChangeThreshold(scraperConfig, parsed);
-        return parsed;
+        return prepared;
       },
       commit: (prepared, attempts) =>
         writeSynchronizedRates(
-          scraperConfig,
-          prepared,
+          prepared.config,
+          prepared.parsed,
           attemptedAt,
           mode,
           attempts,
           startedAtMs,
+          cronSlot,
+          prepared.sourceAttempts,
         ),
       maxAttempts:
         mode === "AUTOMATIC_CRON" ? scraperConfig.maxRetries + 1 : 1,
@@ -551,6 +704,7 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
       parsed,
       database: synchronized.summary,
       attemptCount,
+      cronSlot,
     };
   } catch (error) {
     const underlyingError =
@@ -576,6 +730,8 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
         config,
         underlyingError,
         parsed,
+        cronSlot,
+        sourceAttempts,
       );
 
       return {
@@ -586,6 +742,7 @@ export async function executeScraper(mode: ScraperMode): Promise<ScraperExecutio
         parsed,
         attemptCount,
         locked,
+        cronSlot,
       };
     } catch (logError) {
       console.error("The scraper attempt could not be recorded.", logError);

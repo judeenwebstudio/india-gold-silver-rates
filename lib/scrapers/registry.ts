@@ -1,5 +1,6 @@
 import { ScraperConfigurationError } from "@/lib/scrapers/errors";
 import { IbjaRateProvider } from "@/lib/scrapers/providers/ibja";
+import { IbjaCoRateProvider } from "@/lib/scrapers/providers/ibja-co";
 import type {
   RateScraperProvider,
   ScraperProviderConfig,
@@ -21,4 +22,15 @@ export function createRateScraperProvider(config: ScraperProviderConfig) {
   }
 
   return factory(config);
+}
+
+export function createRateScraperProviders(config: ScraperProviderConfig) {
+  return [
+    createRateScraperProvider(config),
+    new IbjaCoRateProvider({
+      ...config,
+      name: "IBJA_CO",
+      url: "https://ibja.co/",
+    }),
+  ];
 }

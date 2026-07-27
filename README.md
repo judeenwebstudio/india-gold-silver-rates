@@ -156,8 +156,9 @@ scheduling is enabled.
 
 ## Automatic daily rate synchronization
 
-Vercel Cron calls `GET /api/cron/rate-sync` every day at `0 13 * * *`, which is
-1:00 PM UTC and 6:30 PM IST. The endpoint requires
+Vercel Cron calls `GET /api/cron/rate-sync` three times daily at `30 4 * * *`,
+`30 8 * * *`, and `30 12 * * *` UTC, corresponding to 10:00 AM, 2:00 PM, and
+6:00 PM IST. Each request includes a slot query parameter and the endpoint requires
 `Authorization: Bearer <CRON_SECRET>` and returns HTTP 401 before doing any work
 when the header or configured secret is missing or invalid.
 

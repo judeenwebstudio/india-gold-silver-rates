@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 
 import { handleRateSyncCron } from "@/lib/scheduler/cron-handler";
 import { executeScraper } from "@/lib/scrapers/service";
+import { parseCronSlot } from "@/lib/scheduler/cron-slot";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,16 +15,27 @@ function revalidateRatePages() {
   revalidatePath("/admin/gold-rates");
   revalidatePath("/admin/silver-rates");
   revalidatePath("/api/rates/national");
+  revalidatePath("/api/v1/home");
+  revalidatePath("/api/v1/rates/[state]/[city]");
   revalidatePath("/api/rates/city/[slug]", "page");
 }
 
 export async function GET(request: Request) {
+  const requestedSlot = new URL(request.url).searchParams.get("slot");
+  const cronSlot = requestedSlot === null ? undefined : parseCronSlot(requestedSlot);
   const executionTime = new Date().toISOString();
+  const istExecutionTime = new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "short",
+    timeStyle: "long",
+    timeZone: "Asia/Kolkata",
+  }).format(new Date());
   const startedAt = Date.now();
 
   console.info("[rate-sync-cron] execution started", {
     executionTime,
-    scheduleUtc: "0 13 * * *",
+    istExecutionTime,
+    scheduleUtc: ["30 4 * * *", "30 8 * * *", "30 12 * * *"],
+    cronSlot: cronSlot ?? requestedSlot ?? "UNSPECIFIED",
     timezone: process.env.RATE_SYNC_TIMEZONE ?? "Asia/Kolkata",
     cronSecretConfigured: Boolean(process.env.CRON_SECRET),
     sourceConfigured: Boolean(process.env.RATE_SOURCE_NAME),
@@ -33,9 +45,12 @@ export async function GET(request: Request) {
 
   return handleRateSyncCron(request, {
     secret: process.env.CRON_SECRET,
+    cronSlot,
     execute: async () => {
       try {
-        const result = await executeScraper("AUTOMATIC_CRON");
+        const result = await executeScraper("AUTOMATIC_CRON", {
+          cronSlot: cronSlot ?? undefined,
+        });
         console.info("[rate-sync-cron] database update result", {
           executionTime,
           durationMs: Date.now() - startedAt,

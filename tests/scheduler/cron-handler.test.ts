@@ -92,3 +92,18 @@ test("missing configured cron secret fails closed with HTTP 401", async () => {
 
   assert.equal(response.status, 401);
 });
+
+test("invalid cron slots are rejected after authentication", async () => {
+  const response = await handleRateSyncCron(
+    new Request("http://localhost/api/cron/rate-sync?slot=UNKNOWN", {
+      headers: { Authorization: `Bearer ${SECRET}` },
+    }),
+    {
+      secret: SECRET,
+      cronSlot: null,
+      execute: async () => ({ ok: true, outcome: "SUCCESS", message: "Unexpected." }),
+    },
+  );
+
+  assert.equal(response.status, 400);
+});

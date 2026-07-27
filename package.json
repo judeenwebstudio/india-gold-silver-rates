@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "test": "pnpm run build && node --import dotenv/config --test tests/rendered-html.test.mjs",
-    "test:scraper": "node --import tsx --test tests/scrapers/ibja-parser.test.ts",
+    "test:scraper": "node --import tsx --test tests/scrapers/ibja-parser.test.ts tests/scrapers/reliable-sources.test.ts",
     "test:scheduler": "node --import tsx --test tests/scheduler/*.test.ts",
     "test:scheduler:db": "node --import dotenv/config --import tsx --test tests/integration/scheduler-database.test.ts",
     "test:city-rates": "node --import tsx --test tests/city-rate-calculation.test.ts tests/city-adjustment-validation.test.ts",

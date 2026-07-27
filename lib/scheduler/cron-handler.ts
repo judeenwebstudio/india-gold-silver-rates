@@ -1,4 +1,5 @@
 import { isValidCronAuthorization } from "@/lib/scheduler/cron-auth";
+import type { CronSlot } from "@/lib/scheduler/cron-slot";
 
 export type CronExecutionResult = {
   ok: boolean;
@@ -11,15 +12,18 @@ export type CronExecutionResult = {
     historyEntries: number;
   };
   locked?: boolean;
+  cronSlot?: CronSlot;
 };
 
 export async function handleRateSyncCron(
   request: Request,
   {
     secret,
+    cronSlot,
     execute,
   }: {
     secret: string | undefined;
+    cronSlot?: CronSlot | null;
     execute: () => Promise<CronExecutionResult>;
   },
 ) {
@@ -35,6 +39,18 @@ export async function handleRateSyncCron(
       { status: 401 },
     );
   }
+
+  if (cronSlot === null) {
+    return Response.json(
+      { ok: false, outcome: "REJECTED", message: "Invalid cron slot.", changedRates: 0 },
+      { status: 400 },
+    );
+  }
+
+  console.info("[rate-sync-cron] authorization accepted", {
+    cronSecretConfigured: true,
+    cronSlot: cronSlot ?? "UNSPECIFIED",
+  });
 
   let result: CronExecutionResult;
   try {
@@ -65,6 +81,7 @@ export async function handleRateSyncCron(
       outcome: result.outcome,
       message: result.message,
       changedRates,
+      cronSlot: result.cronSlot ?? cronSlot ?? undefined,
     },
     { status },
   );

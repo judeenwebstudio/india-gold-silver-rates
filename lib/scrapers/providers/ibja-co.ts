@@ -1,11 +1,11 @@
 import { fetchPublicHtml } from "@/lib/scrapers/http";
-import { parseIbjaRates } from "@/lib/scrapers/providers/ibja-parser";
+import { parseIbjaCoRates } from "@/lib/scrapers/providers/ibja-co-parser";
 import type {
   RateScraperProvider,
   ScraperProviderConfig,
 } from "@/lib/scrapers/types";
 
-export class IbjaRateProvider implements RateScraperProvider {
+export class IbjaCoRateProvider implements RateScraperProvider {
   readonly name: string;
   readonly sourceUrl: string;
   readonly config: ScraperProviderConfig;
@@ -21,12 +21,7 @@ export class IbjaRateProvider implements RateScraperProvider {
   }
 
   async scrape() {
-    const response = await fetchPublicHtml(
-      this.sourceUrl,
-      this.userAgent,
-      this.requestTimeoutMs,
-    );
-
+    const response = await fetchPublicHtml(this.sourceUrl, this.userAgent, this.requestTimeoutMs);
     console.info("[rate-source] response", {
       provider: this.name,
       sourceUrl: this.sourceUrl,
@@ -36,7 +31,7 @@ export class IbjaRateProvider implements RateScraperProvider {
       fetchedAt: response.fetchedAt,
     });
 
-    return parseIbjaRates(response.html, {
+    return parseIbjaCoRates(response.html, {
       provider: this.name,
       sourceUrl: this.sourceUrl,
       fetchedAt: response.fetchedAt,

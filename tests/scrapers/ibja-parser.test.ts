@@ -83,3 +83,15 @@ test("rejects missing, malformed, zero, and negative AM values", async () => {
     );
   }
 });
+
+test("derives Gold 22K only when the direct Gold 916 value is unavailable", async () => {
+  const html = (await fixture())
+    .replace(/(<span id="lblGold916_AM">)[^<]*/, "$1")
+    .replace(/(<span id="lblGold916_PM">)[^<]*/, "$1");
+  const result = parseIbjaRates(html, context);
+  const gold22 = result.quotes.find(({ code }) => code === "GOLD_916");
+
+  assert.equal(gold22?.am.derived, true);
+  assert.equal(gold22?.pm?.derived, true);
+  assert.equal(gold22?.am.pricePerGram, "13332.0000");
+});

@@ -12,12 +12,13 @@ export type ScraperMetalType = "GOLD" | "SILVER";
 
 export type ScraperMappedPurity = "K24" | "K22" | "K18" | "K14" | "P999";
 
-export type SourceRateUnit = "PER_10_GRAMS" | "PER_KILOGRAM";
+export type SourceRateUnit = "PER_GRAM" | "PER_10_GRAMS" | "PER_KILOGRAM";
 
 export type NormalizedSessionRate = {
   sourceValue: string;
   pricePerGram: string;
   pricePerKilogram: string | null;
+  derived?: boolean;
 };
 
 export type ScrapedRateQuote = {
@@ -42,6 +43,17 @@ export type ScrapedRateResult = {
   quotes: ScrapedRateQuote[];
 };
 
+export type ScraperSourceAttempt = {
+  provider: string;
+  sourceUrl: string;
+  status: "SUCCESS" | "FAILED" | "REJECTED";
+  message?: string;
+  sourceDate?: string;
+  sourceRecordedAt?: string;
+  preferredSession?: ScraperSession;
+  attemptedAt: string;
+};
+
 export type ScraperProviderConfig = {
   name: string;
   url: string;
@@ -55,5 +67,6 @@ export type ScraperProviderConfig = {
 export interface RateScraperProvider {
   readonly name: string;
   readonly sourceUrl: string;
+  readonly config: ScraperProviderConfig;
   scrape(): Promise<ScrapedRateResult>;
 }

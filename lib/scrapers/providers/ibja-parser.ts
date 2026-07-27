@@ -37,7 +37,7 @@ function parsePositiveCurrency(rawValue: string, field: string) {
     throw new ScraperRejectedError(`Missing value for ${field}.`, { field });
   }
 
-  const numericText = trimmed.replace(/^(?:₹|INR|Rs\.?)\s*/i, "");
+  const numericText = trimmed.replace(/^(?:₹|â‚¹|\?|INR|Rs\.?)\s*/i, "");
   const validNumber = /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(numericText);
   if (!validNumber) {
     throw new ScraperRejectedError(`Malformed currency value for ${field}.`, {
@@ -56,8 +56,23 @@ function parsePositiveCurrency(rawValue: string, field: string) {
   return value;
 }
 
+function deriveGold22K(base: NormalizedSessionRate): NormalizedSessionRate {
+  const pricePerGram = Number(base.pricePerGram) * (22 / 24);
+  if (!Number.isFinite(pricePerGram) || pricePerGram <= 0) {
+    throw new ScraperRejectedError("Gold 22K could not be derived from Gold 24K.");
+  }
+
+  return {
+    sourceValue: (pricePerGram * 10).toFixed(2),
+    pricePerGram: pricePerGram.toFixed(4),
+    pricePerKilogram: null,
+    derived: true,
+  };
+}
+
 function normalize(value: number, unit: SourceRateUnit): NormalizedSessionRate {
-  const perGram = unit === "PER_10_GRAMS" ? value / 10 : value / 1_000;
+  const perGram =
+    unit === "PER_10_GRAMS" ? value / 10 : unit === "PER_KILOGRAM" ? value / 1_000 : value;
 
   return {
     sourceValue: value.toFixed(2),
@@ -95,18 +110,42 @@ export function parseIbjaRates(
     pmText: $(definition.pmSelector).first().text().trim(),
   }));
 
-  const pmValueCount = rawRows.filter(({ pmText }) => pmText.length > 0).length;
-  if (pmValueCount > 0 && pmValueCount < RATE_DEFINITIONS.length) {
-    const missing = rawRows.filter(({ pmText }) => !pmText).map(({ definition }) => definition.label);
+  const pmRequiredRows = rawRows.filter(({ definition }) => definition.code !== "GOLD_916");
+  const pmValueCount = pmRequiredRows.filter(({ pmText }) => pmText.length > 0).length;
+  if (pmValueCount > 0 && pmValueCount < pmRequiredRows.length) {
+    const missing = pmRequiredRows.filter(({ pmText }) => !pmText).map(({ definition }) => definition.label);
     throw new ScraperRejectedError("The PM rate table is incomplete.", { missing });
   }
 
-  const hasPmRates = pmValueCount === RATE_DEFINITIONS.length;
-  const quotes: ScrapedRateQuote[] = rawRows.map(({ definition, amText, pmText }) => {
-    const amValue = parsePositiveCurrency(amText, `${definition.label} AM`);
-    const pmValue = hasPmRates
-      ? parsePositiveCurrency(pmText, `${definition.label} PM`)
+  const hasPmRates = pmValueCount === pmRequiredRows.length;
+  const normalizedRows = rawRows.map(({ definition, amText, pmText }) => {
+    const allowMissingGold916 = definition.code === "GOLD_916";
+    const am = amText.length > 0
+      ? normalize(parsePositiveCurrency(amText, `${definition.label} AM`), definition.sourceUnit)
+      : allowMissingGold916
+        ? null
+        : (() => { throw new ScraperRejectedError(`Missing value for ${definition.label} AM.`, { field: `${definition.label} AM` }); })();
+    const pm = hasPmRates && pmText.length > 0
+      ? normalize(parsePositiveCurrency(pmText, `${definition.label} PM`), definition.sourceUnit)
       : null;
+
+    return { definition, am, pm };
+  });
+
+  const gold999 = normalizedRows.find(({ definition }) => definition.code === "GOLD_999");
+  if (!gold999?.am) {
+    throw new ScraperRejectedError("Gold 999 is required to normalize the source rates.");
+  }
+
+  const quotes: ScrapedRateQuote[] = normalizedRows.map(({ definition, am, pm }) => {
+    const normalizedAm = am ?? deriveGold22K(gold999.am!);
+    const normalizedPm = hasPmRates
+      ? pm ?? (definition.code === "GOLD_916" && gold999.pm ? deriveGold22K(gold999.pm) : null)
+      : null;
+
+    if (!normalizedAm || (hasPmRates && !normalizedPm)) {
+      throw new ScraperRejectedError(`${definition.label} is missing a valid normalized value.`);
+    }
 
     return {
       code: definition.code,
@@ -115,8 +154,8 @@ export function parseIbjaRates(
       sourcePurity: definition.sourcePurity,
       sourceUnit: definition.sourceUnit,
       mappedPurity: definition.mappedPurity,
-      am: normalize(amValue, definition.sourceUnit),
-      pm: pmValue === null ? null : normalize(pmValue, definition.sourceUnit),
+      am: normalizedAm,
+      pm: normalizedPm,
     };
   });
 

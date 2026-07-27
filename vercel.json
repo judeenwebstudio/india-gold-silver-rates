@@ -2,8 +2,16 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
-      "path": "/api/cron/rate-sync",
-      "schedule": "0 13 * * *"
+      "path": "/api/cron/rate-sync?slot=MORNING_10_AM",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/rate-sync?slot=AFTERNOON_2_PM",
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/cron/rate-sync?slot=EVENING_6_PM",
+      "schedule": "30 12 * * *"
     }
   ]
 }

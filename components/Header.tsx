@@ -7,7 +7,7 @@ import { AuthModal } from "@/components/AuthModal";
 
 const navigation = [
   { label: "Today’s rates", href: "/#rates" },
-  { label: "Coin Savings Scheme", href: "/schemes" },
+  { label: "Shop", href: "/shop" },
   { label: "Cities", href: "/#cities" },
   { label: "Calculator", href: "/#calculator" },
 ];
@@ -17,15 +17,10 @@ export function Header() {
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [userToken, setUserToken] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>("Customer");
+  const [userToken, setUserToken] = useState<string | null>(() => typeof window === "undefined" ? null : localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token"));
+  const [userName, setUserName] = useState<string>(() => typeof window === "undefined" ? "Customer" : localStorage.getItem("scheme_user_name") || "Customer");
 
   useEffect(() => {
-    const token = localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token");
-    setUserToken(token);
-    const savedName = localStorage.getItem("scheme_user_name");
-    if (savedName) setUserName(savedName);
-
     const handleAuthChange = () => {
       const updatedToken = localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token");
       setUserToken(updatedToken);
@@ -101,7 +96,7 @@ export function Header() {
                   {accountDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white border border-stone-200 shadow-xl py-2 z-50 text-xs font-semibold text-stone-800 space-y-1">
                       <Link
-                        href="/schemes/dashboard"
+                        href="/shop/orders"
                         onClick={() => setAccountDropdownOpen(false)}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-amber-50 hover:text-amber-900 transition-colors"
                       >
@@ -176,7 +171,7 @@ export function Header() {
               {userToken ? (
                 <div className="pt-2 border-t border-stone-200 grid gap-1">
                   <Link
-                    href="/schemes/dashboard"
+                    href="/shop/orders"
                     onClick={() => setOpen(false)}
                     className="rounded-lg px-3 py-2 text-sm font-bold text-amber-900 hover:bg-amber-50"
                   >

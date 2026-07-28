@@ -335,11 +335,69 @@ model SchemeUser {
   paymentOrders      PaymentOrder[]
   redemptionRequests RedemptionRequest[]
   auditLogs          AuditLog[]
+  shopOrders         ShopOrder[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
   @@index([phone, isActive])
   @@index([email, isActive])
+}
+
+model ShopProduct {
+  id                        String      @id @default(cuid())
+  slug                      String      @unique
+  name                      String
+  metalType                 MetalType
+  purity                    MetalPurity
+  description               String
+  imageUrl                  String?
+  availableWeightsGramsJson Json
+  serviceChargeBasisPoints  Int         @default(500)
+  gstBasisPoints            Int         @default(300)
+  isActive                  Boolean     @default(true)
+  orders                    ShopOrder[]
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
+
+  @@index([isActive, metalType])
+}
+
+model ShopOrder {
+  id                         String    @id @default(cuid())
+  orderNumber                String    @unique
+  userId                     String
+  user                       SchemeUser @relation(fields: [userId], references: [id])
+  productId                  String
+  product                    ShopProduct @relation(fields: [productId], references: [id])
+  productName                String
+  metalType                  MetalType
+  purity                     MetalPurity
+  weightGrams                Decimal   @db.Decimal(12, 3)
+  quantity                   Int
+  trichyRatePerGramPaise     BigInt
+  metalValuePaise            BigInt
+  serviceChargeBasisPoints   Int
+  serviceChargePaise         BigInt
+  gstBasisPoints             Int
+  gstPaise                   BigInt
+  totalAmountPaise           BigInt
+  currency                   String    @default("INR")
+  gateway                    String
+  gatewayOrderId             String?
+  gatewayPaymentId           String?
+  gatewaySignature           String?
+  paymentStatus              String    @default("CREATED")
+  orderStatus                String    @default("PAYMENT_PENDING")
+  invoiceNumber              String?   @unique
+  failureCode                String?
+  failureMessage             String?
+  paidAt                     DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([gatewayOrderId])
+  @@index([paymentStatus, orderStatus])
 }
 
 model EmailAuthToken {
@@ -709,4 +767,3 @@ model PasswordResetOtp {
   @@index([mobileNumber, createdAt])
   @@index([resetTokenHash])
 }
-

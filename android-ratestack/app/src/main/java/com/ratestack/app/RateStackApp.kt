@@ -196,7 +196,7 @@ fun RateStackApp(
             bottomBar = {
                 NavigationBar {
                     BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
-                    BottomItem(Routes.SCHEMES, "Schemes", Icons.Default.Star, currentRoute, navController)
+                    BottomItem(Routes.SCHEMES, "Shop", Icons.Default.Star, currentRoute, navController)
                     BottomItem(Routes.FAVORITES, "Favorites", Icons.Default.Favorite, currentRoute, navController)
                     BottomItem(Routes.SETTINGS, "Settings", Icons.Default.Settings, currentRoute, navController)
                 }
@@ -215,44 +215,12 @@ fun RateStackApp(
 
                 composable(Routes.SCHEMES) {
                     val userToken by schemeViewModel.userToken.collectAsState()
-                    val userName by schemeViewModel.userName.collectAsState()
-                    val schemePlansState by schemeViewModel.schemePlans.collectAsState()
-                    val mySchemesState by schemeViewModel.mySchemes.collectAsState()
-
                     val isLoggedIn = !userToken.isNullOrBlank()
-                    val plans = (schemePlansState as? LoadState.Ready)?.data?.plans ?: emptyList()
-                    val userSchemes = (mySchemesState as? LoadState.Ready)?.data ?: emptyList()
-                    val isLoading = schemePlansState is LoadState.Loading || (isLoggedIn && mySchemesState is LoadState.Loading)
-
-                    com.ratestack.app.ui.schemes.SchemesListingScreen(
-                        plans = plans,
-                        userSchemes = userSchemes,
+                    com.ratestack.app.ui.schemes.ShopLandingScreen(
                         isLoggedIn = isLoggedIn,
-                        userName = userName,
-                        isLoading = isLoading,
-                        onLoginClick = { navController.navigate(Routes.CUSTOMER_LOGIN) },
-                        onRegisterClick = { navController.navigate(Routes.CUSTOMER_REGISTER) },
-                        onJoinScheme = { plan, amount ->
-                            schemeViewModel.selectPlan(plan)
-                            val planId = plan.id ?: ""
-                            if (com.ratestack.app.BuildConfig.DEBUG) {
-                                android.util.Log.d(
-                                    "RateStackNav",
-                                    "onJoinScheme Clicked: PlanID=$planId Name=${plan.name} IsLoggedIn=$isLoggedIn Amount=$amount"
-                                )
-                            }
-                            if (!isLoggedIn) {
-                                schemeViewModel.setPendingJoin(planId, amount)
-                                navController.navigate(Routes.CUSTOMER_LOGIN)
-                            } else {
-                                navController.navigate("scheme_join/${android.net.Uri.encode(planId)}")
-                            }
-                        },
-                        onSelectScheme = { enrollmentId ->
-                            navController.navigate("scheme_dashboard/$enrollmentId")
-                        },
-                        onProfileClick = { navController.navigate(Routes.CUSTOMER_PROFILE) },
-                        onLogoutClick = { schemeViewModel.logout() }
+                        onLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                        onRegister = { navController.navigate(Routes.CUSTOMER_REGISTER) },
+                        onOpenShop = { onOpenExternal("${BuildConfig.WEBSITE_URL}/shop") },
                     )
                 }
 
@@ -1484,13 +1452,13 @@ private fun SettingsScreen(
                     SettingsCategoryCard(title = "Customer Account") {
                         SettingTile(
                             title = "Profile (${userName ?: "Customer"})",
-                            subtitle = "View active schemes & member details",
+                            subtitle = "View your coin orders and account details",
                             icon = Icons.Default.Info,
                             onClick = onProfileClick,
                         )
                         SettingTile(
                             title = "Logout",
-                            subtitle = "Sign out of your RateStack scheme account",
+                            subtitle = "Sign out of your RateStack shop account",
                             icon = Icons.Default.Clear,
                             onClick = onLogoutClick,
                         )

@@ -11,6 +11,8 @@ export interface CreatePhonePeOrderParams {
   userId: string;
   mobileNumber?: string;
   enrollmentId: string;
+  redirectUrl?: string;
+  callbackUrl?: string;
 }
 
 export interface PhonePeOrderResponse {
@@ -78,9 +80,9 @@ export async function createPhonePeOrder(params: CreatePhonePeOrderParams): Prom
     merchantTransactionId: params.orderId,
     merchantUserId: params.userId,
     amount: amountNumber,
-    redirectUrl: `${config.siteUrl}/api/v1/me/schemes/callback/phonepe?enrollmentId=${params.enrollmentId}&orderId=${params.orderId}`,
+    redirectUrl: params.redirectUrl || `${config.siteUrl}/api/v1/me/schemes/callback/phonepe?enrollmentId=${params.enrollmentId}&orderId=${params.orderId}`,
     redirectMode: 'POST',
-    callbackUrl: `${config.siteUrl}/api/v1/webhooks/phonepe`,
+    callbackUrl: params.callbackUrl || `${config.siteUrl}/api/v1/webhooks/phonepe`,
     mobileNumber: (params.mobileNumber || '9999999999').replace(/\D/g, '').slice(-10),
     paymentInstrument: {
       type: 'PAY_PAGE',

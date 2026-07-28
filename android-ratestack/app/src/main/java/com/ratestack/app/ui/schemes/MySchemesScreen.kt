@@ -47,13 +47,13 @@ fun MySchemesScreen(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "No active scheme accounts found.",
+                        text = "No shop orders found.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFF78716C),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Join a 22K Gold or 999 Silver Coin Scheme to start saving.",
+                        text = "Visit Shop to purchase a Gold 22K or Silver coin.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFA8A29E),
                     )
@@ -68,7 +68,7 @@ fun MySchemesScreen(
             ) {
                 item {
                     Text(
-                        text = "My Scheme Accounts",
+                        text = "My Orders",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF1C1917),
@@ -91,7 +91,7 @@ fun MySchemesScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    text = scheme.productName ?: "Savings Scheme",
+                                    text = scheme.productName ?: "Coin Order",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = Color(0xFF1C1917),

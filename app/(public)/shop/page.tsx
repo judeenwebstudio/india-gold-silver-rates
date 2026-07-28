@@ -1,0 +1,51 @@
+"use client";
+import { useEffect, useState } from "react";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
+import { AuthModal } from "@/components/AuthModal";
+
+type Price = { metalValue: number; serviceCharge: number; gst: number; total: number };
+type Product = { id: string; name: string; metalType: string; description: string; imageUrl: string | null; weights: number[]; serviceChargePercent: number; gstPercent: number; ratePerGram: number; prices: Record<string, Price> };
+declare global { interface Window { Razorpay?: new (options: Record<string, unknown>) => { open(): void } } }
+async function loadRazorpay() {
+  if (window.Razorpay) return;
+  await new Promise<void>((resolve, reject) => { const s = document.createElement("script"); s.src = "https://checkout.razorpay.com/v1/checkout.js"; s.onload = () => resolve(); s.onerror = () => reject(new Error("Unable to load Razorpay.")); document.head.appendChild(s); });
+}
+
+export default function ShopPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [location, setLocation] = useState("Trichy");
+  const [selections, setSelections] = useState<Record<string, { weight: number; quantity: number }>>({});
+  const [authOpen, setAuthOpen] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => { fetch("/api/v1/shop", { cache: "no-store" }).then((r) => r.json()).then((body) => { if (!body.success) throw new Error(body.error?.message); setProducts(body.data.products); setLocation(body.data.location); setSelections(Object.fromEntries(body.data.products.map((p: Product) => [p.id, { weight: p.weights[0], quantity: 1 }]))); }).catch((e) => setError(e.message)); }, []);
+
+  async function buy(product: Product) {
+    const token = localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token");
+    if (!token) { setAuthOpen(true); return; }
+    setBusy(product.id); setError("");
+    try {
+      const selection = selections[product.id];
+      const response = await fetch("/api/v1/shop/checkout", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ productId: product.id, weightGrams: selection.weight, quantity: selection.quantity }) });
+      const body = await response.json();
+      if (!response.ok || !body.success) throw new Error(body.error?.message || "Checkout failed.");
+      const order = body.data;
+      if (order.gateway === "PHONEPE") { if (!order.redirectUrl) throw new Error("PhonePe is unavailable."); window.location.assign(order.redirectUrl); return; }
+      await loadRazorpay();
+      new window.Razorpay!({
+        key: order.keyId, order_id: order.gatewayOrderId, amount: Math.round(order.amount * 100), currency: order.currency,
+        name: "RateStack Shop", description: `${product.name} — ${selection.weight}g`,
+        handler: async (result: Record<string, string>) => {
+          const verify = await fetch("/api/v1/shop/verify", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ shopOrderId: order.shopOrderId, gatewayPaymentId: result.razorpay_payment_id, gatewaySignature: result.razorpay_signature }) });
+          const verified = await verify.json();
+          if (!verify.ok || !verified.success) { setError(verified.error?.message || "Payment verification failed."); setBusy(""); return; }
+          window.location.href = "/shop/orders?payment=success";
+        },
+        modal: { ondismiss: () => setBusy("") },
+      }).open();
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to start checkout."); setBusy(""); }
+  }
+
+  return <div className="min-h-screen bg-[#fbfaf7]"><Header/><main className="mx-auto max-w-6xl px-4 py-12"><div className="mb-10 text-center"><p className="text-xs font-black uppercase tracking-[.25em] text-amber-700">Direct Coin Purchase</p><h1 className="mt-2 text-4xl font-black text-stone-900">RateStack Shop</h1><p className="mt-3 text-stone-600">All products use the same live {location} rate, regardless of customer location.</p></div>{error && <p role="alert" className="mb-6 rounded-xl bg-red-50 p-4 font-semibold text-red-800">{error}</p>}<div className="grid gap-8 md:grid-cols-2">{products.map((product) => { const selection = selections[product.id] || { weight: product.weights[0], quantity: 1 }; const unit = product.prices[String(selection.weight)]; const price = unit ? { metalValue: unit.metalValue * selection.quantity, serviceCharge: unit.serviceCharge * selection.quantity, gst: unit.gst * selection.quantity, total: unit.total * selection.quantity } : null; return <article key={product.id} className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-xl"><div className={`h-52 bg-center bg-cover ${product.metalType === "GOLD" ? "bg-gradient-to-br from-amber-100 to-amber-500" : "bg-gradient-to-br from-slate-100 to-slate-400"}`} style={product.imageUrl ? { backgroundImage: `url("${product.imageUrl}")` } : undefined}><div className="grid h-full place-items-center text-7xl">{product.metalType === "GOLD" ? "●" : "○"}</div></div><div className="space-y-5 p-6"><div><h2 className="text-2xl font-black">{product.name}</h2><p className="mt-1 text-sm text-stone-600">{product.description}</p><p className="mt-3 rounded-lg bg-stone-100 p-2 text-sm font-bold">Live Trichy rate: ₹{product.ratePerGram.toLocaleString("en-IN")}/g</p></div><div className="grid grid-cols-2 gap-3"><label className="text-sm font-bold">Weight<select value={selection.weight} onChange={(e) => setSelections({ ...selections, [product.id]: { ...selection, weight: Number(e.target.value) } })} className="mt-1 w-full rounded-xl border p-3">{product.weights.map((w) => <option key={w} value={w}>{w >= 1000 ? `${w / 1000}kg` : `${w}g`}</option>)}</select></label><label className="text-sm font-bold">Quantity<input type="number" min="1" max="10" value={selection.quantity} onChange={(e) => setSelections({ ...selections, [product.id]: { ...selection, quantity: Math.max(1, Math.min(10, Number(e.target.value))) } })} className="mt-1 w-full rounded-xl border p-3"/></label></div>{price && <div className="space-y-2 rounded-2xl bg-stone-950 p-4 text-sm text-white"><div className="flex justify-between"><span>Metal value</span><span>₹{price.metalValue.toLocaleString("en-IN")}</span></div><div className="flex justify-between"><span>Service / making charge ({product.serviceChargePercent}%)</span><span>₹{price.serviceCharge.toLocaleString("en-IN")}</span></div><div className="flex justify-between"><span>GST ({product.gstPercent}%)</span><span>₹{price.gst.toLocaleString("en-IN")}</span></div><div className="flex justify-between border-t border-stone-700 pt-3 text-lg font-black text-amber-300"><span>Total Payable</span><span>₹{price.total.toLocaleString("en-IN")}</span></div></div>}<button onClick={() => buy(product)} disabled={busy === product.id} className="w-full rounded-xl bg-amber-500 py-4 font-black text-stone-950 disabled:opacity-50">{busy === product.id ? "Preparing secure payment…" : "Buy Now"}</button></div></article>; })}</div></main><Footer/>{authOpen && <AuthModal initialMode="login" redirectTo="/shop" onClose={() => setAuthOpen(false)} onSuccess={() => setAuthOpen(false)}/>}</div>;
+}

@@ -60,7 +60,7 @@ fun CustomerRegisterScreen(
                     )
 
                     Text(
-                        text = "Join 22K Gold & 999 Silver Coin Savings Schemes",
+                        text = "Create an account to buy Gold 22K and Silver coins",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFA8A29E),
                         modifier = Modifier.padding(top = 4.dp, bottom = 18.dp),

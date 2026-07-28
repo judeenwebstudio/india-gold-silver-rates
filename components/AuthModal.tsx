@@ -6,11 +6,12 @@ type AuthModalProps = {
   initialMode?: "login" | "register" | "forgot";
   onClose: () => void;
   onSuccess: () => void;
+  redirectTo?: string;
 };
 
 type Mode = "login" | "register" | "forgot_mobile" | "forgot_email" | "forgot_otp" | "forgot_reset";
 
-export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthModalProps) {
+export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectTo = "/schemes/dashboard" }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>(initialMode === "forgot" ? "forgot_mobile" : initialMode);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -218,7 +219,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
             localStorage.setItem("scheme_user_phone", resData.data.user.phone);
           }
           onSuccess();
-          window.location.href = "/schemes/dashboard";
+          window.location.href = redirectTo;
         } else {
           setError(resData.error?.message || "Registration failed. Please try again.");
         }
@@ -260,7 +261,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
             localStorage.setItem("scheme_user_phone", resData.data.user.phone);
           }
           onSuccess();
-          window.location.href = "/schemes/dashboard";
+          window.location.href = redirectTo;
         } else {
           setError(resData.error?.message || "Invalid login details.");
         }

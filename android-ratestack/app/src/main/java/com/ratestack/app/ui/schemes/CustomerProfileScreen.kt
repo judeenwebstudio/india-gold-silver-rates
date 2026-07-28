@@ -91,7 +91,7 @@ fun CustomerProfileScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text("Active Schemes:", color = Color.Gray, fontSize = 12.sp)
+                                Text("Orders:", color = Color.Gray, fontSize = 12.sp)
                                 Text("$totalSchemesCount Account(s)", color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }

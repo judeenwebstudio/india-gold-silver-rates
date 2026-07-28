@@ -19,6 +19,7 @@ const navGroups: NavGroup[] = [
   {
     title: "Workspace",
     items: [
+      { label: "Products", href: "/admin/products", marker: "PR", available: true },
       { label: "Dashboard", href: "/admin/dashboard", marker: "OV", available: true },
       { label: "Analytics", href: "/admin/analytics", marker: "AN", available: true },
       { label: "AdSense", href: "/admin/adsense", marker: "AD", available: true },

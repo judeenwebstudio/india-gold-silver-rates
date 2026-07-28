@@ -83,6 +83,29 @@ input {
     filter 220ms ease;
 }
 
+.shop-hero {
+  background:
+    radial-gradient(circle at 50% -20%, rgba(211, 161, 62, 0.16), transparent 58%),
+    linear-gradient(135deg, #fffdf8 0%, #faf6ec 50%, #fffdf9 100%);
+}
+
+.shop-hero-gold {
+  color: #a86d13;
+  background: linear-gradient(110deg, #87520c 5%, #d29b36 50%, #9b600d 95%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.shop-hero-divider {
+  background: linear-gradient(90deg, transparent, rgba(183, 122, 23, 0.55), transparent);
+}
+
+.shop-hero-divider span {
+  background: linear-gradient(90deg, transparent, #f0c768, transparent);
+  animation: shop-divider-shimmer 3.2s ease-in-out infinite;
+}
+
 .premium-buy-button {
   background: linear-gradient(135deg, #b97912 0%, #e2ad3d 52%, #f2cc72 100%);
   box-shadow: 0 8px 20px rgba(159, 103, 16, 0.25);
@@ -116,6 +139,11 @@ input {
   to { transform: rotate(360deg); }
 }
 
+@keyframes shop-divider-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(200%); }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .shop-product-card:hover {
     transform: translateY(-4px);
@@ -145,5 +173,10 @@ input {
   .premium-coin {
     animation: none;
     transform: none;
+  }
+
+  .shop-hero-divider span {
+    animation: none;
+    transform: translateX(50%);
   }
 }

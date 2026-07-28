@@ -70,3 +70,16 @@ test('Shop premium effects preserve dimensions, loading safety and reduced motio
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /translateY\(-4px\)/);
 });
+
+test('Shop uses the compact premium live-rate hero', async () => {
+  const shop = await readFile(path.join(root, 'app/(public)/shop/page.tsx'), 'utf8');
+  const styles = await readFile(path.join(root, 'app/globals.css'), 'utf8');
+  assert.match(shop, /Buy Certified/);
+  assert.match(shop, /Gold &amp; Silver Coins/);
+  assert.match(shop, /at Live Trichy Rates/);
+  assert.match(shop, /same live \{location === "Trichy" \? "Tiruchirappalli" : location\} rate/);
+  assert.doesNotMatch(shop, />Direct Coin Purchase</);
+  assert.doesNotMatch(shop, />RateStack Shop</);
+  assert.match(styles, /\.shop-hero-gold/);
+  assert.match(styles, /shop-divider-shimmer/);
+});

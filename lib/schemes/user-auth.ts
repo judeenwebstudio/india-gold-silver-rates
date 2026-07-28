@@ -3,7 +3,6 @@
  * Handles registration, login, token signing & verification for web and native Android app.
  */
 
-import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -11,17 +10,17 @@ const JWT_SECRET = process.env.AUTH_SECRET || 'ratestack_scheme_jwt_secret_key_2
 
 export interface SchemeAuthTokenPayload {
   userId: string;
-  phone: string;
+  phone?: string;
   email?: string;
   fullName: string;
   exp: number;
 }
 
-export function signSchemeToken(userId: string, phone: string, fullName: string, email?: string): string {
+export function signSchemeToken(userId: string, phone: string | null | undefined, fullName: string, email?: string): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const exp = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // 30 days
   const payload = Buffer.from(
-    JSON.stringify({ userId, phone, email, fullName, exp })
+    JSON.stringify({ userId, ...(phone ? { phone } : {}), ...(email ? { email } : {}), fullName, exp })
   ).toString('base64url');
 
   const signature = crypto
@@ -83,4 +82,8 @@ export function normalizePhoneNumber(phone: string): string {
     digits = digits.substring(1);
   }
   return digits;
+}
+
+export function normalizeEmailAddress(email: string): string {
+  return email.trim().toLowerCase();
 }

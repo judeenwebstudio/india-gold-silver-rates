@@ -44,7 +44,7 @@ async function main() {
     amountPaise,
     receiptNumber: orderId,
     userId: enrollment.userId,
-    mobileNumber: enrollment.user.phone,
+    mobileNumber: enrollment.user.phone || undefined,
     enrollmentId: enrollment.id,
   });
 

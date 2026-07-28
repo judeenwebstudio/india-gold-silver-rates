@@ -27,6 +27,7 @@ fun CustomerRegisterScreen(
 ) {
     var fullName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var useEmail by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var validationError by remember { mutableStateOf<String?>(null) }
@@ -106,10 +107,17 @@ fun CustomerRegisterScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Mobile Number Field
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        listOf("Mobile", "Email").forEachIndexed { index, label ->
+                            SegmentedButton(selected = useEmail == (index == 1), onClick = { useEmail = index == 1; phone = "" }, shape = SegmentedButtonDefaults.itemShape(index, 2)) { Text("Register with $label", fontSize = 11.sp) }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     OutlinedTextField(
                         value = phone,
                         onValueChange = { input ->
+                            if (useEmail) { phone = input.trim(); validationError = null; return@OutlinedTextField }
                             val digits = input.replace(Regex("\\D"), "")
                             val clean = if (digits.length == 12 && digits.startsWith("91")) {
                                 digits.substring(2)
@@ -123,11 +131,11 @@ fun CustomerRegisterScreen(
                                 validationError = null
                             }
                         },
-                        label = { Text("Indian Mobile Number (10 digits)", color = Color.Gray) },
+                        label = { Text(if (useEmail) "Email Address" else "Indian Mobile Number (10 digits)", color = Color.Gray) },
                         leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFFD97706)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        keyboardOptions = KeyboardOptions(keyboardType = if (useEmail) KeyboardType.Email else KeyboardType.Phone),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFFD97706),
                             unfocusedBorderColor = Color(0xFF44403C),
@@ -192,10 +200,10 @@ fun CustomerRegisterScreen(
                         onClick = {
                             if (fullName.trim().isEmpty()) {
                                 validationError = "Please enter your Full Name."
-                            } else if (phone.length != 10) {
-                                validationError = "Please enter a valid 10-digit mobile number."
-                            } else if (password.length < 6) {
-                                validationError = "Password must be at least 6 characters long."
+                            } else if ((!useEmail && phone.length != 10) || (useEmail && !phone.contains("@"))) {
+                                validationError = if (useEmail) "Please enter a valid email address." else "Please enter a valid 10-digit mobile number."
+                            } else if (password.length < 8 || !password.any(Char::isLetter) || !password.any(Char::isDigit)) {
+                                validationError = "Use at least 8 characters with a letter and number."
                             } else if (password != confirmPassword) {
                                 validationError = "Passwords do not match."
                             } else {

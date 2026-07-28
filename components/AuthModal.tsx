@@ -8,11 +8,14 @@ type AuthModalProps = {
   onSuccess: () => void;
 };
 
-type Mode = "login" | "register" | "forgot_mobile" | "forgot_otp" | "forgot_reset";
+type Mode = "login" | "register" | "forgot_mobile" | "forgot_email" | "forgot_otp" | "forgot_reset";
 
 export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>(initialMode === "forgot" ? "forgot_mobile" : initialMode);
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [authMethod, setAuthMethod] = useState<"MOBILE" | "EMAIL">("MOBILE");
+  const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -23,7 +26,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [resendTimer, setResendTimer] = useState(45);
-  const [canResend, setCanResend] = useState(false);
+  const canResend = resendTimer === 0;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,12 +36,9 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (mode === "forgot_otp" && resendTimer > 0) {
-      setCanResend(false);
       interval = setInterval(() => {
         setResendTimer((prev) => prev - 1);
       }, 1000);
-    } else if (resendTimer === 0) {
-      setCanResend(true);
     }
     return () => clearInterval(interval);
   }, [mode, resendTimer]);
@@ -73,12 +73,11 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
         setSuccessMessage(data.message || "If an account exists, a verification code has been sent.");
         setMode("forgot_otp");
         setResendTimer(45);
-        setCanResend(false);
       } else {
         setError(data.error?.message || "Failed to send OTP.");
       }
-    } catch (err: any) {
-      setError(err.message || "Network error. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -113,8 +112,8 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
       } else {
         setError(data.error?.message || "The verification code is incorrect.");
       }
-    } catch (err: any) {
-      setError(err.message || "Network error. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -159,8 +158,8 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
       } else {
         setError(data.error?.message || "Password reset failed.");
       }
-    } catch (err: any) {
-      setError(err.message || "Network error. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -176,12 +175,16 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
         setError("Please enter your full name.");
         return;
       }
-      if (!phone || phone.length < 10) {
+      if (authMethod === "MOBILE" && (!phone || phone.length < 10)) {
         setError("Please enter a valid 10-digit mobile number.");
         return;
       }
-      if (!password || password.length < 6) {
-        setError("Password must be at least 6 characters.");
+      if (authMethod === "EMAIL" && !email.includes("@")) {
+        setError("Please enter a valid email address.");
+        return;
+      }
+      if (!password || password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+        setError("Use at least 8 characters with a letter and a number.");
         return;
       }
       if (password !== confirmPassword) {
@@ -191,18 +194,21 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
 
       setLoading(true);
       try {
-        const res = await fetch("/api/v1/auth/register", {
+        const res = await fetch(authMethod === "EMAIL" ? "/api/v1/auth/register/email" : "/api/v1/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            phone,
+            ...(authMethod === "EMAIL" ? { email } : { phone }),
             password,
             fullName: fullName.trim(),
           }),
         });
 
         const resData = await res.json();
-        if (resData.success) {
+        if (resData.success && resData.data.verificationRequired) {
+          setSuccessMessage("Check your email and open the verification link to activate your account.");
+          setMode("login");
+        } else if (resData.success) {
           localStorage.setItem("scheme_user_token", resData.data.token);
           localStorage.setItem("ratestack_user_token", resData.data.token);
           if (resData.data.user?.fullName) {
@@ -216,14 +222,15 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
         } else {
           setError(resData.error?.message || "Registration failed. Please try again.");
         }
-      } catch (err: any) {
-        setError(err.message || "Network error. Please try again.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Network error. Please try again.");
       } finally {
         setLoading(false);
       }
     } else if (mode === "login") {
-      if (!phone) {
-        setError("Please enter your registered mobile number.");
+      const identifier = authMethod === "EMAIL" ? email : phone;
+      if (!identifier) {
+        setError(`Please enter your ${authMethod === "EMAIL" ? "email address" : "registered mobile number"}.`);
         return;
       }
       if (!password) {
@@ -237,7 +244,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            identifier: phone,
+            identifier,
             password,
           }),
         });
@@ -255,10 +262,10 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
           onSuccess();
           window.location.href = "/schemes/dashboard";
         } else {
-          setError(resData.error?.message || "Incorrect mobile number or password.");
+          setError(resData.error?.message || "Invalid login details.");
         }
-      } catch (err: any) {
-        setError(err.message || "Network error. Please try again.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Network error. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -277,6 +284,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
               {mode === "login" && "Customer Account Login"}
               {mode === "register" && "Register Scheme Account"}
               {mode === "forgot_mobile" && "Forgot Password"}
+              {mode === "forgot_email" && "Reset Password by Email"}
               {mode === "forgot_otp" && "Verify OTP Code"}
               {mode === "forgot_reset" && "Create New Password"}
             </h2>
@@ -304,6 +312,9 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
         {/* LOGIN AND REGISTER MODE */}
         {(mode === "login" || mode === "register") && (
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            <div className="grid grid-cols-2 rounded-xl bg-stone-950 p-1" role="tablist" aria-label="Authentication method">
+              {(["MOBILE", "EMAIL"] as const).map((method) => <button key={method} type="button" role="tab" aria-selected={authMethod === method} onClick={() => setAuthMethod(method)} className={`rounded-lg p-2 font-bold ${authMethod === method ? "bg-amber-500 text-stone-950" : "text-stone-400"}`}>{method === "MOBILE" ? "Mobile Number" : "Email Address"}</button>)}
+            </div>
             {mode === "register" && (
               <div>
                 <label className="block font-bold text-stone-300 mb-1">Full Name *</label>
@@ -319,12 +330,12 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
             )}
 
             <div>
-              <label className="block font-bold text-stone-300 mb-1">Mobile Number *</label>
+              <label className="block font-bold text-stone-300 mb-1">{authMethod === "MOBILE" ? "Mobile Number" : "Email Address"} *</label>
               <input
-                type="tel"
-                placeholder="e.g. 9876543210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                type={authMethod === "MOBILE" ? "tel" : "email"}
+                placeholder={authMethod === "MOBILE" ? "e.g. 9876543210" : "you@example.com"}
+                value={authMethod === "MOBILE" ? phone : email}
+                onChange={(e) => authMethod === "MOBILE" ? setPhone(e.target.value) : setEmail(e.target.value)}
                 required
                 className="w-full rounded-xl bg-stone-950 border border-stone-800 p-3 text-stone-100 font-semibold focus:border-amber-500 focus:outline-none"
               />
@@ -336,21 +347,21 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
                 {mode === "login" && (
                   <button
                     type="button"
-                    onClick={() => { setError(null); setSuccessMessage(null); setMode("forgot_mobile"); }}
+                    onClick={() => { setError(null); setSuccessMessage(null); setMode(authMethod === "EMAIL" ? "forgot_email" : "forgot_mobile"); }}
                     className="text-amber-400 hover:underline font-semibold text-[11px]"
                   >
                     Forgot Password?
                   </button>
                 )}
               </div>
-              <input
-                type="password"
+              <div className="relative"><input
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full rounded-xl bg-stone-950 border border-stone-800 p-3 text-stone-100 font-semibold focus:border-amber-500 focus:outline-none"
-              />
+                className="w-full rounded-xl bg-stone-950 border border-stone-800 p-3 pr-16 text-stone-100 font-semibold focus:border-amber-500 focus:outline-none"
+              /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-amber-400">{showPassword ? "Hide" : "Show"}</button></div>
             </div>
 
             {mode === "register" && (
@@ -378,6 +389,20 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess }: AuthMod
                 ? "Login & Access Dashboard →"
                 : "Register Account & Continue →"}
             </button>
+          </form>
+        )}
+
+        {mode === "forgot_email" && (
+          <form onSubmit={async (event) => {
+            event.preventDefault(); setLoading(true); setError(null);
+            try {
+              const res = await fetch("/api/v1/auth/forgot-password/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+              const data = await res.json(); setSuccessMessage(data.message || "If an account exists, reset instructions have been sent.");
+            } catch { setError("Unable to process the request."); } finally { setLoading(false); }
+          }} className="space-y-4 text-xs">
+            <p className="text-stone-400">Enter your email address. We’ll send a secure, single-use password reset link.</p>
+            <label className="block font-bold">Email Address<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 w-full rounded-xl border border-stone-800 bg-stone-950 p-3"/></label>
+            <button disabled={loading} className="w-full rounded-xl bg-amber-500 p-3 font-bold text-stone-950">{loading ? "Sending…" : "Send Reset Link"}</button>
           </form>
         )}
 

@@ -147,11 +147,11 @@ class SchemeViewModel(
     fun login(phone: String, pass: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _authActionState.value = LoadState.Loading
-            val normalizedPhone = normalizePhoneNumber(phone)
+            val normalizedPhone = if (phone.contains("@")) phone.trim().lowercase() else normalizePhoneNumber(phone)
             try {
                 val body = mapOf(
                     "identifier" to normalizedPhone,
-                    "phone" to normalizedPhone,
+                    "identifier" to normalizedPhone,
                     "password" to pass,
                 )
                 val res = ApiProvider.service.loginUser(body)
@@ -178,7 +178,7 @@ class SchemeViewModel(
                         _authActionState.value = LoadState.Error("Invalid response from server")
                     }
                 } else {
-                    val errMsg = res.body()?.error?.message ?: if (res.code() == 404) "No account found. Please register." else "Incorrect mobile number or password."
+                    val errMsg = res.body()?.error?.message ?: "Invalid login details."
                     _authActionState.value = LoadState.Error(errMsg)
                 }
             } catch (e: Exception) {
@@ -190,14 +190,15 @@ class SchemeViewModel(
     fun register(fullName: String, phone: String, pass: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _authActionState.value = LoadState.Loading
-            val normalizedPhone = normalizePhoneNumber(phone)
+            val isEmail = phone.contains("@")
+            val normalizedPhone = if (isEmail) phone.trim().lowercase() else normalizePhoneNumber(phone)
             try {
                 val body = mapOf(
                     "fullName" to fullName.trim(),
-                    "phone" to normalizedPhone,
+                    (if (isEmail) "email" else "phone") to normalizedPhone,
                     "password" to pass,
                 )
-                val res = ApiProvider.service.registerUser(body)
+                val res = if (isEmail) ApiProvider.service.registerEmailUser(body) else ApiProvider.service.registerUser(body)
 
                 if (com.ratestack.app.BuildConfig.DEBUG) {
                     android.util.Log.d(
@@ -216,6 +217,9 @@ class SchemeViewModel(
                         _userPhone.value = authData.user?.phone ?: normalizedPhone
                         _authActionState.value = LoadState.Ready(authData)
                         loadMySchemes()
+                        onSuccess()
+                    } else if (isEmail && res.body()?.success == true) {
+                        _authActionState.value = LoadState.Ready(requireNotNull(authData))
                         onSuccess()
                     } else {
                         _authActionState.value = LoadState.Error("Invalid registration response")

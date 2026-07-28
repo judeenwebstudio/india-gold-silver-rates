@@ -355,7 +355,8 @@ fun RateStackApp(
                         onRegisterSubmit = { fullName, phone, pass ->
                             schemeViewModel.register(fullName, phone, pass) {
                                 schemeViewModel.resetAuthActionState()
-                                navController.navigate(Routes.SCHEMES) {
+                                val destination = if (schemeViewModel.userToken.value.isNullOrBlank()) Routes.CUSTOMER_LOGIN else Routes.SCHEMES
+                                navController.navigate(destination) {
                                     popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }
                                 }
                             }

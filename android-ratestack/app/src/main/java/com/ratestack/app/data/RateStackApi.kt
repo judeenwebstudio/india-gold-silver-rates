@@ -33,6 +33,16 @@ interface RateStackApi {
         @retrofit2.http.Body body: Map<String, String>,
     ): Response<ApiEnvelope<AuthResponseDto>>
 
+    @POST("api/v1/auth/register/email")
+    suspend fun registerEmailUser(
+        @retrofit2.http.Body body: Map<String, String>,
+    ): Response<ApiEnvelope<AuthResponseDto>>
+
+    @POST("api/v1/auth/forgot-password/email")
+    suspend fun requestEmailPasswordReset(
+        @retrofit2.http.Body body: Map<String, String>,
+    ): Response<ApiEnvelope<Map<String, String>>>
+
     @POST("api/v1/auth/login")
     suspend fun loginUser(
         @retrofit2.http.Body body: Map<String, String>,

@@ -18,12 +18,18 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.google.android.material.snackbar.Snackbar
+import com.razorpay.Checkout
+import com.razorpay.PaymentData
+import com.razorpay.PaymentResultWithDataListener
+import org.json.JSONObject
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     private var incomingUrl by mutableStateOf<String?>(null)
     private var notificationPermissionChecked = false
     private var successfulSessionRecorded = false
     private lateinit var playUpdateCoordinator: PlayUpdateCoordinator
+    private var razorpaySuccess: ((String, String) -> Unit)? = null
+    private var razorpayError: ((String?) -> Unit)? = null
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -65,6 +71,45 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             onError(e.message ?: "Unable to launch PhonePe checkout.")
         }
+    }
+
+    fun startRazorpayCheckout(
+        keyId: String,
+        gatewayOrderId: String,
+        amountPaise: Long,
+        onSuccess: (paymentId: String, signature: String) -> Unit,
+        onError: (description: String?) -> Unit,
+    ) {
+        razorpaySuccess = onSuccess
+        razorpayError = onError
+        try {
+            Checkout.preload(applicationContext)
+            Checkout().apply { setKeyID(keyId) }.open(this, JSONObject().apply {
+                put("name", "RateStack")
+                put("description", "Scheme installment")
+                put("currency", "INR")
+                put("amount", amountPaise)
+                put("order_id", gatewayOrderId)
+                put("theme.color", "#F59E0B")
+            })
+        } catch (e: Exception) {
+            razorpayError?.invoke(e.message)
+        }
+    }
+
+    override fun onPaymentSuccess(paymentId: String?, paymentData: PaymentData?) {
+        val id = paymentData?.paymentId ?: paymentId.orEmpty()
+        val signature = paymentData?.signature.orEmpty()
+        if (id.isBlank() || signature.isBlank()) razorpayError?.invoke("Razorpay verification data is missing.")
+        else razorpaySuccess?.invoke(id, signature)
+        razorpaySuccess = null
+        razorpayError = null
+    }
+
+    override fun onPaymentError(code: Int, response: String?, paymentData: PaymentData?) {
+        razorpayError?.invoke(response ?: "Payment failed.")
+        razorpaySuccess = null
+        razorpayError = null
     }
 
     override fun onNewIntent(intent: Intent) {

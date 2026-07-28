@@ -401,6 +401,13 @@ data class PaymentOrderResponseDto(
     val merchantId: String? = null,
 )
 
+data class PublicGatewayDto(val enabled: Boolean?, val keyId: String? = null)
+data class PaymentConfigDto(
+    val activeGateway: String?,
+    val razorpay: PublicGatewayDto?,
+    val phonepe: PublicGatewayDto?,
+)
+
 sealed interface PaymentActionState {
     object Idle : PaymentActionState
     object CreatingOrder : PaymentActionState

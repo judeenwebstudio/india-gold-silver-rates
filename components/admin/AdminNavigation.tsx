@@ -36,6 +36,7 @@ const navGroups: NavGroup[] = [
       { label: "Redemptions", href: "/admin/schemes/redemptions", marker: "RD", available: true },
       { label: "Financial Reports", href: "/admin/schemes/reports", marker: "FR", available: true },
       { label: "Merchant Compliance", href: "/admin/schemes/merchant-config", marker: "MC", available: true },
+      { label: "Payment Gateway", href: "/admin/settings/payment-gateway", marker: "PG", available: true },
     ],
   },
   {

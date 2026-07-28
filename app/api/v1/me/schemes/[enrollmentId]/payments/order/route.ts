@@ -4,6 +4,7 @@ import { authenticateSchemeUserFromRequest } from '@/lib/schemes/user-auth';
 import { enforceMerchantGuardForLivePayments } from '@/lib/schemes/merchant-guard';
 import { getActivePaymentGateway } from '@/lib/schemes/gateway';
 import { createPhonePeOrder } from '@/lib/schemes/phonepe';
+import { createRazorpayOrder } from '@/lib/schemes/razorpay';
 import { paiseToInrNumber } from '@/lib/schemes/precision';
 import { z } from 'zod';
 
@@ -27,25 +28,13 @@ export async function POST(
       );
     }
 
-    const activeGateway = getActivePaymentGateway();
-    console.log({
-      activeGateway,
-      paymentGatewayEnv: process.env.PAYMENT_GATEWAY,
-      phonePeEnv: process.env.PHONEPE_ENV,
-    });
+    const activeGateway = await getActivePaymentGateway();
 
     // 2. Merchant compliance check
     await enforceMerchantGuardForLivePayments();
 
     const body = await request.json().catch(() => ({}));
     const parsed = paymentOrderSchema.safeParse(body);
-
-    if (activeGateway !== 'PHONEPE') {
-      return NextResponse.json(
-        { success: false, error: { message: 'PhonePe is the only supported payment gateway.' } },
-        { status: 503 }
-      );
-    }
 
     // 3. Fetch Enrollment & Next Installment
     const enrollment = await prisma.schemeEnrollment.findUnique({
@@ -96,21 +85,37 @@ export async function POST(
     let merchantId = '';
 
     try {
-      const phonePeOrder = await createPhonePeOrder({
-        orderId,
-        amountPaise,
-        receiptNumber: orderId,
-        userId: authUser.userId,
-        mobileNumber: authUser.phone,
-        enrollmentId: enrollment.id,
-      });
-      gatewayOrderId = phonePeOrder.merchantTransactionId;
-      redirectUrl = phonePeOrder.redirectUrl;
-      merchantId = phonePeOrder.merchantId;
-    } catch (err: any) {
-      if (err.message?.includes('credentials')) {
+      if (activeGateway === 'RAZORPAY') {
+        const razorpayOrder = await createRazorpayOrder({
+          orderId,
+          amountPaise,
+          receiptNumber: orderId,
+        });
+        gatewayOrderId = razorpayOrder.gatewayOrderId;
+      } else {
+        const phonePeOrder = await createPhonePeOrder({
+          orderId,
+          amountPaise,
+          receiptNumber: orderId,
+          userId: authUser.userId,
+          mobileNumber: authUser.phone,
+          enrollmentId: enrollment.id,
+        });
+        gatewayOrderId = phonePeOrder.merchantTransactionId;
+        redirectUrl = phonePeOrder.redirectUrl;
+        merchantId = phonePeOrder.merchantId;
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '';
+      if (errorMessage.includes('credentials')) {
         return NextResponse.json(
           { success: false, error: { message: 'Payment service is not configured yet.' } },
+          { status: 503 }
+        );
+      }
+      if (activeGateway === 'PHONEPE' && errorMessage.includes('BLOCKED_MERCHANT')) {
+        return NextResponse.json(
+          { success: false, error: { code: 'BLOCKED_MERCHANT', message: 'PhonePe is temporarily unavailable. Please try again shortly.' } },
           { status: 503 }
         );
       }
@@ -144,12 +149,14 @@ export async function POST(
         redirectUrl: redirectUrl || undefined,
         merchantTransactionId: paymentOrder.gatewayOrderId || paymentOrder.orderId,
         merchantId: merchantId || undefined,
+        keyId: activeGateway === 'RAZORPAY' ? process.env.RAZORPAY_KEY_ID : undefined,
       },
     });
-  } catch (error: any) {
-    const isCredentialsErr = error?.message?.includes('credentials');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create payment order';
+    const isCredentialsErr = errorMessage.includes('credentials');
     return NextResponse.json(
-      { success: false, error: { message: isCredentialsErr ? 'Payment service is not configured yet.' : (error.message || 'Failed to create payment order') } },
+      { success: false, error: { message: isCredentialsErr ? 'Payment service is not configured yet.' : errorMessage } },
       { status: isCredentialsErr ? 503 : 500 }
     );
   }

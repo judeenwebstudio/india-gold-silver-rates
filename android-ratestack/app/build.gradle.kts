@@ -171,6 +171,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
     implementation(libs.gson)
+    implementation(libs.razorpay.checkout)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -15,6 +15,7 @@ retrofit = "2.11.0"
 material = "1.11.0"
 playAppUpdate = "2.1.0"
 playReview = "2.0.2"
+razorpay = "1.6.40"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
@@ -43,6 +44,7 @@ play-app-update = { module = "com.google.android.play:app-update", version.ref =
 play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "playAppUpdate" }
 play-review = { module = "com.google.android.play:review", version.ref = "playReview" }
 play-review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "playReview" }
+razorpay-checkout = { module = "com.razorpay:checkout", version.ref = "razorpay" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

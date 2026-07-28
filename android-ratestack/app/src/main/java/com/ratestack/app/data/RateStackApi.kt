@@ -6,6 +6,9 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 
 interface RateStackApi {
+    @GET("api/v1/payment/config")
+    suspend fun getPaymentConfig(): Response<PaymentConfigDto>
+
     @GET("api/v1/home")
     suspend fun getHome(): Response<ApiEnvelope<HomeDto>>
 
@@ -96,4 +99,3 @@ interface RateStackApi {
         @retrofit2.http.Body body: Map<String, String>,
     ): Response<ApiEnvelope<Map<String, String>>>
 }
-

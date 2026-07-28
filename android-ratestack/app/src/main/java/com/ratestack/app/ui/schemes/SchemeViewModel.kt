@@ -309,7 +309,7 @@ class SchemeViewModel(
 
     fun startPaymentFlow(
         enrollmentId: String,
-        onLaunchCheckout: (redirectUrl: String, merchantTransactionId: String, paymentOrderId: String, gateway: String) -> Unit,
+        onLaunchCheckout: (checkoutValue: String, gatewayOrderId: String, paymentOrderId: String, gateway: String, amount: Double) -> Unit,
     ) {
         val token = repository.getUserToken()
         if (token.isNull_or_empty()) {
@@ -324,6 +324,11 @@ class SchemeViewModel(
             }
 
             try {
+                val configRes = ApiProvider.service.getPaymentConfig()
+                if (!configRes.isSuccessful || configRes.body()?.activeGateway.isNullOrBlank()) {
+                    _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Payment configuration is unavailable.")
+                    return@launch
+                }
                 val res = ApiProvider.service.createPaymentOrder(
                     "Bearer $token",
                     enrollmentId,
@@ -341,7 +346,7 @@ class SchemeViewModel(
                     val data = res.body()?.data
                     if (data != null) {
                         val paymentOrderId = data.paymentOrderId ?: ""
-                        val gateway = data.gateway ?: "PHONEPE"
+                        val gateway = data.gateway ?: configRes.body()?.activeGateway ?: "RAZORPAY"
                         val redirectUrl = data.redirectUrl ?: ""
                         val merchantTransactionId = data.merchantTransactionId ?: data.gatewayOrderId ?: ""
 
@@ -361,12 +366,20 @@ class SchemeViewModel(
                                     enrollmentId = enrollmentId,
                                 )
                                 _paymentFlowState.value = state
-                                onLaunchCheckout(redirectUrl, merchantTransactionId, paymentOrderId, gateway)
+                                onLaunchCheckout(redirectUrl, merchantTransactionId, paymentOrderId, gateway, data.amount ?: 0.0)
                             } else {
                                 _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("PhonePe checkout URL is unavailable.")
                             }
+                        } else if (gateway == "RAZORPAY") {
+                            val keyId = configRes.body()?.razorpay?.keyId ?: data.keyId.orEmpty()
+                            val gatewayOrderId = data.gatewayOrderId.orEmpty()
+                            if (keyId.isNotBlank() && gatewayOrderId.isNotBlank()) {
+                                onLaunchCheckout(keyId, gatewayOrderId, paymentOrderId, gateway, data.amount ?: 0.0)
+                            } else {
+                                _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Razorpay is not configured.")
+                            }
                         } else {
-                            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("PhonePe is the only supported payment gateway.")
+                            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Unsupported payment gateway.")
                         }
                     } else {
                         _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Unable to create payment order.")

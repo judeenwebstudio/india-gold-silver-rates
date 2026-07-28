@@ -455,12 +455,12 @@ fun RateStackApp(
                         onPayInstallment = {
                             schemeViewModel.startPaymentFlow(
                                 enrollmentId = enrollmentId,
-                                onLaunchCheckout = { redirectUrl, merchantTransactionId, paymentOrderId, gateway ->
+                                onLaunchCheckout = { checkoutValue, gatewayOrderId, paymentOrderId, gateway, amount ->
                                     if (activity != null) {
                                         if (gateway == "PHONEPE") {
                                             activity.startPhonePePaymentSheet(
-                                                redirectUrl = redirectUrl,
-                                                merchantTransactionId = merchantTransactionId,
+                                                redirectUrl = checkoutValue,
+                                                merchantTransactionId = gatewayOrderId,
                                                 onSuccess = { txId ->
                                                     schemeViewModel.handlePaymentSuccess(
                                                         enrollmentId = enrollmentId,
@@ -473,8 +473,23 @@ fun RateStackApp(
                                                     schemeViewModel.handlePaymentFailed(desc)
                                                 }
                                             )
+                                        } else if (gateway == "RAZORPAY") {
+                                            activity.startRazorpayCheckout(
+                                                keyId = checkoutValue,
+                                                gatewayOrderId = gatewayOrderId,
+                                                amountPaise = (amount * 100).toLong(),
+                                                onSuccess = { paymentId, signature ->
+                                                    schemeViewModel.handlePaymentSuccess(
+                                                        enrollmentId = enrollmentId,
+                                                        paymentOrderId = paymentOrderId,
+                                                        gatewayPaymentId = paymentId,
+                                                        gatewaySignature = signature,
+                                                    )
+                                                },
+                                                onError = { desc -> schemeViewModel.handlePaymentFailed(desc) },
+                                            )
                                         } else {
-                                            schemeViewModel.handlePaymentFailed("PhonePe is the only supported payment gateway.")
+                                            schemeViewModel.handlePaymentFailed("Unsupported payment gateway.")
                                         }
                                     } else {
                                         schemeViewModel.handlePaymentFailed("Activity context unavailable")

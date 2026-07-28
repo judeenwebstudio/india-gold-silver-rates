@@ -51,4 +51,22 @@ test('Android Shop keeps both backend product images compact and contained', asy
   assert.match(shop, /padding\(24\.dp\)/);
   assert.match(shop, /ContentScale\.Fit/);
   assert.match(shop, /product\.imageUrl/);
+  assert.match(shop, /PremiumShopButton/);
+  assert.match(shop, /ShoppingCart/);
+  assert.match(shop, /openingProductId/);
+  assert.match(shop, /Brush\.horizontalGradient/);
+});
+
+test('Shop premium effects preserve dimensions, loading safety and reduced motion', async () => {
+  const shop = await readFile(path.join(root, 'app/(public)/shop/page.tsx'), 'utf8');
+  const styles = await readFile(path.join(root, 'app/globals.css'), 'utf8');
+  assert.match(shop, /if \(busy\) return/);
+  assert.match(shop, /disabled=\{Boolean\(busy\)\}/);
+  assert.match(shop, /aria-busy/);
+  assert.match(shop, /premium-buy-button/);
+  assert.match(shop, /shop-product-card/);
+  assert.match(shop, /premium-coin/);
+  assert.match(styles, /@media \(hover: hover\) and \(pointer: fine\)/);
+  assert.match(styles, /prefers-reduced-motion: reduce/);
+  assert.match(styles, /translateY\(-4px\)/);
 });

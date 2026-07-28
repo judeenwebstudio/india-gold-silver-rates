@@ -17,18 +17,22 @@ function ProductImage({ product }: { product: Product }) {
   const fallback = product.metalType === "GOLD" ? "/products/gold-22k-coin.webp" : "/products/silver-coin.webp";
   const [src, setSrc] = useState(product.imageUrl || fallback);
   const [loaded, setLoaded] = useState(false);
-  return <div className="relative aspect-square overflow-hidden bg-stone-100">
-    {!loaded && <div className="absolute inset-0 animate-pulse bg-stone-200" aria-label="Loading product image" />}
-    <Image
-      src={src}
-      alt={product.name === "Gold 22K Coin" ? "Gold 22K Coin" : "Silver Coin"}
-      fill
-      sizes="(min-width: 768px) 50vw, 100vw"
-      className="object-contain p-4"
-      onLoad={() => setLoaded(true)}
-      onError={() => { if (src !== fallback) setSrc(fallback); else setLoaded(true); }}
-      priority={product.metalType === "GOLD"}
-    />
+  return <div className="p-3 sm:p-4">
+    <div className="relative flex h-[240px] items-center justify-center overflow-hidden rounded-2xl border border-stone-100 bg-neutral-50 p-6 md:h-[320px] md:p-10">
+      {!loaded && <div className="absolute inset-0 animate-pulse bg-stone-100" aria-label="Loading product image" />}
+      <div className="relative h-full w-full">
+        <Image
+          src={src}
+          alt={product.name === "Gold 22K Coin" ? "Gold 22K Coin" : "Silver Coin"}
+          fill
+          sizes="(min-width: 768px) 40vw, 90vw"
+          className="object-contain"
+          onLoad={() => setLoaded(true)}
+          onError={() => { if (src !== fallback) setSrc(fallback); else setLoaded(true); }}
+          priority={product.metalType === "GOLD"}
+        />
+      </div>
+    </div>
   </div>;
 }
 

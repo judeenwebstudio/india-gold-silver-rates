@@ -38,5 +38,17 @@ test('Shop uses bundled coin fallbacks without changing pricing logic', async ()
   assert.match(shop, /gold-22k-coin\.webp/);
   assert.match(shop, /silver-coin\.webp/);
   assert.match(shop, /object-contain/);
+  assert.match(shop, /h-\[240px\]/);
+  assert.match(shop, /md:h-\[320px\]/);
+  assert.match(shop, /p-6/);
+  assert.match(shop, /md:p-10/);
   assert.match(shop, /product\.prices/);
+});
+
+test('Android Shop keeps both backend product images compact and contained', async () => {
+  const shop = await readFile(path.join(root, 'android-ratestack/app/src/main/java/com/ratestack/app/ui/schemes/ShopLandingScreen.kt'), 'utf8');
+  assert.match(shop, /height\(220\.dp\)/);
+  assert.match(shop, /padding\(24\.dp\)/);
+  assert.match(shop, /ContentScale\.Fit/);
+  assert.match(shop, /product\.imageUrl/);
 });

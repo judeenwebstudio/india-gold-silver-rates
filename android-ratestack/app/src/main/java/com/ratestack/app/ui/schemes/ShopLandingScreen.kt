@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -42,7 +44,21 @@ fun ShopLandingScreen(
                 Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val rawImage = product.imageUrl ?: if (isGold) "/products/gold-22k-coin.webp" else "/products/silver-coin.webp"
                     val imageUrl = if (rawImage.startsWith("http")) rawImage else "${BuildConfig.WEBSITE_URL.trimEnd('/')}$rawImage"
-                    AsyncImage(model = imageUrl, contentDescription = product.name, modifier = Modifier.fillMaxWidth().aspectRatio(1f), contentScale = androidx.compose.ui.layout.ContentScale.Fit, placeholder = ColorPainter(Color(0xFFE7E5E4)), error = ColorPainter(if (isGold) Color(0xFFFDE68A) else Color(0xFFCBD5E1)))
+                    Surface(color = Color(0xFFFAFAF9), shape = RoundedCornerShape(16.dp)) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(220.dp).padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AsyncImage(
+                                model = imageUrl,
+                                contentDescription = product.name,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
+                                placeholder = ColorPainter(Color(0xFFE7E5E4)),
+                                error = ColorPainter(if (isGold) Color(0xFFFDE68A) else Color(0xFFCBD5E1)),
+                            )
+                        }
+                    }
                     Text(product.name.orEmpty(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                     Text(product.availableWeights.orEmpty().joinToString(" · ") { if (it >= 1000) "${it / 1000}kg" else "${it.toInt()}g" })
                     Text("Metal value + ${product.serviceChargePercent ?: 5.0}% service charge + ${product.gstPercent ?: 3.0}% GST", style = MaterialTheme.typography.bodySmall)

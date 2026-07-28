@@ -10,13 +10,16 @@ const schema = z.object({
 });
 export async function GET() {
   if (!(await auth())?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const products = await prisma.shopProduct.findMany({ orderBy: { metalType: 'asc' } });
-  return NextResponse.json({ products: products.map((p) => ({ ...p, weights: p.availableWeightsGramsJson, serviceChargePercent: p.serviceChargeBasisPoints / 100, gstPercent: p.gstBasisPoints / 100 })) });
+  const products = await prisma.shopProduct.findMany({ orderBy: { metalType: 'asc' }, omit: { imageData: true } });
+  return NextResponse.json({ products: products.map((p) => ({ ...p, imageUrl: p.imageMimeType ? `/api/v1/shop/products/${p.id}/image` : p.imageUrl, weights: p.availableWeightsGramsJson, serviceChargePercent: p.serviceChargeBasisPoints / 100, gstPercent: p.gstBasisPoints / 100 })) });
 }
 export async function PUT(request: Request) {
   if (!(await auth())?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  if (parsed.data.imageUrl && !/^\/(?:products|api\/v1\/shop\/products)\/[a-zA-Z0-9_./-]+$/.test(parsed.data.imageUrl)) {
+    return NextResponse.json({ error: 'Image URL must be a safe RateStack-hosted product path.' }, { status: 400 });
+  }
   const product = await prisma.shopProduct.update({ where: { id: parsed.data.id }, data: {
     description: parsed.data.description, imageUrl: parsed.data.imageUrl || null,
     availableWeightsGramsJson: parsed.data.weights,

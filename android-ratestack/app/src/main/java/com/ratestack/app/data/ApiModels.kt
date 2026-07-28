@@ -408,6 +408,22 @@ data class PaymentConfigDto(
     val phonepe: PublicGatewayDto?,
 )
 
+data class ShopResponseDto(
+    val location: String?,
+    val products: List<ShopProductDto>?,
+)
+
+data class ShopProductDto(
+    val productId: String?,
+    val name: String?,
+    val description: String?,
+    val imageUrl: String?,
+    val availableWeights: List<Double>?,
+    val serviceChargePercent: Double?,
+    val gstPercent: Double?,
+    val enabled: Boolean?,
+)
+
 sealed interface PaymentActionState {
     object Idle : PaymentActionState
     object CreatingOrder : PaymentActionState

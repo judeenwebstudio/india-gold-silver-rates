@@ -6,6 +6,9 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 
 interface RateStackApi {
+    @GET("api/v1/shop")
+    suspend fun getShop(): Response<ApiEnvelope<ShopResponseDto>>
+
     @GET("api/v1/payment/config")
     suspend fun getPaymentConfig(): Response<PaymentConfigDto>
 

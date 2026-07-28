@@ -16,6 +16,7 @@ material = "1.11.0"
 playAppUpdate = "2.1.0"
 playReview = "2.0.2"
 razorpay = "1.6.40"
+coil = "2.7.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
@@ -45,6 +46,7 @@ play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", versi
 play-review = { module = "com.google.android.play:review", version.ref = "playReview" }
 play-review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "playReview" }
 razorpay-checkout = { module = "com.razorpay:checkout", version.ref = "razorpay" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -351,6 +351,8 @@ model ShopProduct {
   purity                    MetalPurity
   description               String
   imageUrl                  String?
+  imageData                 Bytes?
+  imageMimeType             String?
   availableWeightsGramsJson Json
   serviceChargeBasisPoints  Int         @default(500)
   gstBasisPoints            Int         @default(300)

@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   const baseUrl = new URL(`${protocol}://${host}`);
-  const socialImage = new URL("/ratestack-logo.png", baseUrl).toString();
+  const socialImage = new URL("/og.png", baseUrl).toString();
   const adsense = getAdSenseConfiguration();
 
   return {
@@ -31,6 +31,15 @@ export async function generateMetadata(): Promise<Metadata> {
     ],
     authors: [{ name: "RateStack" }],
     creator: "RateStack",
+    icons: {
+      icon: [
+        { url: "/favicon.ico", sizes: "any" },
+        { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+        { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      ],
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    },
+    manifest: "/manifest.webmanifest",
     openGraph: {
       type: "website",
       locale: "en_IN",
@@ -38,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: "RateStack",
       title: "RateStack | India Gold & Silver Rates",
       description: "Clear daily bullion rates, city comparisons, and a simple purchase calculator.",
-      images: [{ url: socialImage, width: 1466, height: 720, alt: "RateStack logo" }],
+      images: [{ url: socialImage, width: 1200, height: 630, alt: "RateStack — Gold and silver rates" }],
     },
     twitter: {
       card: "summary_large_image",

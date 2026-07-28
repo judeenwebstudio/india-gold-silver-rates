@@ -5,6 +5,7 @@ export type ShopPrice = {
   metalValuePaise: bigint;
   serviceChargePaise: bigint;
   gstPaise: bigint;
+  shippingAmountPaise: bigint;
   totalPaise: bigint;
 };
 
@@ -19,7 +20,15 @@ export function calculateShopPrice(
   const metalValuePaise = (ratePerGramPaise * weightMilliGrams * BigInt(quantity)) / 1000n;
   const serviceChargePaise = (metalValuePaise * BigInt(serviceChargeBasisPoints)) / 10_000n;
   const gstPaise = ((metalValuePaise + serviceChargePaise) * BigInt(gstBasisPoints)) / 10_000n;
-  return { ratePerGramPaise, metalValuePaise, serviceChargePaise, gstPaise, totalPaise: metalValuePaise + serviceChargePaise + gstPaise };
+  const shippingAmountPaise = 0n;
+  return {
+    ratePerGramPaise,
+    metalValuePaise,
+    serviceChargePaise,
+    gstPaise,
+    shippingAmountPaise,
+    totalPaise: metalValuePaise + serviceChargePaise + gstPaise + shippingAmountPaise,
+  };
 }
 
 export async function getTrichyShopRates() {

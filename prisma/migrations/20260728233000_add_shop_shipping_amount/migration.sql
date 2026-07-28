@@ -1,0 +1,2 @@
+ALTER TABLE "ShopOrder"
+  ADD COLUMN "shippingAmountPaise" BIGINT NOT NULL DEFAULT 0;

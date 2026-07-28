@@ -422,6 +422,15 @@ data class ShopProductDto(
     val serviceChargePercent: Double?,
     val gstPercent: Double?,
     val enabled: Boolean?,
+    val prices: Map<String, ShopPriceDto>? = null,
+)
+
+data class ShopPriceDto(
+    val metalValue: Double?,
+    val serviceCharge: Double?,
+    val gst: Double?,
+    val shipping: Double?,
+    val total: Double?,
 )
 
 sealed interface PaymentActionState {

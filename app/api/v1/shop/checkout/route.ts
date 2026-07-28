@@ -46,7 +46,8 @@ export async function POST(request: Request) {
       metalType: product.metalType, purity: product.purity, weightGrams: parsed.data.weightGrams,
       quantity: parsed.data.quantity, trichyRatePerGramPaise: rate, metalValuePaise: price.metalValuePaise,
       serviceChargeBasisPoints: product.serviceChargeBasisPoints, serviceChargePaise: price.serviceChargePaise,
-      gstBasisPoints: product.gstBasisPoints, gstPaise: price.gstPaise, totalAmountPaise: price.totalPaise,
+      gstBasisPoints: product.gstBasisPoints, gstPaise: price.gstPaise,
+      shippingAmountPaise: price.shippingAmountPaise, totalAmountPaise: price.totalPaise,
       gateway, gatewayOrderId, paymentStatus: 'PENDING',
     },
   });
@@ -54,5 +55,12 @@ export async function POST(request: Request) {
     shopOrderId: order.id, orderNumber, gateway, gatewayOrderId, redirectUrl,
     keyId: gateway === 'RAZORPAY' ? process.env.RAZORPAY_KEY_ID : undefined,
     amount: Number(price.totalPaise) / 100, currency: 'INR',
+    pricing: {
+      metalValue: Number(price.metalValuePaise) / 100,
+      serviceChargeAmount: Number(price.serviceChargePaise) / 100,
+      gstAmount: Number(price.gstPaise) / 100,
+      shippingAmount: Number(price.shippingAmountPaise) / 100,
+      totalAmount: Number(price.totalPaise) / 100,
+    },
   } });
 }

@@ -27,6 +27,8 @@ import coil.compose.AsyncImage
 import com.ratestack.app.BuildConfig
 import com.ratestack.app.data.ApiProvider
 import com.ratestack.app.data.ShopProductDto
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
 fun ShopLandingScreen(
@@ -92,7 +94,36 @@ fun ShopLandingScreen(
                     }
                     Text(product.name.orEmpty(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                     Text(product.availableWeights.orEmpty().joinToString(" · ") { if (it >= 1000) "${it / 1000}kg" else "${it.toInt()}g" })
-                    Text("Metal value + ${product.serviceChargePercent ?: 5.0}% service charge + ${product.gstPercent ?: 3.0}% GST", style = MaterialTheme.typography.bodySmall)
+                    val firstWeight = product.availableWeights.orEmpty().firstOrNull()
+                    val priceKey = firstWeight?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }
+                    val price = priceKey?.let { product.prices?.get(it) }
+                    if (price != null) {
+                        Surface(
+                            color = Color(0xFF1C1917),
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                ShopPriceRow("Metal Value", formatShopAmount(price.metalValue))
+                                ShopPriceRow("Service Charge", formatShopAmount(price.serviceCharge))
+                                ShopPriceRow("GST (3%)", formatShopAmount(price.gst))
+                                ShopPriceRow(
+                                    "Shipping Cost",
+                                    if ((price.shipping ?: 0.0) == 0.0) "FREE" else formatShopAmount(price.shipping),
+                                    valueColor = Color(0xFF6EE7B7),
+                                )
+                                HorizontalDivider(color = Color(0xFF57534E))
+                                ShopPriceRow(
+                                    "Total Payable",
+                                    formatShopAmount(price.total),
+                                    valueColor = Color(0xFFFCD34D),
+                                    bold = true,
+                                )
+                            }
+                        }
+                    }
                     PremiumShopButton(
                         text = if (isLoggedIn) "Select Weight & Buy Now" else "Login to Buy",
                         loading = openingProductId == product.id,
@@ -112,6 +143,25 @@ fun ShopLandingScreen(
         }
     }
 }
+
+@Composable
+private fun ShopPriceRow(
+    label: String,
+    value: String,
+    valueColor: Color = Color.White,
+    bold: Boolean = false,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, color = Color(0xFFE7E5E4), fontWeight = if (bold) FontWeight.Black else FontWeight.Normal)
+        Text(value, color = valueColor, fontWeight = FontWeight.Black)
+    }
+}
+
+private fun formatShopAmount(amount: Double?): String =
+    NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(amount ?: 0.0)
 
 @Composable
 private fun PremiumShopButton(

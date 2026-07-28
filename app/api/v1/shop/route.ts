@@ -32,6 +32,7 @@ export async function GET() {
                 metalValue: Number(price.metalValuePaise) / 100,
                 serviceCharge: Number(price.serviceChargePaise) / 100,
                 gst: Number(price.gstPaise) / 100,
+                shipping: Number(price.shippingAmountPaise) / 100,
                 total: Number(price.totalPaise) / 100,
               }];
             })),

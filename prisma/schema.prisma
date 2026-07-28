@@ -382,6 +382,7 @@ model ShopOrder {
   serviceChargePaise         BigInt
   gstBasisPoints             Int
   gstPaise                   BigInt
+  shippingAmountPaise        BigInt    @default(0)
   totalAmountPaise           BigInt
   currency                   String    @default("INR")
   gateway                    String

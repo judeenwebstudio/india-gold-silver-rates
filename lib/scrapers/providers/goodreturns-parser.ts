@@ -68,7 +68,7 @@ export function parseGoodReturnsRates(
   const gold24 = currencyAfter(gold, /24K\s*Gold/);
   const gold22 = currencyAfter(gold, /22K\s*Gold/);
   const gold18 = currencyAfter(gold, /18K\s*Gold/);
-  const silverGram = currencyAfter(silver, /Silver/);
+  const silverGram = currencyAfter(silver, /Silver\s*\/\s*(?:g|gram)/);
   const silverKg = currencyAfter(silver, /Silver\s*\/\s*kg/);
   if (Math.abs(Number(silverGram) * 1000 - Number(silverKg)) > 1) {
     throw new ScraperRejectedError("GoodReturns Silver gram and kilogram values are inconsistent.");

@@ -38,3 +38,21 @@ test("GoodReturns parser rejects another city and inconsistent Silver units", ()
     /inconsistent/i,
   );
 });
+
+test("GoodReturns parser tolerates normal wrapper and element layout changes", () => {
+  const changedGold = gold
+    .replaceAll("<div>", "<section><span>")
+    .replaceAll("</div>", "</span></section>")
+    .replace("<time>", "<p class=\"published\">")
+    .replace("</time>", "</p>");
+  const changedSilver = silver
+    .replaceAll("<div>", "<article><strong>")
+    .replaceAll("</div>", "</strong></article>")
+    .replace("<time>", "<header>")
+    .replace("</time>", "</header>");
+  const result = parseGoodReturnsRates(changedGold, changedSilver, {
+    provider: "GOODRETURNS", sourceUrl: "fixture", fetchedAt: "2026-07-29T06:00:00.000Z",
+  });
+  assert.equal(selectedSourceValue(result, "K22")?.pricePerGram, "14500.0000");
+  assert.equal(selectedSourceValue(result, "P999")?.pricePerGram, "235.0000");
+});

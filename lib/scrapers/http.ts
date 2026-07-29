@@ -1,8 +1,12 @@
 import { ScraperFetchError, ScraperRejectedError } from "@/lib/scrapers/errors";
+import https from "node:https";
+import { gunzipSync, inflateSync } from "node:zlib";
 
-const HTML_CACHE_TTL_MS = 60_000;
+const HTML_CACHE_TTL_MS = 15 * 60_000;
 const ROBOTS_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 const MAX_HTML_BYTES = 2_000_000;
+const MAX_REDIRECTS = 5;
+const TRANSIENT_ATTEMPTS = 3;
 
 type CachedHtml = {
   html: string;
@@ -19,6 +23,57 @@ type CachedRobots = {
 const htmlCache = new Map<string, CachedHtml>();
 const robotsCache = new Map<string, CachedRobots>();
 
+const nodeHttpsFetch = ((input: string | URL | Request, init?: RequestInit) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+  return new Promise<Response>((resolve, reject) => {
+    const headers = Object.fromEntries(new Headers(init?.headers).entries());
+    const request = https.request(url, {
+      method: init?.method ?? "GET",
+      headers,
+      signal: init?.signal ?? undefined,
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      let compressedBytes = 0;
+      response.on("data", (chunk: Buffer) => {
+        compressedBytes += chunk.length;
+        if (compressedBytes > MAX_HTML_BYTES) {
+          request.destroy(new Error("Response exceeded the safe compressed size limit."));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      response.on("end", () => {
+        try {
+          const compressed = Buffer.concat(chunks);
+          const encoding = String(response.headers["content-encoding"] ?? "").toLowerCase();
+          const body = encoding === "gzip"
+            ? gunzipSync(compressed)
+            : encoding === "deflate"
+              ? inflateSync(compressed)
+              : compressed;
+          const responseHeaders = new Headers();
+          for (const [name, value] of Object.entries(response.headers)) {
+            if (value === undefined || name === "content-length" || name === "content-encoding") continue;
+            for (const item of Array.isArray(value) ? value : [value]) responseHeaders.append(name, String(item));
+          }
+          if (encoding) responseHeaders.set("x-ratestack-original-content-encoding", encoding);
+          responseHeaders.set("content-length", String(body.length));
+          resolve(new Response(body, {
+            status: response.statusCode ?? 500,
+            statusText: response.statusMessage,
+            headers: responseHeaders,
+          }));
+        } catch (error) {
+          reject(error);
+        }
+      });
+      response.on("error", reject);
+    });
+    request.on("error", reject);
+    request.end();
+  });
+}) as typeof fetch;
+
 function createAbortSignal(timeoutMs: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -29,30 +84,53 @@ async function fetchWithTimeout(
   url: string,
   userAgent: string,
   requestTimeoutMs: number,
+  fetchImpl: typeof fetch = nodeHttpsFetch,
 ) {
-  const abort = createAbortSignal(requestTimeoutMs);
+  const redirectChain: Array<{ status: number; url: string; location: string }> = [];
+  let currentUrl = url;
 
-  try {
-    return await fetch(url, {
-      method: "GET",
-      redirect: "follow",
-      cache: "no-store",
-      headers: {
-        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
-        "Accept-Language": "en-IN,en;q=0.8",
-        "User-Agent": userAgent,
-      },
-      signal: abort.signal,
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new ScraperFetchError("The public rate source timed out.");
+  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+    const abort = createAbortSignal(requestTimeoutMs);
+    try {
+      const response = await fetchImpl(currentUrl, {
+        method: "GET",
+        redirect: "manual",
+        cache: "no-store",
+        headers: {
+          Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
+          "Accept-Language": "en-IN,en;q=0.8",
+          // Undici's default Brotli negotiation receives a Cloudflare 403 from
+          // GoodReturns. Standards-based gzip/deflate is accepted and decoded.
+          "Accept-Encoding": "gzip, deflate",
+          "User-Agent": userAgent,
+        },
+        signal: abort.signal,
+      });
+      if ([301, 302, 303, 307, 308].includes(response.status)) {
+        const location = response.headers.get("location");
+        if (!location) throw new ScraperRejectedError("The source returned a redirect without a Location header.");
+        const nextUrl = new URL(location, currentUrl);
+        if (nextUrl.protocol !== "https:") throw new ScraperRejectedError("The source redirected to a non-HTTPS address.");
+        redirectChain.push({ status: response.status, url: currentUrl, location: nextUrl.toString() });
+        currentUrl = nextUrl.toString();
+        continue;
+      }
+      return { response, redirectChain, finalUrl: currentUrl };
+    } catch (error) {
+      if (error instanceof ScraperRejectedError) throw error;
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new ScraperFetchError("The public rate source timed out.", { retryable: true, url: currentUrl });
+      }
+      throw new ScraperFetchError("The public rate source could not be reached.", {
+        retryable: true,
+        url: currentUrl,
+        cause: error instanceof Error ? error.name : "UnknownError",
+      });
+    } finally {
+      abort.clear();
     }
-
-    throw new ScraperFetchError("The public rate source could not be reached.");
-  } finally {
-    abort.clear();
   }
+  throw new ScraperRejectedError(`The source exceeded the ${MAX_REDIRECTS}-redirect limit.`);
 }
 
 function stripRobotsComment(line: string) {
@@ -106,16 +184,17 @@ async function assertRobotsAllowed(
   sourceUrl: URL,
   userAgent: string,
   requestTimeoutMs: number,
+  fetchImpl?: typeof fetch,
 ) {
   const robotsUrl = new URL("/robots.txt", sourceUrl.origin).toString();
   const cached = robotsCache.get(robotsUrl);
   let robots = cached && cached.expiresAt > Date.now() ? cached : null;
 
   if (!robots) {
-    const response = await fetchWithTimeout(robotsUrl, userAgent, requestTimeoutMs);
-    const body = await response.text();
+    const result = await fetchWithTimeout(robotsUrl, userAgent, requestTimeoutMs, fetchImpl);
+    const body = await result.response.text();
     robots = {
-      status: response.status,
+      status: result.response.status,
       body,
       expiresAt: Date.now() + ROBOTS_CACHE_TTL_MS,
     };
@@ -149,6 +228,11 @@ export async function fetchPublicHtml(
   url: string,
   userAgent: string,
   requestTimeoutMs: number,
+  options: {
+    fetchImpl?: typeof fetch;
+    wait?: (delayMs: number) => Promise<void>;
+    maxAttempts?: number;
+  } = {},
 ) {
   const sourceUrl = new URL(url);
   const cached = htmlCache.get(sourceUrl.toString());
@@ -163,22 +247,46 @@ export async function fetchPublicHtml(
     };
   }
 
-  await assertRobotsAllowed(sourceUrl, userAgent, requestTimeoutMs);
-  const response = await fetchWithTimeout(
-    sourceUrl.toString(),
-    userAgent,
-    requestTimeoutMs,
-  );
+  await assertRobotsAllowed(sourceUrl, userAgent, requestTimeoutMs, options.fetchImpl);
+  const wait = options.wait ?? ((delayMs: number) => new Promise<void>((resolve) => setTimeout(resolve, delayMs)));
+  const maxAttempts = Math.max(1, Math.min(TRANSIENT_ATTEMPTS, options.maxAttempts ?? TRANSIENT_ATTEMPTS));
+  let fetchResult: Awaited<ReturnType<typeof fetchWithTimeout>> | null = null;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      fetchResult = await fetchWithTimeout(
+        sourceUrl.toString(), userAgent, requestTimeoutMs, options.fetchImpl,
+      );
+      if (fetchResult.response.status === 429 || fetchResult.response.status >= 500) {
+        throw new ScraperFetchError(`The source returned transient HTTP ${fetchResult.response.status}.`, {
+          retryable: true,
+          status: fetchResult.response.status,
+        });
+      }
+      break;
+    } catch (error) {
+      lastError = error;
+      const retryable = error instanceof ScraperFetchError && error.details?.retryable === true;
+      if (!retryable || attempt === maxAttempts) throw error;
+      await wait(500 * 2 ** (attempt - 1));
+    }
+  }
+  if (!fetchResult) throw lastError ?? new ScraperFetchError("The public rate source could not be reached.");
+  const { response, redirectChain, finalUrl } = fetchResult;
   console.info("[rate-source] HTTP response", {
     sourceUrl: sourceUrl.toString(),
-    responseUrl: response.url,
+    redirectChain,
+    finalUrl,
     status: response.status,
     contentType: response.headers.get("content-type") ?? null,
+    contentEncoding: response.headers.get("x-ratestack-original-content-encoding") ?? response.headers.get("content-encoding") ?? null,
+    declaredSize: response.headers.get("content-length") ?? null,
   });
 
   if (response.status === 401 || response.status === 403 || response.status === 429) {
     throw new ScraperFetchError(
       `The source refused the public request (HTTP ${response.status}); no bypass was attempted.`,
+      { status: response.status, redirectChain, finalUrl },
     );
   }
 
@@ -186,7 +294,7 @@ export async function fetchPublicHtml(
     throw new ScraperFetchError(`The source returned HTTP ${response.status}.`);
   }
 
-  if (new URL(response.url).protocol !== "https:") {
+  if (new URL(finalUrl).protocol !== "https:") {
     throw new ScraperRejectedError("The source redirected to a non-HTTPS address.");
   }
 
@@ -201,7 +309,8 @@ export async function fetchPublicHtml(
   }
 
   const html = await response.text();
-  if (Buffer.byteLength(html, "utf8") > MAX_HTML_BYTES) {
+  const responseSize = Buffer.byteLength(html, "utf8");
+  if (responseSize > MAX_HTML_BYTES) {
     throw new ScraperRejectedError("The source document exceeded the safe size limit.");
   }
 
@@ -212,6 +321,13 @@ export async function fetchPublicHtml(
   }
 
   const fetchedAt = new Date().toISOString();
+  console.info("[rate-source] HTTP body accepted", {
+    sourceUrl: sourceUrl.toString(),
+    finalUrl,
+    responseSize,
+    contentType,
+    redirectChain,
+  });
   htmlCache.set(sourceUrl.toString(), {
     html,
     fetchedAt,
@@ -223,6 +339,13 @@ export async function fetchPublicHtml(
     fetchedAt,
     fromCache: false,
     status: response.status,
-    responseUrl: response.url,
+    responseUrl: finalUrl,
+    redirectChain,
+    responseSize,
   };
+}
+
+export function clearRateSourceHttpCachesForTests() {
+  htmlCache.clear();
+  robotsCache.clear();
 }

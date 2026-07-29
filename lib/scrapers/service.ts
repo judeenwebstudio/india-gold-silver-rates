@@ -297,6 +297,13 @@ export async function scrapeWithFallback(
       }
 
       await validate(provider.config, parsed);
+      console.info("[rate-sync] validation result", {
+        provider: provider.name,
+        sourceUrl: provider.sourceUrl,
+        validationResult: "VALID",
+        sourceDate: parsed.sourceDate,
+        quoteCount: parsed.quotes.length,
+      });
       sourceAttempts.push({
         provider: provider.name,
         sourceUrl: provider.sourceUrl,

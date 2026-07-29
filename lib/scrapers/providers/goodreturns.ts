@@ -15,14 +15,25 @@ export class GoodReturnsRateProvider implements RateScraperProvider {
   }
 
   async scrape() {
-    const [gold, silver] = await Promise.all([
-      fetchPublicHtml(GOLD_URL, this.config.userAgent, this.config.requestTimeoutMs),
-      fetchPublicHtml(SILVER_URL, this.config.userAgent, this.config.requestTimeoutMs),
-    ]);
-    return parseGoodReturnsRates(gold.html, silver.html, {
+    // Fetch sequentially to avoid an unnecessary same-origin request burst.
+    const gold = await fetchPublicHtml(GOLD_URL, this.config.userAgent, this.config.requestTimeoutMs);
+    const silver = await fetchPublicHtml(SILVER_URL, this.config.userAgent, this.config.requestTimeoutMs);
+    const parsed = parseGoodReturnsRates(gold.html, silver.html, {
       provider: this.name,
       sourceUrl: GOLD_URL,
       fetchedAt: gold.fetchedAt > silver.fetchedAt ? gold.fetchedAt : silver.fetchedAt,
     });
+    console.info("[rate-source] GoodReturns parse result", {
+      provider: this.name,
+      sourceDate: parsed.sourceDate,
+      quoteCount: parsed.quotes.length,
+      purities: parsed.quotes.map((quote) => quote.mappedPurity).filter(Boolean),
+      goldFromCache: gold.fromCache,
+      silverFromCache: silver.fromCache,
+      goldResponseSize: gold.responseSize ?? null,
+      silverResponseSize: silver.responseSize ?? null,
+      parseSuccess: true,
+    });
+    return parsed;
   }
 }

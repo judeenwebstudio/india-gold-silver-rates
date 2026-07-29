@@ -6,7 +6,6 @@ import { HomeRateExperience } from "@/components/HomeRateExperience";
 import { MajorCityRates } from "@/components/MajorCityRates";
 import {
   getCityDisplayRates,
-  getMajorCityDisplayRates,
   getPublicLocations,
 } from "@/lib/city-rate-service";
 
@@ -24,10 +23,7 @@ export default async function Home() {
     throw new Error("No active city is configured for the public homepage.");
   }
 
-  const [initialSnapshot, majorCities] = await Promise.all([
-    getCityDisplayRates(defaultCity.slug),
-    getMajorCityDisplayRates(6),
-  ]);
+  const initialSnapshot = await getCityDisplayRates(defaultCity.slug);
 
   return (
     <>
@@ -38,7 +34,7 @@ export default async function Home() {
           initialSnapshot={initialSnapshot}
         />
         <HistoricalChart />
-        <MajorCityRates cities={majorCities} />
+        <MajorCityRates />
         <HallmarkSection />
       </main>
       <Footer />

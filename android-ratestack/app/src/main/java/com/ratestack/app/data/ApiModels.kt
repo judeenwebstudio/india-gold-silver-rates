@@ -95,6 +95,60 @@ data class LocationDto(
     val code: String? = null,
 )
 
+data class RateHistoryDto(
+    val city: String?,
+    val metal: String?,
+    val unit: String?,
+    val rateType: String?,
+    val records: List<RateHistoryRecordDto>?,
+    val summary: RateHistorySummaryDto?,
+    val availableDays: Int?,
+)
+
+data class RateHistoryRecordDto(
+    val date: String?,
+    val rate: Double?,
+    val sourcePublishedAt: String?,
+    val sourceName: String?,
+    val sourceSession: String?,
+    val rateType: String?,
+)
+
+data class RateHistorySummaryDto(
+    val current: Double?,
+    val previous: Double?,
+    val change: Double?,
+    val changePercent: Double?,
+    val high: Double?,
+    val low: Double?,
+)
+
+data class CityComparisonDto(
+    val records: List<CityComparisonRecordDto>?,
+    val pagination: CityPaginationDto?,
+    val sourceSummary: CitySourceSummaryDto?,
+    val identicalRates: Boolean?,
+    val states: List<CityStateFilterDto>?,
+)
+
+data class CityComparisonRecordDto(
+    val rank: Int?,
+    val city: String?,
+    val citySlug: String?,
+    val state: String?,
+    val gold24kPerGram: Double?,
+    val gold22kPerGram: Double?,
+    val silverPerKg: Double?,
+    val rateDate: String?,
+    val sourceName: String?,
+    val rateType: String?,
+    val stale: Boolean?,
+)
+
+data class CityPaginationDto(val page: Int?, val totalRecords: Int?, val hasMore: Boolean?)
+data class CitySourceSummaryDto(val originalCount: Int?, val indicativeCount: Int?)
+data class CityStateFilterDto(val name: String?, val slug: String?)
+
 data class GoldRate(
     val purity: String,
     val pricePerGram: Double,

@@ -67,7 +67,7 @@ test("production homepage regression", async () => {
   assert.match(html, /RateStack/);
   assert.match(html, /Indicative city rates/);
   assert.match(html, /Gold price calculator/);
-  assert.match(html, /Rates in major cities/);
+  assert.match(html, /Live Rates Across Indian Cities/);
   assert.match(html, /Know your gold hallmark/);
 });
 

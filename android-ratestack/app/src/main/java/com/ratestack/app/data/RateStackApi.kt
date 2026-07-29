@@ -5,6 +5,7 @@ import retrofit2.http.GET
 import retrofit2.http.DELETE
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface RateStackApi {
     @GET("api/v1/shop")
@@ -27,6 +28,25 @@ interface RateStackApi {
         @Path("state") state: String,
         @Path("city") city: String,
     ): Response<ApiEnvelope<CityRatesDto>>
+
+    @GET("api/v1/rates/history")
+    suspend fun getRateHistory(
+        @Query("city") city: String = "tiruchirappalli",
+        @Query("days") days: Int = 7,
+        @Query("metal") metal: String = "gold22k",
+        @Query("unit") unit: String = "gram",
+    ): Response<ApiEnvelope<RateHistoryDto>>
+
+    @GET("api/v1/rates/cities")
+    suspend fun getCityComparison(
+        @Query("metal") metal: String = "gold22k",
+        @Query("sort") sort: String = "asc",
+        @Query("page") page: Int = 1,
+        @Query("pageSize") pageSize: Int = 12,
+        @Query("search") search: String? = null,
+        @Query("state") state: String? = null,
+        @Query("rateType") rateType: String = "ALL",
+    ): Response<ApiEnvelope<CityComparisonDto>>
 
     // Savings Scheme Endpoints
     @GET("api/v1/schemes")

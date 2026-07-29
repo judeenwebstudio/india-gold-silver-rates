@@ -17,26 +17,28 @@ type NavGroup = {
 
 const navGroups: NavGroup[] = [
   {
-    title: "Workspace",
+    title: "Dashboard",
     items: [
-      { label: "Products", href: "/admin/products", marker: "PR", available: true },
-      { label: "Dashboard", href: "/admin/dashboard", marker: "OV", available: true },
-      { label: "Analytics", href: "/admin/analytics", marker: "AN", available: true },
-      { label: "AdSense", href: "/admin/adsense", marker: "AD", available: true },
-      { label: "Gold Rates", href: "/admin/gold-rates", marker: "AU", available: true },
-      { label: "Silver Rates", href: "/admin/silver-rates", marker: "AG", available: true },
+      { label: "Shop Dashboard", href: "/admin/dashboard", marker: "OV", available: true },
     ],
   },
   {
-    title: "Gold & Silver Savings Scheme",
+    title: "Rates",
     items: [
-      { label: "Scheme Dashboard", href: "/admin/schemes/dashboard", marker: "SD", available: true },
-      { label: "Scheme Plans", href: "/admin/schemes/plans", marker: "SP", available: true },
-      { label: "Scheme Members", href: "/admin/schemes/members", marker: "SM", available: true },
-      { label: "Manual Payments", href: "/admin/schemes/manual-payments", marker: "MP", available: true },
-      { label: "Redemptions", href: "/admin/schemes/redemptions", marker: "RD", available: true },
-      { label: "Financial Reports", href: "/admin/schemes/reports", marker: "FR", available: true },
-      { label: "Merchant Compliance", href: "/admin/schemes/merchant-config", marker: "MC", available: true },
+      { label: "Gold Rates", href: "/admin/gold-rates", marker: "AU", available: true },
+      { label: "Silver Rates", href: "/admin/silver-rates", marker: "AG", available: true },
+      { label: "Rate History", href: "/admin/rate-history", marker: "HI", available: false },
+    ],
+  },
+  {
+    title: "Shop Management",
+    items: [
+      { label: "Products", href: "/admin/products", marker: "PR", available: true },
+      { label: "Orders", href: "/admin/orders", marker: "OR", available: true },
+      { label: "Payments", href: "/admin/payments", marker: "PY", available: true },
+      { label: "Invoices", href: "/admin/invoices", marker: "IN", available: true },
+      { label: "Customers", href: "/admin/customers", marker: "CU", available: true },
+      { label: "Shop Reports", href: "/admin/shop/reports", marker: "RP", available: true },
       { label: "Payment Gateway", href: "/admin/settings/payment-gateway", marker: "PG", available: true },
     ],
   },
@@ -45,9 +47,15 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "States", href: "/admin/states", marker: "ST", available: true },
       { label: "Cities", href: "/admin/cities", marker: "CT", available: true },
-      { label: "Rate History", href: "/admin/rate-history", marker: "HI", available: false },
       { label: "API Logs", href: "/admin/api-logs", marker: "LG", available: true },
-      { label: "Settings", href: "/admin/settings", marker: "SE", available: false },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      { label: "Analytics", href: "/admin/analytics", marker: "AN", available: true },
+      { label: "AdSense", href: "/admin/adsense", marker: "AD", available: true },
+      { label: "Admin Settings", href: "/admin/settings", marker: "SE", available: false },
     ],
   },
 ];

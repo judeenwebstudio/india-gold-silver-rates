@@ -34,6 +34,12 @@ enum MetalPurity {
   P925 @map("925")
 }
 
+enum AuthProvider {
+  GOOGLE
+  PASSWORD
+  MOBILE
+}
+
 enum RateUpdateStatus {
   SUCCESS
   FAILED
@@ -322,7 +328,8 @@ model SchemeUser {
   preferredLoginMethod String            @default("MOBILE")
   accountStatus      String              @default("ACTIVE")
   lastLoginAt        DateTime?
-  passwordHash       String
+  passwordHash       String?
+  profileImageUrl    String?
   pinHash            String?
   address            String?
   city               String?
@@ -336,11 +343,27 @@ model SchemeUser {
   redemptionRequests RedemptionRequest[]
   auditLogs          AuditLog[]
   shopOrders         ShopOrder[]
+  authAccounts       AuthAccount[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
   @@index([phone, isActive])
   @@index([email, isActive])
+}
+
+model AuthAccount {
+  id                String       @id @default(cuid())
+  userId            String
+  user              SchemeUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          AuthProvider
+  providerAccountId String
+  providerEmail     String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([provider, providerAccountId])
+  @@index([userId, provider])
+  @@index([providerEmail])
 }
 
 model ShopProduct {

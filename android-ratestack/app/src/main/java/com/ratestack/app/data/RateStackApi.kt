@@ -2,6 +2,7 @@ package com.ratestack.app.data
 
 import retrofit2.Response
 import retrofit2.http.GET
+import retrofit2.http.DELETE
 import retrofit2.http.POST
 import retrofit2.http.Path
 
@@ -44,12 +45,33 @@ interface RateStackApi {
     @POST("api/v1/auth/forgot-password/email")
     suspend fun requestEmailPasswordReset(
         @retrofit2.http.Body body: Map<String, String>,
-    ): Response<ApiEnvelope<Map<String, String>>>
+    ): Response<ApiEnvelope<GoogleConnectionDto>>
 
     @POST("api/v1/auth/login")
     suspend fun loginUser(
         @retrofit2.http.Body body: Map<String, String>,
     ): Response<ApiEnvelope<AuthResponseDto>>
+
+    @POST("api/v1/auth/google")
+    suspend fun googleSignIn(
+        @retrofit2.http.Body body: Map<String, String>,
+    ): Response<ApiEnvelope<AuthResponseDto>>
+
+    @GET("api/v1/me/profile")
+    suspend fun getCustomerProfile(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+    ): Response<ApiEnvelope<CustomerProfileDto>>
+
+    @POST("api/v1/me/profile")
+    suspend fun connectGoogleAccount(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Body body: Map<String, String>,
+    ): Response<ApiEnvelope<GoogleConnectionDto>>
+
+    @DELETE("api/v1/me/profile")
+    suspend fun disconnectGoogleAccount(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+    ): Response<ApiEnvelope<Map<String, String>>>
 
     @POST("api/v1/auth/forgot-password/request-otp")
     suspend fun requestPasswordResetOtp(

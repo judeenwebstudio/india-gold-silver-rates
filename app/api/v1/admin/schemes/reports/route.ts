@@ -43,6 +43,20 @@ export async function GET(request: Request) {
     const totalScheduled = await prisma.schemeEnrollment.aggregate({
       _sum: { totalScheduledAmountPaise: true },
     });
+    const members = await prisma.schemeUser.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 250,
+      select: {
+        id: true,
+        fullName: true,
+        phone: true,
+        email: true,
+        emailVerifiedAt: true,
+        preferredLoginMethod: true,
+        lastLoginAt: true,
+        authAccounts: { where: { provider: 'GOOGLE' }, select: { providerEmail: true } },
+      },
+    });
 
     const summary = {
       totalMembers,
@@ -55,6 +69,17 @@ export async function GET(request: Request) {
       silverCollectionsInr: paiseToInrNumber(silverPayments._sum.amountPaise || BigInt(0)),
       totalPurchaseLiabilityInr: paiseToInrNumber(totalBalance._sum.eligiblePurchaseBalancePaise || BigInt(0)),
       totalScheduledLiabilitiesInr: paiseToInrNumber(totalScheduled._sum.totalScheduledAmountPaise || BigInt(0)),
+      members: members.map((member) => ({
+        id: member.id,
+        fullName: member.fullName,
+        mobile: member.phone,
+        email: member.email,
+        provider: member.preferredLoginMethod,
+        googleConnected: member.authAccounts.length > 0,
+        googleEmail: member.authAccounts[0]?.providerEmail || null,
+        emailVerified: Boolean(member.emailVerifiedAt),
+        lastLoginAt: member.lastLoginAt,
+      })),
     };
 
     if (exportCsv) {
@@ -71,7 +96,7 @@ export async function GET(request: Request) {
       success: true,
       data: summary,
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: { message: error.message } }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ success: false, error: { message: error instanceof Error ? error.message : 'Unable to load reports.' } }, { status: 500 });
   }
 }

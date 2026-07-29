@@ -103,7 +103,7 @@ export function Header() {
                         📊 My Dashboard
                       </Link>
                       <Link
-                        href="/schemes/dashboard#profile"
+                        href="/profile"
                         onClick={() => setAccountDropdownOpen(false)}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-amber-50 hover:text-amber-900 transition-colors"
                       >
@@ -178,7 +178,7 @@ export function Header() {
                     📊 My Dashboard
                   </Link>
                   <Link
-                    href="/schemes/dashboard#profile"
+                    href="/profile"
                     onClick={() => setOpen(false)}
                     className="rounded-lg px-3 py-2 text-sm font-bold text-amber-900 hover:bg-amber-50"
                   >

@@ -22,6 +22,7 @@ fun CustomerLoginScreen(
     isLoading: Boolean,
     errorMessage: String?,
     onLoginSubmit: (phone: String, pass: String) -> Unit,
+    onGoogleIdToken: (String) -> Unit,
     onNavigateRegister: () -> Unit,
     onNavigateForgotPassword: () -> Unit,
 ) {
@@ -203,6 +204,14 @@ fun CustomerLoginScreen(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    GoogleSignInButton(
+                        isLoading = isLoading,
+                        onIdToken = onGoogleIdToken,
+                        onError = { validationError = it },
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Register Link
                     TextButton(onClick = onNavigateRegister) {

@@ -457,4 +457,21 @@ data class SchemeUserDto(
     val fullName: String?,
     val phone: String?,
     val email: String?,
+    val emailVerified: Boolean? = null,
+    val authProvider: String? = null,
+    val profileImageUrl: String? = null,
+)
+
+data class CustomerProfileDto(
+    val fullName: String?,
+    val phone: String?,
+    val email: String?,
+    val emailVerified: Boolean?,
+    val googleConnected: Boolean?,
+    val googleEmail: String?,
+)
+
+data class GoogleConnectionDto(
+    val googleConnected: Boolean?,
+    val googleEmail: String? = null,
 )

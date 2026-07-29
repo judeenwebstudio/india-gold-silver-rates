@@ -18,7 +18,11 @@ import androidx.compose.ui.unit.sp
 fun CustomerProfileScreen(
     userName: String?,
     userPhone: String?,
+    googleConnected: Boolean,
+    googleEmail: String?,
     totalSchemesCount: Int,
+    onConnectGoogle: (String) -> Unit,
+    onDisconnectGoogle: () -> Unit,
     onLogoutClick: () -> Unit,
 ) {
     Surface(
@@ -98,6 +102,36 @@ fun CustomerProfileScreen(
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0D0B)),
+                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF292524)),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                "Google account: ${if (googleConnected) "Connected" else "Not Connected"}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            if (googleEmail != null) Text(googleEmail, color = Color.Gray, fontSize = 12.sp)
+                            if (googleConnected) {
+                                OutlinedButton(onClick = onDisconnectGoogle, modifier = Modifier.fillMaxWidth()) {
+                                    Text("Disconnect Google Account")
+                                }
+                            } else {
+                                GoogleSignInButton(
+                                    isLoading = false,
+                                    onIdToken = onConnectGoogle,
+                                    onError = {},
+                                    label = "Connect Google Account",
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
                         onClick = onLogoutClick,

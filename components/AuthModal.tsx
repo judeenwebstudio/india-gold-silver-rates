@@ -30,6 +30,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectT
   const canResend = resendTimer === 0;
 
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -273,6 +274,12 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectT
     }
   };
 
+  const handleGoogleSignIn = () => {
+    if (googleLoading || loading) return;
+    setGoogleLoading(true);
+    window.location.assign(`/api/auth/google?next=${encodeURIComponent(redirectTo)}`);
+  };
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 backdrop-blur-sm p-4">
       <div className="w-full max-w-md rounded-3xl bg-stone-900 border border-amber-500/30 p-6 md:p-8 shadow-2xl space-y-6 text-stone-100">
@@ -312,6 +319,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectT
 
         {/* LOGIN AND REGISTER MODE */}
         {(mode === "login" || mode === "register") && (
+          <>
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div className="grid grid-cols-2 rounded-xl bg-stone-950 p-1" role="tablist" aria-label="Authentication method">
               {(["MOBILE", "EMAIL"] as const).map((method) => <button key={method} type="button" role="tab" aria-selected={authMethod === method} onClick={() => setAuthMethod(method)} className={`rounded-lg p-2 font-bold ${authMethod === method ? "bg-amber-500 text-stone-950" : "text-stone-400"}`}>{method === "MOBILE" ? "Mobile Number" : "Email Address"}</button>)}
@@ -391,6 +399,17 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectT
                 : "Register Account & Continue →"}
             </button>
           </form>
+          <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500"><span className="h-px flex-1 bg-stone-700"/><span>OR</span><span className="h-px flex-1 bg-stone-700"/></div>
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={googleLoading || loading}
+            className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-bold text-stone-800 shadow-sm transition hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {googleLoading ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-stone-300 border-t-blue-600" aria-hidden="true"/> : <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"/><path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.39 13.93A6.02 6.02 0 0 1 6.07 12c0-.67.12-1.32.32-1.93V7.45H3.04A10 10 0 0 0 2 12c0 1.61.39 3.14 1.04 4.55l3.35-2.62Z"/><path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.88A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.96 5.45l3.35 2.62C7.18 7.7 9.39 5.94 12 5.94Z"/></svg>}
+            <span>{googleLoading ? "Connecting to Google…" : "Continue with Google"}</span>
+          </button>
+          </>
         )}
 
         {mode === "forgot_email" && (

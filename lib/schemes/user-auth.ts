@@ -57,11 +57,14 @@ export function verifySchemeToken(token: string): SchemeAuthTokenPayload | null 
 
 export async function authenticateSchemeUserFromRequest(request: Request): Promise<SchemeAuthTokenPayload | null> {
   const authHeader = request.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7).trim();
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
+  const cookieToken = request.headers.get('cookie')
+    ?.split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('ratestack_scheme_session='))
+    ?.slice('ratestack_scheme_session='.length);
+  const token = bearer || (cookieToken ? decodeURIComponent(cookieToken) : '');
+  if (!token) return null;
   return verifySchemeToken(token);
 }
 

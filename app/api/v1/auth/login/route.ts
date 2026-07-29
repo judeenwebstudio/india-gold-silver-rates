@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const passwordValid = await comparePassword(password, user.passwordHash);
+    const passwordValid = user.passwordHash ? await comparePassword(password, user.passwordHash) : false;
 
     if (!passwordValid) {
       return NextResponse.json(

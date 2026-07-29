@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 
+type Member = {
+  id: string; fullName: string; provider: string; mobile: string | null; email: string | null;
+  googleConnected: boolean; googleEmail: string | null; emailVerified: boolean; lastLoginAt: string | null;
+};
+type MemberReport = { totalMembers: number; activeSchemes: number; maturedSchemes: number; members: Member[] };
+
 export default function AdminSchemeMembersPage() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<MemberReport | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -59,26 +65,24 @@ export default function AdminSchemeMembersPage() {
             <thead>
               <tr className="border-b border-stone-200 bg-stone-50 text-stone-500 font-bold uppercase tracking-wider">
                 <th className="p-3">Member Name</th>
-                <th className="p-3">Account Number</th>
-                <th className="p-3">Plan Type</th>
-                <th className="p-3">Monthly Amount</th>
-                <th className="p-3">Eligible Purchase Balance</th>
-                <th className="p-3">Status</th>
+                <th className="p-3">Provider</th>
+                <th className="p-3">Mobile</th>
+                <th className="p-3">Email</th>
+                <th className="p-3">Google</th>
+                <th className="p-3">Verified</th>
+                <th className="p-3">Last Login</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 text-stone-700">
-              <tr>
-                <td className="p-3 font-semibold text-stone-900">Sample Member</td>
-                <td className="p-3 font-mono">RS-SCH-2026-00001</td>
-                <td className="p-3">22K Gold Coin Scheme</td>
-                <td className="p-3 font-bold">₹1,000</td>
-                <td className="p-3 font-bold text-amber-700">₹1,000</td>
-                <td className="p-3">
-                  <span className="inline-block px-2 py-0.5 rounded-full text-[0.65rem] font-bold bg-emerald-100 text-emerald-800">
-                    ACTIVE
-                  </span>
-                </td>
-              </tr>
+              {data?.members?.map((member) => <tr key={member.id}>
+                <td className="p-3 font-semibold text-stone-900">{member.fullName}</td>
+                <td className="p-3">{member.provider}</td>
+                <td className="p-3">{member.mobile || "—"}</td>
+                <td className="p-3">{member.email || "—"}</td>
+                <td className="p-3">{member.googleConnected ? `Connected (${member.googleEmail})` : "Not connected"}</td>
+                <td className="p-3">{member.emailVerified ? "Email verified" : "Not verified"}</td>
+                <td className="p-3">{member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString("en-IN") : "Never"}</td>
+              </tr>)}
             </tbody>
           </table>
         </div>

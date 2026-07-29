@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.ratestack.app.LoadState
 import com.ratestack.app.data.ApiProvider
 import com.ratestack.app.data.AuthResponseDto
+import com.ratestack.app.data.CustomerProfileDto
 import com.ratestack.app.data.PaymentOrderResponseDto
 import com.ratestack.app.data.RedemptionQuotationDto
 import com.ratestack.app.data.RepositoryResult
@@ -42,6 +43,9 @@ class SchemeViewModel(
     private val _authActionState = MutableStateFlow<LoadState<AuthResponseDto>?>(null)
     val authActionState: StateFlow<LoadState<AuthResponseDto>?> = _authActionState.asStateFlow()
 
+    private val _customerProfile = MutableStateFlow<CustomerProfileDto?>(null)
+    val customerProfile: StateFlow<CustomerProfileDto?> = _customerProfile.asStateFlow()
+
     private val _paymentOrderState = MutableStateFlow<LoadState<PaymentOrderResponseDto>?>(null)
     val paymentOrderState: StateFlow<LoadState<PaymentOrderResponseDto>?> = _paymentOrderState.asStateFlow()
 
@@ -64,6 +68,7 @@ class SchemeViewModel(
         loadSchemePlans()
         if (!repository.getUserToken().isNull_or_empty()) {
             loadMySchemes()
+            loadCustomerProfile()
         }
     }
 
@@ -173,6 +178,7 @@ class SchemeViewModel(
                         _userPhone.value = authData.user?.phone ?: normalizedPhone
                         _authActionState.value = LoadState.Ready(authData)
                         loadMySchemes()
+                        loadCustomerProfile()
                         onSuccess()
                     } else {
                         _authActionState.value = LoadState.Error("Invalid response from server")
@@ -184,6 +190,63 @@ class SchemeViewModel(
             } catch (e: Exception) {
                 _authActionState.value = LoadState.Error(e.message ?: "Network connection error")
             }
+        }
+    }
+
+    fun googleSignIn(idToken: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _authActionState.value = LoadState.Loading
+            try {
+                val res = ApiProvider.service.googleSignIn(mapOf("idToken" to idToken))
+                val authData = res.body()?.data
+                if (res.isSuccessful && res.body()?.success == true && authData?.token != null) {
+                    repository.saveUserToken(authData.token)
+                    repository.saveUserDetails(authData.user?.fullName ?: "Customer", authData.user?.phone.orEmpty())
+                    _userToken.value = authData.token
+                    _userName.value = authData.user?.fullName ?: "Customer"
+                    _userPhone.value = authData.user?.phone.orEmpty()
+                    _authActionState.value = LoadState.Ready(authData)
+                    loadMySchemes()
+                    loadCustomerProfile()
+                    onSuccess()
+                } else {
+                    _authActionState.value = LoadState.Error(
+                        res.body()?.error?.message ?: "Google sign-in could not be completed. Please try again.",
+                    )
+                }
+            } catch (_: Exception) {
+                _authActionState.value = LoadState.Error("Google sign-in could not be completed. Please try again.")
+            }
+        }
+    }
+
+    fun loadCustomerProfile() {
+        val token = _userToken.value ?: return
+        viewModelScope.launch {
+            runCatching { ApiProvider.service.getCustomerProfile("Bearer $token") }
+                .onSuccess { response ->
+                    if (response.isSuccessful && response.body()?.success == true) {
+                        _customerProfile.value = response.body()?.data
+                    }
+                }
+        }
+    }
+
+    fun connectGoogleAccount(idToken: String) {
+        val token = _userToken.value ?: return
+        viewModelScope.launch {
+            val response = runCatching {
+                ApiProvider.service.connectGoogleAccount("Bearer $token", mapOf("idToken" to idToken))
+            }.getOrNull()
+            if (response?.isSuccessful == true && response.body()?.success == true) loadCustomerProfile()
+        }
+    }
+
+    fun disconnectGoogleAccount() {
+        val token = _userToken.value ?: return
+        viewModelScope.launch {
+            val response = runCatching { ApiProvider.service.disconnectGoogleAccount("Bearer $token") }.getOrNull()
+            if (response?.isSuccessful == true && response.body()?.success == true) loadCustomerProfile()
         }
     }
 
@@ -217,6 +280,7 @@ class SchemeViewModel(
                         _userPhone.value = authData.user?.phone ?: normalizedPhone
                         _authActionState.value = LoadState.Ready(authData)
                         loadMySchemes()
+                        loadCustomerProfile()
                         onSuccess()
                     } else if (isEmail && res.body()?.success == true) {
                         _authActionState.value = LoadState.Ready(requireNotNull(authData))

@@ -23,6 +23,10 @@ val trustedHost = providers.gradleProperty("RATESTACK_TRUSTED_HOST")
 val privacyPolicyUrl = providers.gradleProperty("RATESTACK_PRIVACY_POLICY_URL")
     .orElse("https://india-gold-silver-rates.vercel.app/privacy-policy")
     .get()
+val googleAndroidClientId = providers.gradleProperty("GOOGLE_ANDROID_CLIENT_ID")
+    .orElse(providers.environmentVariable("GOOGLE_ANDROID_CLIENT_ID"))
+    .orElse("")
+    .get()
 val configuredVersionCode = providers.gradleProperty("RATESTACK_VERSION_CODE")
     .orElse("1")
     .get()
@@ -74,6 +78,7 @@ android {
             quotedBuildConfig(privacyPolicyUrl),
         )
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigPresent.toString())
+        buildConfigField("String", "GOOGLE_ANDROID_CLIENT_ID", quotedBuildConfig(googleAndroidClientId))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -173,6 +178,9 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.razorpay.checkout)
     implementation(libs.coil.compose)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

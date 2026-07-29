@@ -299,6 +299,21 @@ fun RateStackApp(
                                 }
                             }
                         },
+                        onGoogleIdToken = { idToken ->
+                            schemeViewModel.googleSignIn(idToken) {
+                                schemeViewModel.resetAuthActionState()
+                                val pendingId = schemeViewModel.pendingJoinPlanId.value
+                                if (!pendingId.isNullOrBlank()) {
+                                    navController.navigate("scheme_join/${android.net.Uri.encode(pendingId)}") {
+                                        popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
+                                    }
+                                } else {
+                                    navController.navigate(Routes.SCHEMES) {
+                                        popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
+                                    }
+                                }
+                            }
+                        },
                         onNavigateRegister = {
                             schemeViewModel.resetAuthActionState()
                             navController.navigate(Routes.CUSTOMER_REGISTER) {
@@ -325,6 +340,14 @@ fun RateStackApp(
                                 schemeViewModel.resetAuthActionState()
                                 val destination = if (schemeViewModel.userToken.value.isNullOrBlank()) Routes.CUSTOMER_LOGIN else Routes.SCHEMES
                                 navController.navigate(destination) {
+                                    popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }
+                                }
+                            }
+                        },
+                        onGoogleIdToken = { idToken ->
+                            schemeViewModel.googleSignIn(idToken) {
+                                schemeViewModel.resetAuthActionState()
+                                navController.navigate(Routes.SCHEMES) {
                                     popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }
                                 }
                             }
@@ -475,12 +498,18 @@ fun RateStackApp(
                     val userName by schemeViewModel.userName.collectAsState()
                     val userPhone by schemeViewModel.userPhone.collectAsState()
                     val mySchemesState by schemeViewModel.mySchemes.collectAsState()
+                    val customerProfile by schemeViewModel.customerProfile.collectAsState()
                     val schemesList = (mySchemesState as? LoadState.Ready)?.data ?: emptyList()
+                    LaunchedEffect(Unit) { schemeViewModel.loadCustomerProfile() }
 
                     com.ratestack.app.ui.schemes.CustomerProfileScreen(
                         userName = userName,
                         userPhone = userPhone,
+                        googleConnected = customerProfile?.googleConnected == true,
+                        googleEmail = customerProfile?.googleEmail,
                         totalSchemesCount = schemesList.size,
+                        onConnectGoogle = { schemeViewModel.connectGoogleAccount(it) },
+                        onDisconnectGoogle = { schemeViewModel.disconnectGoogleAccount() },
                         onLogoutClick = {
                             schemeViewModel.logout()
                             navController.navigate(Routes.SCHEMES) {

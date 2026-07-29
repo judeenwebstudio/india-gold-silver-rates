@@ -45,6 +45,15 @@ Open [http://localhost:3000](http://localhost:3000). The homepage loads active s
 
 2. Open `.env` and replace every placeholder. `AUTH_SECRET` must be a long random value; `ADMIN_PASSWORD` must contain at least 12 characters. The completed `.env` is ignored by Git and must never be committed.
 
+   For Google customer authentication, configure `GOOGLE_CLIENT_ID` and
+   `GOOGLE_CLIENT_SECRET` for the website OAuth client,
+   `GOOGLE_ANDROID_CLIENT_ID` for the approved Android audience, and
+   `GOOGLE_REDIRECT_URI`. Production must use
+   `https://ratestack.in/api/auth/google/callback`; register that exact URI in
+   Google Cloud Console. Local and preview callbacks must be registered
+   separately and must never reuse or expose the client secret in public
+   variables.
+
    On Vercel, do not configure `AUTH_URL` or `NEXTAUTH_URL`. Auth.js v5 uses
    Vercel's trusted request host automatically. Configure `AUTH_SECRET` as a
    strong random value with no wrapping quotes.

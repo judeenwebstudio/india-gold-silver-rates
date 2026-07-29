@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { handleRateSyncCron } from "@/lib/scheduler/cron-handler";
 import { executeScraper } from "@/lib/scrapers/service";
 import { parseCronSlot } from "@/lib/scheduler/cron-slot";
+import { logResolvedProviderOrder } from "@/lib/scrapers/config";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
     timeZone: "Asia/Kolkata",
   }).format(new Date());
   const startedAt = Date.now();
+  const providerOrder = logResolvedProviderOrder("cron-startup");
 
   console.info("[rate-sync-cron] execution started", {
     executionTime,
@@ -41,6 +43,9 @@ export async function GET(request: Request) {
     sourceConfigured: Boolean(process.env.RATE_SOURCE_NAME),
     sourceUrlConfigured: Boolean(process.env.RATE_SOURCE_URL),
     sourceEnabled: process.env.RATE_SOURCE_ENABLED ?? null,
+    requestedProviderOrder: providerOrder.requested,
+    enabledProviderOrder: providerOrder.enabled,
+    disabledProviders: providerOrder.disabled,
   });
 
   return handleRateSyncCron(request, {

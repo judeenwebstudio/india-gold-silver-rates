@@ -4,6 +4,8 @@ import path from "node:path";
 import test from "node:test";
 import { scrapeWithFallback } from "../../lib/scrapers/service";
 import type { RateScraperProvider, ScrapedRateResult, ScraperProviderConfig } from "../../lib/scrapers/types";
+import { getResolvedProviderOrder } from "../../lib/scrapers/config";
+import { createRateScraperProviders } from "../../lib/scrapers/registry";
 
 const config = (name: string): ScraperProviderConfig => ({
   name, url: `https://${name.toLowerCase()}.example/`, enabled: true,
@@ -31,6 +33,36 @@ test("valid GoodReturns prevents an unnecessary IBJA request", async () => {
   ], 20, async () => {});
   assert.equal(selected.config.name, "GOODRETURNS");
   assert.equal(ibjaCalls, 0);
+});
+
+test("runtime reads and resolves the three provider environment variables", () => {
+  const resolved = getResolvedProviderOrder({
+    RATE_PRIMARY_PROVIDER: "GOODRETURNS",
+    RATE_SECONDARY_PROVIDER: "IBJA",
+    RATE_TERTIARY_PROVIDER: "BANKBAZAAR",
+    BANKBAZAAR_ENABLED: "false",
+    BANKBAZAAR_AUTHORISED: "false",
+  });
+  assert.deepEqual(resolved.requested, ["GOODRETURNS", "IBJA", "BANKBAZAAR"]);
+  assert.deepEqual(resolved.enabled, ["GOODRETURNS", "IBJA"]);
+  assert.equal(resolved.disabled[0]?.provider, "BANKBAZAAR");
+  assert.deepEqual(
+    createRateScraperProviders(config("IBJA"), resolved.enabled).map((item) => item.name),
+    ["GOODRETURNS", "IBJA", "IBJA_CO"],
+  );
+});
+
+test("configured provider order is respected instead of hardcoded", () => {
+  const resolved = getResolvedProviderOrder({
+    RATE_PRIMARY_PROVIDER: "IBJA",
+    RATE_SECONDARY_PROVIDER: "GOODRETURNS",
+    RATE_TERTIARY_PROVIDER: "BANKBAZAAR",
+  });
+  assert.deepEqual(resolved.enabled, ["IBJA", "GOODRETURNS"]);
+  assert.deepEqual(
+    createRateScraperProviders(config("IBJA"), resolved.enabled).map((item) => item.name),
+    ["IBJA", "IBJA_CO", "GOODRETURNS"],
+  );
 });
 
 test("IBJA is selected only after GoodReturns fails", async () => {

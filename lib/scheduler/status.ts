@@ -3,7 +3,10 @@ import {
   RateUpdateStatus,
 } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getScraperConfig } from "@/lib/scrapers/config";
+import {
+  getResolvedProviderOrder,
+  getScraperConfig,
+} from "@/lib/scrapers/config";
 
 export const RATE_SYNC_CRON_SCHEDULE_UTC = "30 4 * * *, 30 8 * * *, 30 12 * * *";
 export const RATE_SYNC_CRON_LABEL_UTC = "Daily at 04:30, 08:30, and 12:30 UTC";
@@ -56,8 +59,9 @@ export async function getSchedulerStatus() {
 
   try {
     const scraper = getScraperConfig();
+    const providerOrder = getResolvedProviderOrder();
     sourceEnabled = scraper.enabled;
-    sourceName = scraper.name;
+    sourceName = providerOrder.enabled.join(" → ") || scraper.name;
   } catch {
     sourceEnabled = false;
   }

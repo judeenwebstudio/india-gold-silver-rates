@@ -21,7 +21,7 @@ import {
 } from "@/lib/scheduler/lock";
 import { rateValuesAreEqual } from "@/lib/scheduler/rate-values";
 import type { CronSlot } from "@/lib/scheduler/cron-slot";
-import { getScraperConfig } from "@/lib/scrapers/config";
+import { getScraperConfig, logResolvedProviderOrder } from "@/lib/scrapers/config";
 import {
   RateSyncLockUnavailableError,
   ScraperError,
@@ -667,7 +667,8 @@ export async function executeScraper(
       throw new ScraperRejectedError("The configured rate source is disabled.");
     }
 
-    const providers = createRateScraperProviders(scraperConfig);
+    const providerOrder = logResolvedProviderOrder(`executeScraper:${mode}`);
+    const providers = createRateScraperProviders(scraperConfig, providerOrder.enabled);
 
     if (mode === "MANUAL_TEST") {
       const prepared = await scrapeWithFallback(providers, scraperConfig.maxChangePercent);

@@ -3,6 +3,15 @@ import { z } from "zod";
 import { ScraperConfigurationError } from "@/lib/scrapers/errors";
 import type { ScraperProviderConfig } from "@/lib/scrapers/types";
 
+export type ConfiguredRateProvider = "GOODRETURNS" | "IBJA" | "BANKBAZAAR";
+export type ResolvedProviderOrder = {
+  requested: ConfiguredRateProvider[];
+  enabled: ConfiguredRateProvider[];
+  disabled: Array<{ provider: ConfiguredRateProvider; reason: string }>;
+};
+
+const providerNameSchema = z.enum(["GOODRETURNS", "IBJA", "BANKBAZAAR"]);
+
 const configSchema = z.object({
   name: z.string().trim().min(1).max(80),
   url: z
@@ -50,4 +59,59 @@ export function getScraperConfig(): ScraperProviderConfig {
   }
 
   return result.data;
+}
+
+function enabledFlag(value: string | undefined) {
+  return value?.trim().toLowerCase() === "true";
+}
+
+export function getResolvedProviderOrder(
+  env: Record<string, string | undefined> = process.env,
+): ResolvedProviderOrder {
+  const raw = [
+    env.RATE_PRIMARY_PROVIDER ?? "GOODRETURNS",
+    env.RATE_SECONDARY_PROVIDER ?? "IBJA",
+    env.RATE_TERTIARY_PROVIDER ?? "BANKBAZAAR",
+  ];
+  const parsed = raw.map((value) => providerNameSchema.safeParse(value.trim().toUpperCase()));
+  const invalid = parsed.flatMap((result, index) =>
+    result.success ? [] : [{ position: index + 1, value: raw[index] }]);
+  if (invalid.length > 0) {
+    throw new ScraperConfigurationError("The configured provider priority contains an unsupported provider.", { invalid });
+  }
+  const requested = [...new Set(parsed.flatMap((result) => result.success ? [result.data] : []))];
+  const bankBazaarEnabled = enabledFlag(env.BANKBAZAAR_ENABLED);
+  const bankBazaarAuthorised = enabledFlag(env.BANKBAZAAR_AUTHORISED);
+  const disabled: ResolvedProviderOrder["disabled"] = [];
+  const enabled = requested.filter((provider) => {
+    if (provider !== "BANKBAZAAR") return true;
+    if (!bankBazaarEnabled || !bankBazaarAuthorised) {
+      disabled.push({
+        provider,
+        reason: !bankBazaarAuthorised
+          ? "Authorised BankBazaar source access is not configured."
+          : "BankBazaar is disabled.",
+      });
+      return false;
+    }
+    throw new ScraperConfigurationError(
+      "BankBazaar is marked enabled and authorised, but no licensed provider adapter is configured.",
+    );
+  });
+  return { requested, enabled, disabled };
+}
+
+export function logResolvedProviderOrder(
+  context: string,
+  resolved = getResolvedProviderOrder(),
+) {
+  console.info("[rate-source] resolved provider order", {
+    context,
+    requestedOrder: resolved.requested,
+    enabledOrder: resolved.enabled,
+    disabledProviders: resolved.disabled,
+    finalFallback: "PREVIOUS_VERIFIED_RATE",
+    mcxSeparateBenchmark: true,
+  });
+  return resolved;
 }

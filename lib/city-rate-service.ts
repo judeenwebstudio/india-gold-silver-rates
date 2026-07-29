@@ -190,7 +190,13 @@ function buildSnapshot(
   adjustments: CityAdjustments,
 ): PublicRateSnapshot {
   const latestRecords = [...latest.values()];
-  const newestSourceRecord = latestRecords.reduce((newest, record) =>
+  const publishedCityRecords = location.cityId
+    ? latestRecords.filter((record) => record.cityId === location.cityId)
+    : [];
+  const sourceRecords = publishedCityRecords.length > 0
+    ? publishedCityRecords
+    : latestRecords;
+  const newestSourceRecord = sourceRecords.reduce((newest, record) =>
     record.recordedAt > newest.recordedAt ? record : newest,
   );
   const mostRecentlyUpdated = latestRecords.reduce((newest, record) =>
@@ -211,7 +217,7 @@ function buildSnapshot(
     source: newestSourceRecord.source,
     sourceTimestamp: newestSourceRecord.recordedAt.toISOString(),
     lastUpdatedAt: mostRecentlyUpdated.updatedAt.toISOString(),
-    indicative: location.cityId !== null,
+    indicative: location.cityId !== null && publishedCityRecords.length === 0,
     fallbackMessage: latestRecords.some((record) => record.fallbackUsed)
       ? "Current market rates are temporarily unavailable. Showing the last verified rate."
       : null,

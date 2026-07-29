@@ -1,5 +1,4 @@
 import { Footer } from "@/components/Footer";
-import { HallmarkSection } from "@/components/HallmarkSection";
 import { Header } from "@/components/Header";
 import { HistoricalChart } from "@/components/HistoricalChart";
 import { HomeRateExperience } from "@/components/HomeRateExperience";
@@ -35,7 +34,6 @@ export default async function Home() {
         />
         <HistoricalChart />
         <MajorCityRates />
-        <HallmarkSection />
       </main>
       <Footer />
     </>

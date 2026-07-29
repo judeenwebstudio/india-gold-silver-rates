@@ -17,12 +17,15 @@ test("footer link order matches the approved order", () => {
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
 });
 
-test("footer contains logo, certificate, safe optional social links and responsive layout", () => {
+test("footer contains logo, certificate, safe social links and responsive layout", () => {
   assert.match(footer, /ratestack-logo\.png/);
   assert.match(footer, /BIS Certificate No/);
   assert.match(footer, /target="_blank" rel="noopener noreferrer"/);
   assert.match(footer, /md:grid-cols-2/);
-  assert.match(config, /filter\(\(item\).*Boolean\(item\.url\)/s);
+  assert.match(config, /https:\/\/facebook\.com\//);
+  assert.match(config, /https:\/\/x\.com\//);
+  assert.match(config, /https:\/\/instagram\.com\//);
+  assert.match(footer, /hover:-translate-y-0\.5/);
 });
 
 test("all policy route files exist with metadata and shared footer", () => {

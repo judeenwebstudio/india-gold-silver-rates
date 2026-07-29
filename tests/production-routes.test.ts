@@ -68,7 +68,10 @@ test("production homepage regression", async () => {
   assert.match(html, /Indicative city rates/);
   assert.match(html, /Gold price calculator/);
   assert.match(html, /Live Rates Across Indian Cities/);
-  assert.match(html, /Know your gold hallmark/);
+  assert.doesNotMatch(html, /Know your gold hallmark/);
+  assert.match(html, /href="https:\/\/facebook\.com\/"/);
+  assert.match(html, /href="https:\/\/x\.com\/"/);
+  assert.match(html, /href="https:\/\/instagram\.com\/"/);
   assert.match(html, /BIS Certificate No:.*HM\/C-6590483527/s);
 });
 

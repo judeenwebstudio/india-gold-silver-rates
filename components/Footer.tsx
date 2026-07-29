@@ -30,7 +30,7 @@ export function Footer() {
         <div>
           <p className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-amber-400">Connect</p>
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-sm hover:text-amber-300">{CONTACT_EMAIL}</a>
-          {SOCIAL_LINKS.length > 0 && <div className="mt-5 flex gap-3">{SOCIAL_LINKS.map((item) => <a key={item.label} href={item.url} target="_blank" rel="noopener noreferrer" aria-label={`RateStack on ${item.label}`} className="grid h-10 w-10 place-items-center rounded-full border border-stone-700 transition hover:border-amber-400 hover:text-amber-300"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="2"><SocialIcon label={item.label} /></svg></a>)}</div>}
+          <div className="mt-5 flex gap-3">{SOCIAL_LINKS.map((item) => <a key={item.label} href={item.url} target="_blank" rel="noopener noreferrer" aria-label={`RateStack on ${item.label}`} className="grid h-10 w-10 place-items-center rounded-full border border-stone-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400 hover:bg-amber-400/10 hover:text-amber-300 focus-visible:border-amber-400 focus-visible:text-amber-300"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="2"><SocialIcon label={item.label} /></svg></a>)}</div>
         </div>
       </div>
       <div className="border-t border-stone-800"><p className="mx-auto max-w-7xl px-4 py-5 text-center text-xs text-stone-500 sm:px-6 lg:px-8">© {new Date().getFullYear()} RateStack. All rights reserved.</p></div>

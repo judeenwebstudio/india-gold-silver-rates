@@ -31,7 +31,7 @@ const RATE_DEFINITIONS: RateDefinition[] = [
   { code: "SILVER_999", label: "Silver 999", metalType: "SILVER", sourcePurity: "999", sourceUnit: "PER_KILOGRAM", mappedPurity: "P999", amSelector: "#lblSilver999_AM", pmSelector: "#lblSilver999_PM" },
 ];
 
-function parsePositiveCurrency(rawValue: string, field: string) {
+export function parsePositiveCurrency(rawValue: string, field: string) {
   const trimmed = rawValue.replace(/\u00a0/g, " ").trim();
   if (!trimmed) {
     throw new ScraperRejectedError(`Missing value for ${field}.`, { field });
@@ -53,6 +53,38 @@ function parsePositiveCurrency(rawValue: string, field: string) {
     });
   }
 
+  return value;
+}
+
+function parseNormalizedCurrency(rawValue: string, field: string) {
+  // Decode HTML entities first, then remove currency presentation and grouping.
+  // The remaining value must still be a strict positive decimal number.
+  const decoded = load(`<span>${rawValue}</span>`)("span")
+    .text()
+    .normalize("NFKC");
+  const normalizedValue = decoded
+    .replace(/(?:\u20b9|â‚¹|Ã¢â€šÂ¹|\?|INR|Rs\.?)/gi, "")
+    .replace(/[\s,\u2007\u202f]+/g, "")
+    .trim();
+
+  if (!normalizedValue) {
+    throw new ScraperRejectedError(`Missing value for ${field}.`, { field });
+  }
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalizedValue)) {
+    throw new ScraperRejectedError(`Malformed currency value for ${field}.`, {
+      field,
+      rawValue,
+      normalizedValue,
+    });
+  }
+
+  const value = Number(normalizedValue);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new ScraperRejectedError(
+      `The value for ${field} must be greater than zero.`,
+      { field, rawValue, normalizedValue },
+    );
+  }
   return value;
 }
 
@@ -121,12 +153,12 @@ export function parseIbjaRates(
   const normalizedRows = rawRows.map(({ definition, amText, pmText }) => {
     const allowMissingGold916 = definition.code === "GOLD_916";
     const am = amText.length > 0
-      ? normalize(parsePositiveCurrency(amText, `${definition.label} AM`), definition.sourceUnit)
+      ? normalize(parseNormalizedCurrency(amText, `${definition.label} AM`), definition.sourceUnit)
       : allowMissingGold916
         ? null
         : (() => { throw new ScraperRejectedError(`Missing value for ${definition.label} AM.`, { field: `${definition.label} AM` }); })();
     const pm = hasPmRates && pmText.length > 0
-      ? normalize(parsePositiveCurrency(pmText, `${definition.label} PM`), definition.sourceUnit)
+      ? normalize(parseNormalizedCurrency(pmText, `${definition.label} PM`), definition.sourceUnit)
       : null;
 
     return { definition, am, pm };

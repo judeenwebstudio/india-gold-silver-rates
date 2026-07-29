@@ -1,6 +1,5 @@
 import { ScraperConfigurationError } from "@/lib/scrapers/errors";
 import { IbjaRateProvider } from "@/lib/scrapers/providers/ibja";
-import { IbjaCoRateProvider } from "@/lib/scrapers/providers/ibja-co";
 import { GoodReturnsRateProvider } from "@/lib/scrapers/providers/goodreturns";
 import type { ConfiguredRateProvider } from "@/lib/scrapers/config";
 import type {
@@ -33,10 +32,7 @@ export function createRateScraperProviders(
   return providerOrder.flatMap((provider): RateScraperProvider[] => {
     if (provider === "GOODRETURNS") return [new GoodReturnsRateProvider(config)];
     if (provider === "IBJA") {
-      return [
-        createRateScraperProvider({ ...config, name: "IBJA" }),
-        new IbjaCoRateProvider({ ...config, name: "IBJA_CO", url: "https://ibja.co/" }),
-      ];
+      return [createRateScraperProvider({ ...config, name: "IBJA" })];
     }
     return [];
   });

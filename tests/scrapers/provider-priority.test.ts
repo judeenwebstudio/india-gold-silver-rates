@@ -48,7 +48,7 @@ test("runtime reads and resolves the three provider environment variables", () =
   assert.equal(resolved.disabled[0]?.provider, "BANKBAZAAR");
   assert.deepEqual(
     createRateScraperProviders(config("IBJA"), resolved.enabled).map((item) => item.name),
-    ["GOODRETURNS", "IBJA", "IBJA_CO"],
+    ["GOODRETURNS", "IBJA"],
   );
 });
 
@@ -61,7 +61,7 @@ test("configured provider order is respected instead of hardcoded", () => {
   assert.deepEqual(resolved.enabled, ["IBJA", "GOODRETURNS"]);
   assert.deepEqual(
     createRateScraperProviders(config("IBJA"), resolved.enabled).map((item) => item.name),
-    ["IBJA", "IBJA_CO", "GOODRETURNS"],
+    ["IBJA", "GOODRETURNS"],
   );
 });
 

@@ -46,6 +46,23 @@ test("normalizes gold per 10 grams and silver per kilogram", async () => {
   assert.equal(result.quotes.find(({ code }) => code === "GOLD_995")?.mappedPurity, null);
 });
 
+test("normalizes IBJA currency symbols, commas, whitespace, and HTML entities", async () => {
+  const html = (await fixture())
+    .replace(
+      "<span id=\"lblSilver999_AM\">226238",
+      "<span id=\"lblSilver999_AM\">&#8377;&nbsp;2,26,238&nbsp;",
+    )
+    .replace(
+      "<span id=\"lblSilver999_PM\">225460",
+      "<span id=\"lblSilver999_PM\">Rs.&#8239;2,25,460",
+    );
+  const result = parseIbjaRates(html, context);
+  const silver999 = result.quotes.find(({ code }) => code === "SILVER_999");
+
+  assert.equal(silver999?.am.sourceValue, "226238.00");
+  assert.equal(silver999?.pm?.sourceValue, "225460.00");
+});
+
 test("falls back to AM only when every PM value is absent", async () => {
   const html = (await fixture()).replace(
     /(<span id="lbl(?:Gold|Silver)\d+_PM">)[^<]*/g,

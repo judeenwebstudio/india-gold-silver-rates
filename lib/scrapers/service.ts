@@ -192,12 +192,23 @@ async function validateChangeThreshold(
   const selectedRates = selectedMappedRates(result);
   const violations: Array<Record<string, unknown>> = [];
   const stale: string[] = [];
+  const sourceCity = config.name === "GOODRETURNS"
+    ? await prisma.city.findFirst({
+        where: { slug: "tiruchirappalli", state: { code: "TN" } },
+        select: { id: true },
+      })
+    : null;
+  if (config.name === "GOODRETURNS" && !sourceCity) {
+    throw new ScraperRejectedError(
+      "The configured Tiruchirappalli city record is unavailable.",
+    );
+  }
 
   await Promise.all(
     selectedRates.map(async ({ quote, selected, purity }) => {
       const baseline = await prisma.metalRate.findFirst({
         where: {
-          cityId: null,
+          cityId: sourceCity?.id ?? null,
           isActive: true,
           metalType: toMetalType(quote.metalType),
           purity: purity as MetalPurity,
@@ -280,6 +291,7 @@ export async function scrapeWithFallback(
     const attemptedAt = new Date().toISOString();
     let parsedForAttempt: ScrapedRateResult | undefined;
     let parsedValidated = false;
+    let failureStage = "FETCH_OR_PARSE";
     console.info("[rate-sync] source attempted", {
       provider: provider.name,
       sourceUrl: provider.sourceUrl,
@@ -289,13 +301,24 @@ export async function scrapeWithFallback(
     try {
       const parsed = await provider.scrape();
       parsedForAttempt = parsed;
+      console.info("[rate-sync] parsed values before validation", {
+        provider: provider.name,
+        sourceUrl: provider.sourceUrl,
+        sourceDate: parsed.sourceDate,
+        sourceRecordedAt: parsed.recordedAt,
+        preferredSession: parsed.preferredSession,
+        rates: parsedRateSummary(parsed),
+      });
+      failureStage = "STRUCTURAL_VALIDATION";
       assertValidScrapedResult(parsed);
       parsedValidated = true;
 
       if (validPrimary) {
+        failureStage = "CROSS_SOURCE_VALIDATION";
         assertCrossSourceVariance(validPrimary.parsed, parsed, maxChangePercent);
       }
 
+      failureStage = "DATABASE_VALIDATION";
       await validate(provider.config, parsed);
       console.info("[rate-sync] validation result", {
         provider: provider.name,
@@ -338,7 +361,12 @@ export async function scrapeWithFallback(
         provider: provider.name,
         sourceUrl: provider.sourceUrl,
         status: error instanceof ScraperRejectedError ? "REJECTED" : "FAILED",
+        failureStage,
         reason: error instanceof Error ? error.message : "Unknown source failure",
+        details: error instanceof ScraperError ? error.details ?? null : null,
+        parsedValues: parsedForAttempt
+          ? parsedRateSummary(parsedForAttempt)
+          : null,
       });
 
       if (parsedValidated && parsedForAttempt) {

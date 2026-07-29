@@ -25,6 +25,11 @@ export type DisplayRate = {
   previousPrice: number | null;
   change: number | null;
   changePercent: number | null;
+  source?: string;
+  sourceType?: string;
+  rateDate?: string;
+  fetchedAt?: string;
+  fallbackUsed?: boolean;
 };
 
 export type PublicRateSnapshot = {
@@ -41,6 +46,7 @@ export type PublicRateSnapshot = {
   sourceTimestamp: string;
   lastUpdatedAt: string;
   indicative: boolean;
+  fallbackMessage?: string | null;
 };
 
 export type MajorCityRate = {

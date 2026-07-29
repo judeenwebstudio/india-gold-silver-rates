@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     ) {
         try {
             if (redirectUrl.isNotBlank() && redirectUrl.startsWith("https://")) {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(redirectUrl))
+                val intent = Intent(Intent.ACTION_VIEW, redirectUrl.toUri())
                 startActivity(intent)
             } else {
                 onError("PhonePe checkout URL is unavailable.")

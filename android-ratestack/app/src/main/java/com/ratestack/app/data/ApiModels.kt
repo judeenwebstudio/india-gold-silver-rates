@@ -477,6 +477,9 @@ data class ShopProductDto(
     val gstPercent: Double?,
     val enabled: Boolean?,
     val ratePerGram: Double? = null,
+    val rateSource: String? = null,
+    val rateSourceType: String? = null,
+    val rateDate: String? = null,
     val prices: Map<String, ShopPriceDto>? = null,
 )
 

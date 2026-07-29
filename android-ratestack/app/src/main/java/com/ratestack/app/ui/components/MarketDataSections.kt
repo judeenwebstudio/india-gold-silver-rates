@@ -97,7 +97,7 @@ fun CityComparisonSection() {
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Live Rates Across Indian Cities", style = MaterialTheme.typography.titleLarge)
-        Text("Indicative calculations from the IBJA national base and configured city adjustments.", style = MaterialTheme.typography.bodySmall)
+        Text("Indicative city calculations use the stored market-reference rate and configured city adjustments. Source-published Trichy rates are shown without adjustment.", style = MaterialTheme.typography.bodySmall)
         OutlinedTextField(search, { search = it; page = 1 }, Modifier.fillMaxWidth(), label = { Text("Search all cities") }, singleLine = true)
         if (data?.identicalRates == true) Text("Multiple cities currently have the same calculated rate; none is labelled lowest.", style = MaterialTheme.typography.bodySmall)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

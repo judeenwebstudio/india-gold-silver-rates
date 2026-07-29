@@ -100,6 +100,8 @@ private fun ShopCard(product: ShopProductDto, weights: List<Double>, weight: Dou
             Text(product.name.orEmpty(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
             Text(product.description.orEmpty())
             Text("Live Trichy rate: ${money(product.ratePerGram ?: 0.0)} / g", fontWeight = FontWeight.Bold)
+            Text("Source: ${product.rateSource ?: "Previous verified rate"}")
+            Text("${product.rateSourceType?.replace('_', ' ') ?: "Market reference rate"} - ${product.rateDate ?: "Date unavailable"}")
             Text("Available weights", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { weights.forEach { option -> if (option == weight) Button({ onWeight(option) }) { Text("${option.toInt()}g") } else OutlinedButton({ onWeight(option) }) { Text("${option.toInt()}g") } } }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

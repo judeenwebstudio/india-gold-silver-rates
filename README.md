@@ -375,3 +375,26 @@ tests/            Parser, city calculation, and rendered-page tests
 Add production freshness alerts and administrator notifications for repeated
 automatic failures. Before using source rates for commercial valuation or
 pricing, evaluate migration to IBJA's official subscribed API.
+## Production rate sources
+
+Retail rate checks run in this order: `GOODRETURNS` (exact Tiruchirappalli pages), `IBJA`
+(market-reference fallback), `BANKBAZAAR` (disabled until written authorised feed access is
+configured), then the previous verified database rate. MCX is a separate disabled exchange
+benchmark and is never used for Shop pricing.
+
+Set the rate variables documented in `.env.example` in Vercel Production. Keep
+`BANKBAZAAR_ENABLED=false`, `BANKBAZAAR_AUTHORISED=false`, and `MCX_ENABLED=false` unless
+the corresponding licensed integration has been contracted and implemented. Existing
+`RATE_SOURCE_URL` and scraper variables configure the IBJA fallback.
+
+After deploying the code, apply pending production migrations from the website project root:
+
+```powershell
+$env:DATABASE_URL="<production pooled or direct PostgreSQL URL>"
+pnpm prisma migrate deploy
+pnpm prisma migrate status
+```
+
+Vercel does not run Prisma migrations automatically in this project. Run the migration command
+once against production before enabling the upgraded scheduler. The cron schedule remains
+10:00 AM, 2:00 PM, and 6:00 PM Asia/Kolkata.

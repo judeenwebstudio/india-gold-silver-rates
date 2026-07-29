@@ -55,7 +55,12 @@ export async function getTrichyShopRates() {
   return {
     gold22kPerGramPaise: BigInt(Math.round(gold.price * 100)),
     silver999PerGramPaise: BigInt(Math.round(silver.price * 100)),
-    source: snapshot.source,
-    recordedAt: snapshot.sourceTimestamp,
+    goldSource: gold.source,
+    goldSourceType: gold.sourceType,
+    goldRateDate: gold.rateDate,
+    silverSource: silver.source,
+    silverSourceType: silver.sourceType,
+    silverRateDate: silver.rateDate,
+    fallbackMessage: snapshot.fallbackMessage,
   };
 }

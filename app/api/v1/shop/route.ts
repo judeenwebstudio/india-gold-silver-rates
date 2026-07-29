@@ -14,8 +14,7 @@ export async function GET() {
       success: true,
       data: {
         location: 'Tiruchirappalli (Trichy), Tamil Nadu',
-        source: rates.source,
-        recordedAt: rates.recordedAt,
+        fallbackMessage: rates.fallbackMessage,
         products: products.map((product) => {
           const rate = product.metalType === 'GOLD' ? rates.gold22kPerGramPaise : rates.silver999PerGramPaise;
           const weights = customerShopWeights(product.metalType, product.availableWeightsGramsJson as number[]);
@@ -26,6 +25,9 @@ export async function GET() {
             weights, availableWeights: weights, serviceChargePercent: product.serviceChargeBasisPoints / 100,
             enabled: product.isActive,
             gstPercent: product.gstBasisPoints / 100, ratePerGram: Number(rate) / 100,
+            rateSource: product.metalType === 'GOLD' ? rates.goldSource : rates.silverSource,
+            rateSourceType: product.metalType === 'GOLD' ? rates.goldSourceType : rates.silverSourceType,
+            rateDate: product.metalType === 'GOLD' ? rates.goldRateDate : rates.silverRateDate,
             prices: Object.fromEntries(weights.map((weight) => {
               const price = calculateShopPrice(rate, weight, 1, product.serviceChargeBasisPoints, product.gstBasisPoints);
               return [String(weight), {

@@ -19,7 +19,7 @@ const REQUIRED_BASE_RATES = [
 type BaseRateKey = `${MetalType}:${MetalPurity}`;
 type NationalRate = Pick<
   MetalRate,
-  "id" | "metalType" | "purity" | "pricePerGram" | "pricePerKilogram" | "source" | "recordedAt" | "updatedAt"
+  "id" | "metalType" | "purity" | "pricePerGram" | "pricePerKilogram" | "cityId" | "source" | "sourceType" | "rateDate" | "fetchedAt" | "fallbackUsed" | "recordedAt" | "updatedAt"
 >;
 
 type AdjustmentAmount = number | { toString(): string };
@@ -77,7 +77,12 @@ async function getNationalRateRecords() {
           purity: true,
           pricePerGram: true,
           pricePerKilogram: true,
+          cityId: true,
           source: true,
+          sourceType: true,
+          rateDate: true,
+          fetchedAt: true,
+          fallbackUsed: true,
           recordedAt: true,
           updatedAt: true,
         },
@@ -170,6 +175,11 @@ function createRate(
     previousPrice,
     change,
     changePercent,
+    source: base.source,
+    sourceType: base.sourceType ?? (base.cityId ? "SOURCE_PUBLISHED_CITY_RATE" : "MARKET_REFERENCE_RATE"),
+    rateDate: (base.rateDate ?? base.recordedAt).toISOString(),
+    fetchedAt: (base.fetchedAt ?? base.updatedAt).toISOString(),
+    fallbackUsed: base.fallbackUsed,
   };
 }
 
@@ -202,6 +212,9 @@ function buildSnapshot(
     sourceTimestamp: newestSourceRecord.recordedAt.toISOString(),
     lastUpdatedAt: mostRecentlyUpdated.updatedAt.toISOString(),
     indicative: location.cityId !== null,
+    fallbackMessage: latestRecords.some((record) => record.fallbackUsed)
+      ? "Current market rates are temporarily unavailable. Showing the last verified rate."
+      : null,
   };
 }
 
@@ -245,9 +258,45 @@ async function getCityDisplayRatesForSlugs(
 
   if (!city) throw new CityRateDataError("The requested active city was not found.");
 
+  const published = await prisma.metalRate.findMany({
+    where: { cityId: city.id, isActive: true, deletedAt: null },
+    orderBy: [{ recordedAt: "desc" }, { createdAt: "desc" }],
+    select: {
+      id: true, metalType: true, purity: true, pricePerGram: true, cityId: true,
+      pricePerKilogram: true, source: true, sourceType: true, rateDate: true,
+      fetchedAt: true, fallbackUsed: true, recordedAt: true, updatedAt: true,
+    },
+  });
+  const latest = new Map(baseRates.latest);
+  const previous = new Map(baseRates.previous);
+  const seen = new Set<BaseRateKey>();
+  const cityCounts = new Map<BaseRateKey, number>();
+  for (const rate of published) {
+    const rateKey = key(rate.metalType, rate.purity);
+    const cityCount = (cityCounts.get(rateKey) ?? 0) + 1;
+    cityCounts.set(rateKey, cityCount);
+    if (!seen.has(rateKey)) {
+      latest.set(rateKey, rate);
+      seen.add(rateKey);
+    } else if (cityCount === 2) {
+      previous.set(rateKey, Number(rate.pricePerGram));
+    }
+  }
+  const adjustments: CityAdjustments = {
+    gold24KAdjustment: city.gold24KAdjustment,
+    gold22KAdjustment: city.gold22KAdjustment,
+    gold18KAdjustment: city.gold18KAdjustment,
+    gold14KAdjustment: city.gold14KAdjustment,
+    silver999Adjustment: city.silver999Adjustment,
+  };
+  if (seen.has(key(MetalType.GOLD, MetalPurity.K24))) adjustments.gold24KAdjustment = 0;
+  if (seen.has(key(MetalType.GOLD, MetalPurity.K22))) adjustments.gold22KAdjustment = 0;
+  if (seen.has(key(MetalType.GOLD, MetalPurity.K18))) adjustments.gold18KAdjustment = 0;
+  if (seen.has(key(MetalType.SILVER, MetalPurity.P999))) adjustments.silver999Adjustment = 0;
+
   return buildSnapshot(
-    baseRates.latest,
-    baseRates.previous,
+    latest,
+    previous,
     {
       cityId: city.id,
       cityName: city.name,
@@ -256,7 +305,7 @@ async function getCityDisplayRatesForSlugs(
       stateName: city.state.name,
       stateSlug: city.state.slug,
     },
-    city,
+    adjustments,
   );
 }
 

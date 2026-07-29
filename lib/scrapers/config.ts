@@ -31,7 +31,7 @@ export function getScraperConfig(): ScraperProviderConfig {
     name: process.env.RATE_SOURCE_NAME,
     url: process.env.RATE_SOURCE_URL,
     enabled: process.env.RATE_SOURCE_ENABLED,
-    maxChangePercent: process.env.SCRAPER_MAX_CHANGE_PERCENT,
+    maxChangePercent: process.env.RATE_MAX_VARIANCE_PERCENT ?? process.env.SCRAPER_MAX_CHANGE_PERCENT,
     userAgent: process.env.SCRAPER_USER_AGENT,
     requestTimeoutMs: process.env.SCRAPER_REQUEST_TIMEOUT_MS ?? "15000",
     maxRetries: process.env.SCRAPER_MAX_RETRIES ?? "2",

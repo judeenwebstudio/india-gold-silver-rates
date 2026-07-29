@@ -3,6 +3,10 @@ import {
   MetalType,
   Prisma,
   RateHistoryAction,
+  RateProvider,
+  RateSourceType,
+  RateSourceUnit,
+  RateValidationStatus,
   RateSyncExecutionType,
   RateUpdateStatus,
 } from "@/generated/prisma/client";
@@ -180,6 +184,11 @@ async function validateChangeThreshold(
   result: ScrapedRateResult,
 ) {
   assertValidScrapedResult(result);
+  const staleHours = Number(process.env.RATE_STALE_HOURS ?? "72");
+  const ageMs = Date.now() - new Date(result.recordedAt).getTime();
+  if (!Number.isFinite(staleHours) || staleHours <= 0 || ageMs > staleHours * 60 * 60 * 1000) {
+    throw new ScraperRejectedError(`The source rate is stale beyond the configured ${staleHours}-hour threshold.`);
+  }
   const selectedRates = selectedMappedRates(result);
   const violations: Array<Record<string, unknown>> = [];
   const stale: string[] = [];
@@ -357,11 +366,21 @@ async function writeSynchronizedRates(
   const rates = selectedMappedRates(parsed);
   const recordedAt = new Date(parsed.recordedAt);
   const historySource = `SCRAPER:${config.name}:${executionType}`;
+  const provider = config.name === "GOODRETURNS" ? RateProvider.GOODRETURNS : RateProvider.IBJA;
+  const sourceType = provider === RateProvider.GOODRETURNS
+    ? RateSourceType.SOURCE_PUBLISHED_CITY_RATE
+    : RateSourceType.MARKET_REFERENCE_RATE;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const synchronized = await prisma.$transaction(
         async (transaction) => {
+          const sourceCity = provider === RateProvider.GOODRETURNS
+            ? await transaction.city.findFirst({ where: { slug: "tiruchirappalli", state: { code: "TN" } }, select: { id: true } })
+            : null;
+          if (provider === RateProvider.GOODRETURNS && !sourceCity) {
+            throw new ScraperRejectedError("The configured Tiruchirappalli city record is unavailable.");
+          }
           const summary: ScraperDatabaseSummary = {
             created: 0,
             updated: 0,
@@ -375,7 +394,7 @@ async function writeSynchronizedRates(
             const metalType = toMetalType(quote.metalType);
             const existing = await transaction.metalRate.findFirst({
               where: {
-                cityId: null,
+                cityId: sourceCity?.id ?? null,
                 isActive: true,
                 metalType,
                 purity: purity as MetalPurity,
@@ -384,6 +403,33 @@ async function writeSynchronizedRates(
             });
 
             const pricePerKilogram = selected.pricePerKilogram;
+            const sourceUnit = quote.sourceUnit as RateSourceUnit;
+            const provenance = {
+              provider,
+              sourceType,
+              sourceValue: selected.sourceValue,
+              sourceUnit,
+              normalizedPer10Grams: (Number(selected.pricePerGram) * 10).toFixed(4),
+              normalizedPerKg: (Number(selected.pricePerGram) * 1000).toFixed(4),
+              conversionApplied: quote.sourceUnit !== "PER_GRAM",
+              conversionFormula: quote.sourceUnit === "PER_10_GRAMS"
+                ? "v1: sourceValue / 10"
+                : quote.sourceUnit === "PER_KILOGRAM"
+                  ? "v1: sourceValue / 1000"
+                  : "v1: identity",
+              rateDate: recordedAt,
+              sourcePublishedAt: recordedAt,
+              fetchedAt: new Date(parsed.fetchedAt),
+              lastSuccessfulSync: new Date(attemptedAt),
+              validationStatus: RateValidationStatus.VALID,
+              validationMessage: "Provider response passed city, date, unit and movement validation.",
+              sourceReference: parsed.sourceUrl,
+              rawResponseHash: "rawResponseHash" in parsed ? String(parsed.rawResponseHash) : null,
+              fallbackUsed: false,
+              fallbackReason: null,
+              originalProvider: provider,
+              originalRateDate: recordedAt,
+            };
             const valuesUnchanged =
               existing &&
               rateValuesAreEqual(existing, {
@@ -395,7 +441,7 @@ async function writeSynchronizedRates(
               if (existing && recordedAt.getTime() > existing.recordedAt.getTime()) {
                 await transaction.metalRate.update({
                   where: { id: existing.id },
-                  data: { recordedAt, source: config.name },
+                  data: { recordedAt, source: config.name, ...provenance },
                 });
                 summary.metadataUpdated += 1;
                 decisions.push({ rate: quote.label, decision: "METADATA_UPDATED" });
@@ -414,6 +460,7 @@ async function writeSynchronizedRates(
                   pricePerKilogram,
                   recordedAt,
                   source: config.name,
+                  ...provenance,
                 },
               });
 
@@ -437,9 +484,10 @@ async function writeSynchronizedRates(
                   purity: purity as MetalPurity,
                   pricePerGram: selected.pricePerGram,
                   pricePerKilogram,
-                  cityId: null,
+                  cityId: sourceCity?.id ?? null,
                   source: config.name,
                   recordedAt,
+                  ...provenance,
                 },
               });
 
@@ -560,8 +608,17 @@ async function recordUnsuccessfulAttempt(
     details,
   });
 
-  return prisma.rateUpdateLog.create({
-    data: {
+  return prisma.$transaction(async (transaction) => {
+    await transaction.metalRate.updateMany({
+      where: { isActive: true, deletedAt: null },
+      data: {
+        fallbackUsed: true,
+        fallbackReason: "All enabled live rate providers failed validation.",
+        validationStatus: RateValidationStatus.FALLBACK,
+      },
+    });
+    return transaction.rateUpdateLog.create({
+      data: {
       source,
       sourceUrl,
       status,
@@ -578,8 +635,9 @@ async function recordUnsuccessfulAttempt(
         ...(parsed ? { parsed } : {}),
         ...(details ? { errorDetails: details } : {}),
       } as Prisma.InputJsonObject,
-    },
-    select: { id: true },
+      },
+      select: { id: true },
+    });
   });
 }
 

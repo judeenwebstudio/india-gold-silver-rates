@@ -45,6 +45,11 @@ function serializeGoldRate(snapshot: PublicRateSnapshot, id: GoldRateId) {
     previousPricePerGram: rate.previousPrice,
     change: rate.change,
     changePercent: rate.changePercent,
+    source: rate.source,
+    sourceType: rate.sourceType,
+    rateDate: rate.rateDate,
+    fetchedAt: rate.fetchedAt,
+    fallbackUsed: rate.fallbackUsed,
     currency: "INR" as const,
   };
 }
@@ -61,6 +66,11 @@ function serializeSilverRate(snapshot: PublicRateSnapshot) {
     changePerGram: perGram.change,
     changePercent: perGram.changePercent,
     currency: "INR" as const,
+    source: perGram.source,
+    sourceType: perGram.sourceType,
+    rateDate: perGram.rateDate,
+    fetchedAt: perGram.fetchedAt,
+    fallbackUsed: perGram.fallbackUsed,
   };
 }
 
@@ -75,6 +85,7 @@ export function serializeNationalRates(snapshot: PublicRateSnapshot) {
       name: snapshot.source,
       timestamp: snapshot.sourceTimestamp,
     },
+    fallbackMessage: snapshot.fallbackMessage,
   };
 }
 
@@ -96,6 +107,7 @@ export function serializeCityRates(snapshot: PublicRateSnapshot) {
       timestamp: snapshot.sourceTimestamp,
     },
     indicative: snapshot.indicative,
+    fallbackMessage: snapshot.fallbackMessage,
   };
 }
 

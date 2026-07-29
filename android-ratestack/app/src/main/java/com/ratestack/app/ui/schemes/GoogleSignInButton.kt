@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.ratestack.app.BuildConfig
@@ -61,6 +62,8 @@ fun GoogleSignInButton(
                         } else {
                             onError("Google sign-in could not be completed. Please try again.")
                         }
+                    } catch (_: NoCredentialException) {
+                        onError("No eligible Google account was found on this device.")
                     } catch (_: Exception) {
                         onError("Google sign-in could not be completed. Please try again.")
                     } finally {

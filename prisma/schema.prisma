@@ -59,6 +59,35 @@ enum RateHistoryAction {
   SOFT_DELETE
 }
 
+enum RateProvider {
+  GOODRETURNS
+  IBJA
+  BANKBAZAAR
+  MCX
+  PREVIOUS_VERIFIED_RATE
+  OTHER
+}
+
+enum RateSourceType {
+  SOURCE_PUBLISHED_CITY_RATE
+  MARKET_REFERENCE_RATE
+  EXCHANGE_BENCHMARK
+  INDICATIVE_CALCULATED_RATE
+  PREVIOUS_VERIFIED_RATE
+}
+
+enum RateSourceUnit {
+  PER_GRAM
+  PER_10_GRAMS
+  PER_KILOGRAM
+}
+
+enum RateValidationStatus {
+  VALID
+  REJECTED
+  FALLBACK
+}
+
 enum AnalyticsEventType {
   PAGE_VIEW
   CITY_VIEW
@@ -109,6 +138,26 @@ model MetalRate {
   cityId           String?
   city             City?         @relation(fields: [cityId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   source           String
+  provider         RateProvider?
+  sourceType       RateSourceType?
+  sourceValue      Decimal?      @db.Decimal(18, 4)
+  sourceUnit       RateSourceUnit?
+  normalizedPer10Grams Decimal?  @db.Decimal(18, 4)
+  normalizedPerKg  Decimal?      @db.Decimal(18, 4)
+  conversionApplied Boolean      @default(false)
+  conversionFormula String?
+  rateDate         DateTime?
+  sourcePublishedAt DateTime?
+  fetchedAt        DateTime?
+  lastSuccessfulSync DateTime?
+  validationStatus RateValidationStatus?
+  validationMessage String?
+  sourceReference  String?
+  rawResponseHash  String?
+  fallbackUsed     Boolean       @default(false)
+  fallbackReason   String?
+  originalProvider RateProvider?
+  originalRateDate DateTime?
   recordedAt       DateTime
   isActive         Boolean       @default(true)
   deletedAt        DateTime?

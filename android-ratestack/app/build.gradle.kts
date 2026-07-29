@@ -146,8 +146,6 @@ android {
             "AndroidGradlePluginVersion",
             "GradleDependency",
             "OldTargetApi",
-            "AutoboxingStateCreation",
-            "MutableCollectionMutableState",
         )
     }
 }

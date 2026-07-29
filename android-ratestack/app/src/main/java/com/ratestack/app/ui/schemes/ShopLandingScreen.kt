@@ -114,7 +114,7 @@ fun ShopLandingScreen(
                                     if ((price.shipping ?: 0.0) == 0.0) "FREE" else formatShopAmount(price.shipping),
                                     valueColor = Color(0xFF6EE7B7),
                                 )
-                                HorizontalDivider(color = Color(0xFF57534E))
+                                Divider(color = Color(0xFF57534E))
                                 ShopPriceRow(
                                     "Total Payable",
                                     formatShopAmount(price.total),
@@ -126,11 +126,11 @@ fun ShopLandingScreen(
                     }
                     PremiumShopButton(
                         text = if (isLoggedIn) "Select Weight & Buy Now" else "Login to Buy",
-                        loading = openingProductId == product.id,
+                        loading = openingProductId == product.productId,
                         enabled = openingProductId == null,
                         onClick = {
                             if (openingProductId == null) {
-                                openingProductId = product.id
+                                openingProductId = product.productId
                                 if (isLoggedIn) onOpenShop() else onLogin()
                             }
                         },

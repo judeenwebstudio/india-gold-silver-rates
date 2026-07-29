@@ -84,9 +84,11 @@ fun CustomerLoginScreen(
                         }
                     }
 
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("Mobile Number", "Email Address").forEachIndexed { index, label ->
-                            SegmentedButton(selected = useEmail == (index == 1), onClick = { useEmail = index == 1; phone = "" }, shape = SegmentedButtonDefaults.itemShape(index, 2)) { Text(label, fontSize = 11.sp) }
+                            val selected = useEmail == (index == 1)
+                            if (selected) Button(onClick = { useEmail = index == 1; phone = "" }, modifier = Modifier.weight(1f)) { Text(label, fontSize = 11.sp) }
+                            else OutlinedButton(onClick = { useEmail = index == 1; phone = "" }, modifier = Modifier.weight(1f)) { Text(label, fontSize = 11.sp) }
                         }
                     }
                     Spacer(modifier = Modifier.height(14.dp))

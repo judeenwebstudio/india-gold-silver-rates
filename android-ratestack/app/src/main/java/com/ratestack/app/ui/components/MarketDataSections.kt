@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -49,7 +49,8 @@ fun RealRateHistorySection() {
         Text("Real stored IBJA publications; missing trading days are not estimated.", style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("gold24k" to "24K", "gold22k" to "22K", "silver" to "Silver").forEach { choice ->
-                FilterChip(selected = metal == choice.first, onClick = { metal = choice.first }, label = { Text(choice.second) })
+                if (metal == choice.first) Button(onClick = { metal = choice.first }) { Text(choice.second) }
+                else OutlinedButton(onClick = { metal = choice.first }) { Text(choice.second) }
             }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }

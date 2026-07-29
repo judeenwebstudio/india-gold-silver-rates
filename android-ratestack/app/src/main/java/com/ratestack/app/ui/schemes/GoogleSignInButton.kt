@@ -34,9 +34,9 @@ fun GoogleSignInButton(
     var selecting by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF57534E))
+            Divider(modifier = Modifier.weight(1f), color = Color(0xFF57534E))
             Text("OR", modifier = Modifier.padding(horizontal = 12.dp), color = Color(0xFFA8A29E))
-            HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF57534E))
+            Divider(modifier = Modifier.weight(1f), color = Color(0xFF57534E))
         }
         Spacer(Modifier.height(12.dp))
         OutlinedButton(

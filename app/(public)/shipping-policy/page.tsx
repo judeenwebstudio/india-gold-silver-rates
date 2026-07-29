@@ -1,0 +1,8 @@
+import { LegalPage } from "@/components/legal/LegalPage"; import { CONTACT_EMAIL } from "@/lib/footer-config"; import { legalMetadata } from "@/lib/legal-metadata";
+export const metadata = legalMetadata("Shipping Policy", "Learn how RateStack verifies, dispatches, tracks and delivers coin orders.", "/shipping-policy");
+export default function Page() { return <LegalPage title="Shipping Policy" intro="Shipping Cost is currently shown as FREE for direct coin orders. Delivery availability and timing depend on the destination and carrier serviceability.">
+  <section><h2>Coverage and dispatch</h2><p>Orders are dispatched only after successful payment verification and product processing. Coverage is subject to serviceability at the delivery location; no fixed delivery timeline is promised unless it is shown during the order process.</p></section>
+  <section><h2>Delivery timing</h2><p>Timelines may vary by location and can be affected by courier operations, weather, holidays, regulatory checks, or other events outside reasonable control. Tracking details will be shared where available.</p></section>
+  <section><h2>Customer responsibilities</h2><p>Provide a complete and correct recipient name, address, postcode, and contact details. Address errors may prevent or delay delivery.</p></section>
+  <section><h2>Damaged or tampered packages</h2><p>Where possible, refuse a visibly damaged or tampered package. Otherwise preserve all packaging and report the issue promptly with photographs and order details to <a href={`mailto:${CONTACT_EMAIL}`} className="text-amber-800 underline">{CONTACT_EMAIL}</a>.</p></section>
+</LegalPage>; }

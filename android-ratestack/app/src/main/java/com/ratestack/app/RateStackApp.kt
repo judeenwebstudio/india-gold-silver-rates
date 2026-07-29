@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -1503,7 +1502,30 @@ private fun SettingsScreen(
 
             // Category: About & Legal
             item {
-                SettingsCategoryCard(title = "About & Support") {
+                SettingsCategoryCard(title = "About & Legal") {
+                    listOf(
+                        "About Us" to "/about-us",
+                        "Terms & Conditions" to "/terms-and-conditions",
+                        "Refund Policy" to "/refund-policy",
+                        "Shipping Policy" to "/shipping-policy",
+                        "Privacy Policy" to "/privacy-policy",
+                        "FAQ" to "/faq",
+                        "Contact Us" to "/contact-us",
+                    ).forEach { (title, path) ->
+                        SettingTile(
+                            title = title,
+                            subtitle = "Open RateStack website",
+                            icon = Icons.Default.Info,
+                            onClick = { openExternal(BuildConfig.WEBSITE_URL.trimEnd('/') + path) },
+                        )
+                    }
+
+                    SettingTile(
+                        title = "BIS Certificate No",
+                        subtitle = "HM/C-6590483527",
+                        icon = Icons.Default.Info,
+                    )
+
                     SettingTile(
                         title = "Rate App",
                         subtitle = "Open Google Play Store listing",
@@ -1516,13 +1538,6 @@ private fun SettingsScreen(
                         subtitle = "Tell friends about RateStack",
                         icon = Icons.Default.Share,
                         onClick = { onShare("RateStack - Live Gold & Silver Prices in India: ${BuildConfig.WEBSITE_URL}") },
-                    )
-
-                    SettingTile(
-                        title = "Privacy Policy",
-                        subtitle = "Opens in external browser",
-                        icon = Icons.Default.Lock,
-                        onClick = { openExternal(BuildConfig.PRIVACY_POLICY_URL) },
                     )
 
                     SettingTile(

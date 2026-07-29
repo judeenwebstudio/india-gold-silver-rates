@@ -69,6 +69,22 @@ test("production homepage regression", async () => {
   assert.match(html, /Gold price calculator/);
   assert.match(html, /Live Rates Across Indian Cities/);
   assert.match(html, /Know your gold hallmark/);
+  assert.match(html, /BIS Certificate No:.*HM\/C-6590483527/s);
+});
+
+test("footer policy routes render without broken links", async () => {
+  const routes = [
+    "/about-us", "/terms-and-conditions", "/refund-policy", "/shipping-policy",
+    "/privacy-policy", "/faq", "/contact-us",
+  ];
+  for (const route of routes) {
+    const response = await fetch(`${BASE_URL}${route}`);
+    const html = await response.text();
+    assert.equal(response.status, 200, route);
+    assert.match(html, /RateStack/);
+    assert.match(html, /BIS Certificate No:.*HM\/C-6590483527/s);
+    for (const footerRoute of routes) assert.match(html, new RegExp(`href="${footerRoute}"`));
+  }
 });
 
 test("Auth.js session route tolerates an invalid optional URL override", async () => {

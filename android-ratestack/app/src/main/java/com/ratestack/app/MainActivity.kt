@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             Checkout.preload(applicationContext)
             Checkout().apply { setKeyID(keyId) }.open(this, JSONObject().apply {
                 put("name", "RateStack")
-                put("description", "Scheme installment")
+                put("description", "Direct coin purchase")
                 put("currency", "INR")
                 put("amount", amountPaise)
                 put("order_id", gatewayOrderId)

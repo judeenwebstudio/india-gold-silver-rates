@@ -4,7 +4,7 @@ import { authenticateSchemeUserFromRequest } from '@/lib/schemes/user-auth';
 import { getActivePaymentGateway } from '@/lib/schemes/gateway';
 import { createRazorpayOrder } from '@/lib/schemes/razorpay';
 import { createPhonePeOrder } from '@/lib/schemes/phonepe';
-import { calculateShopPrice, getTrichyShopRates } from '@/lib/shop';
+import { calculateShopPrice, getTrichyShopRates, validateShopWeight } from '@/lib/shop';
 import { z } from 'zod';
 
 const schema = z.object({ productId: z.string().min(1), weightGrams: z.number().positive(), quantity: z.number().int().min(1).max(10) });
@@ -14,14 +14,12 @@ export async function POST(request: Request) {
   if (!authUser) return NextResponse.json({ success: false, error: { message: 'Authentication required.' } }, { status: 401 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ success: false, error: { message: 'Invalid product selection.' } }, { status: 400 });
-  const [product, rates, gateway] = await Promise.all([
-    prisma.shopProduct.findUnique({ where: { id: parsed.data.productId } }),
-    getTrichyShopRates(),
-    getActivePaymentGateway(),
-  ]);
+  const product = await prisma.shopProduct.findUnique({ where: { id: parsed.data.productId } });
   if (!product?.isActive) return NextResponse.json({ success: false, error: { message: 'Product is unavailable.' } }, { status: 404 });
   const weights = product.availableWeightsGramsJson as number[];
-  if (!weights.includes(parsed.data.weightGrams)) return NextResponse.json({ success: false, error: { message: 'Selected weight is unavailable.' } }, { status: 400 });
+  const weightError = validateShopWeight(product.metalType, weights, parsed.data.weightGrams);
+  if (weightError) return NextResponse.json({ success: false, error: weightError }, { status: 400 });
+  const [rates, gateway] = await Promise.all([getTrichyShopRates(), getActivePaymentGateway()]);
   const rate = product.metalType === 'GOLD' ? rates.gold22kPerGramPaise : rates.silver999PerGramPaise;
   const price = calculateShopPrice(rate, parsed.data.weightGrams, parsed.data.quantity, product.serviceChargeBasisPoints, product.gstBasisPoints);
   const orderNumber = `SHOP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;

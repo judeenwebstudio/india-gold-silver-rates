@@ -476,6 +476,7 @@ data class ShopProductDto(
     val serviceChargePercent: Double?,
     val gstPercent: Double?,
     val enabled: Boolean?,
+    val ratePerGram: Double? = null,
     val prices: Map<String, ShopPriceDto>? = null,
 )
 
@@ -485,6 +486,20 @@ data class ShopPriceDto(
     val gst: Double?,
     val shipping: Double?,
     val total: Double?,
+)
+
+data class ShopCheckoutRequestDto(val productId: String, val weightGrams: Double, val quantity: Int)
+data class ShopCheckoutDto(
+    val shopOrderId: String?, val orderNumber: String?, val gateway: String?,
+    val gatewayOrderId: String?, val redirectUrl: String?, val keyId: String?,
+    val amount: Double?, val currency: String?,
+)
+data class ShopVerifyRequestDto(val shopOrderId: String, val gatewayPaymentId: String, val gatewaySignature: String)
+data class ShopVerifyResultDto(val orderNumber: String?, val invoiceNumber: String?)
+data class ShopOrderDto(
+    val id: String?, val orderNumber: String?, val product: String?, val weightGrams: Double?,
+    val quantity: Int?, val total: Double?, val paymentStatus: String?, val orderStatus: String?,
+    val invoiceNumber: String?, val createdAt: String?,
 )
 
 sealed interface PaymentActionState {

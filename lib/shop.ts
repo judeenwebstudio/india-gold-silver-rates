@@ -9,6 +9,22 @@ export type ShopPrice = {
   totalPaise: bigint;
 };
 
+export const SILVER_COIN_WEIGHT_GRAMS = 10;
+
+export function customerShopWeights(metalType: 'GOLD' | 'SILVER', configuredWeights: number[]) {
+  return metalType === 'SILVER' ? [SILVER_COIN_WEIGHT_GRAMS] : configuredWeights;
+}
+
+export function validateShopWeight(metalType: 'GOLD' | 'SILVER', configuredWeights: number[], weightGrams: number) {
+  if (metalType === 'SILVER' && weightGrams !== SILVER_COIN_WEIGHT_GRAMS) {
+    return { code: 'INVALID_SILVER_WEIGHT', message: 'Silver Coin is available only in 10g.' };
+  }
+  if (!configuredWeights.includes(weightGrams)) {
+    return { code: 'INVALID_WEIGHT', message: 'Selected weight is unavailable.' };
+  }
+  return null;
+}
+
 export function calculateShopPrice(
   ratePerGramPaise: bigint,
   weightGrams: number,

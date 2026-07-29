@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
@@ -126,7 +127,7 @@ import kotlinx.coroutines.launch
 
 private object Routes {
     const val HOME = "home"
-    const val SCHEMES = "schemes"
+    const val SCHEMES = "shop"
     const val SCHEME_JOIN = "scheme_join/{planId}"
     const val MY_SCHEMES = "my_schemes"
     const val CUSTOMER_LOGIN = "customer_login"
@@ -139,6 +140,7 @@ private object Routes {
     const val CITIES = "cities/{state}"
     const val RATES = "rates/{state}/{city}"
     const val FAVORITES = "favorites"
+    const val MY_ORDERS = "my_orders"
     const val SETTINGS = "settings"
 }
 
@@ -196,7 +198,7 @@ fun RateStackApp(
                 NavigationBar {
                     BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
                     BottomItem(Routes.SCHEMES, "Shop", Icons.Default.Star, currentRoute, navController)
-                    BottomItem(Routes.FAVORITES, "Favorites", Icons.Default.Favorite, currentRoute, navController)
+                    BottomItem(Routes.MY_ORDERS, "My Orders", Icons.Default.ShoppingCart, currentRoute, navController)
                     BottomItem(Routes.SETTINGS, "Settings", Icons.Default.Settings, currentRoute, navController)
                 }
             },
@@ -214,12 +216,12 @@ fun RateStackApp(
 
                 composable(Routes.SCHEMES) {
                     val userToken by schemeViewModel.userToken.collectAsState()
-                    val isLoggedIn = !userToken.isNullOrBlank()
-                    com.ratestack.app.ui.schemes.ShopLandingScreen(
-                        isLoggedIn = isLoggedIn,
+                    com.ratestack.app.ui.shop.NativeShopScreen(
+                        token = userToken,
                         onLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
                         onRegister = { navController.navigate(Routes.CUSTOMER_REGISTER) },
-                        onOpenShop = { onOpenExternal("${BuildConfig.WEBSITE_URL}/shop") },
+                        onGoogleLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                        onOrders = { navController.navigate(Routes.MY_ORDERS) },
                     )
                 }
 
@@ -556,6 +558,15 @@ fun RateStackApp(
                     val favorites by viewModel.favorites.collectAsState()
                     FavoritesScreen(favorites, viewModel, navController)
                 }
+                composable(Routes.MY_ORDERS) {
+                    val userToken by schemeViewModel.userToken.collectAsState()
+                    com.ratestack.app.ui.shop.MyOrdersScreen(
+                        token = userToken,
+                        onLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                        onRegister = { navController.navigate(Routes.CUSTOMER_REGISTER) },
+                        onGoogleLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                    )
+                }
                 composable(Routes.SETTINGS) {
                     val userToken by schemeViewModel.userToken.collectAsState()
                     val userName by schemeViewModel.userName.collectAsState()
@@ -569,7 +580,9 @@ fun RateStackApp(
                         onShare = onShare,
                         onRateApp = onRateApp,
                         onProfileClick = { navController.navigate(Routes.CUSTOMER_PROFILE) },
-                        onLogoutClick = { schemeViewModel.logout() }
+                        onLogoutClick = { schemeViewModel.logout() },
+                        onLoginClick = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                        onRegisterClick = { navController.navigate(Routes.CUSTOMER_REGISTER) },
                     )
                 }
             }
@@ -654,7 +667,8 @@ private fun AppTopBar(
     selection: Pair<String?, String?>,
     navController: NavHostController,
 ) {
-    val isRoot = route == Routes.HOME || route == Routes.FAVORITES || route == Routes.SETTINGS
+    val isRoot = route == Routes.HOME || route == Routes.SCHEMES ||
+        route == Routes.MY_ORDERS || route == Routes.FAVORITES || route == Routes.SETTINGS
     SmallTopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1387,6 +1401,8 @@ private fun SettingsScreen(
     onRateApp: () -> Unit,
     onProfileClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
+    onLoginClick: () -> Unit = {},
+    onRegisterClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val selection by viewModel.selection.collectAsState()
@@ -1441,6 +1457,14 @@ private fun SettingsScreen(
                             icon = Icons.Default.Clear,
                             onClick = onLogoutClick,
                         )
+                    }
+                }
+            } else {
+                item {
+                    SettingsCategoryCard(title = "Customer Account") {
+                        SettingTile("Login", "Access orders and checkout", Icons.Default.Info, onClick = onLoginClick)
+                        SettingTile("Register", "Create your RateStack account", Icons.Default.Info, onClick = onRegisterClick)
+                        SettingTile("Continue with Google", "Use Google on the secure login screen", Icons.Default.Info, onClick = onLoginClick)
                     }
                 }
             }
@@ -1525,6 +1549,12 @@ private fun SettingsScreen(
                         subtitle = "HM/C-6590483527",
                         icon = Icons.Default.Info,
                     )
+                    SettingTile("Email", "info@ratestack.in", Icons.Default.Info) {
+                        openExternal("mailto:info@ratestack.in")
+                    }
+                    SettingTile("Facebook", "facebook.com", Icons.Default.Share) { openExternal("https://facebook.com/") }
+                    SettingTile("X (Twitter)", "x.com", Icons.Default.Share) { openExternal("https://x.com/") }
+                    SettingTile("Instagram", "instagram.com", Icons.Default.Share) { openExternal("https://instagram.com/") }
 
                     SettingTile(
                         title = "Rate App",
@@ -1740,6 +1770,8 @@ private fun routeTitle(route: String?): String = when {
     route?.startsWith("cities") == true -> "Select City"
     route?.startsWith("rates") == true -> "Rate Details"
     route == Routes.FAVORITES -> "Favorites"
+    route == Routes.MY_ORDERS -> "My Orders"
+    route == Routes.SCHEMES -> "Shop"
     route == Routes.SETTINGS -> "Settings"
     else -> "RateStack"
 }

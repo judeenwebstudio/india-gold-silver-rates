@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { calculateShopPrice, getTrichyShopRates } from '@/lib/shop';
+import { calculateShopPrice, customerShopWeights, getTrichyShopRates } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,7 @@ export async function GET() {
         recordedAt: rates.recordedAt,
         products: products.map((product) => {
           const rate = product.metalType === 'GOLD' ? rates.gold22kPerGramPaise : rates.silver999PerGramPaise;
-          const weights = product.availableWeightsGramsJson as number[];
+          const weights = customerShopWeights(product.metalType, product.availableWeightsGramsJson as number[]);
           return {
             id: product.id, productId: product.id, slug: product.slug, name: product.name, metalType: product.metalType,
             purity: product.purity, description: product.description,

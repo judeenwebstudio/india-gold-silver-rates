@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { customerShopWeights } from '@/lib/shop';
 
 const schema = z.object({
   id: z.string(), description: z.string().min(1), imageUrl: z.string().url().nullable().optional(),
@@ -11,7 +12,7 @@ const schema = z.object({
 export async function GET() {
   if (!(await auth())?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const products = await prisma.shopProduct.findMany({ orderBy: { metalType: 'asc' }, omit: { imageData: true } });
-  return NextResponse.json({ products: products.map((p) => ({ ...p, imageUrl: p.imageMimeType ? `/api/v1/shop/products/${p.id}/image` : p.imageUrl, weights: p.availableWeightsGramsJson, serviceChargePercent: p.serviceChargeBasisPoints / 100, gstPercent: p.gstBasisPoints / 100 })) });
+  return NextResponse.json({ products: products.map((p) => ({ ...p, imageUrl: p.imageMimeType ? `/api/v1/shop/products/${p.id}/image` : p.imageUrl, weights: customerShopWeights(p.metalType, p.availableWeightsGramsJson as number[]), serviceChargePercent: p.serviceChargeBasisPoints / 100, gstPercent: p.gstBasisPoints / 100 })) });
 }
 export async function PUT(request: Request) {
   if (!(await auth())?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -20,9 +21,11 @@ export async function PUT(request: Request) {
   if (parsed.data.imageUrl && !/^\/(?:products|api\/v1\/shop\/products)\/[a-zA-Z0-9_./-]+$/.test(parsed.data.imageUrl)) {
     return NextResponse.json({ error: 'Image URL must be a safe RateStack-hosted product path.' }, { status: 400 });
   }
+  const existing = await prisma.shopProduct.findUnique({ where: { id: parsed.data.id }, select: { metalType: true } });
+  if (!existing) return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
   const product = await prisma.shopProduct.update({ where: { id: parsed.data.id }, data: {
     description: parsed.data.description, imageUrl: parsed.data.imageUrl || null,
-    availableWeightsGramsJson: parsed.data.weights,
+    availableWeightsGramsJson: customerShopWeights(existing.metalType, parsed.data.weights),
     serviceChargeBasisPoints: Math.round(parsed.data.serviceChargePercent * 100),
     gstBasisPoints: Math.round(parsed.data.gstPercent * 100), isActive: parsed.data.isActive,
   } });

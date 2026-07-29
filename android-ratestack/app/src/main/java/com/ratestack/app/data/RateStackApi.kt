@@ -11,6 +11,23 @@ interface RateStackApi {
     @GET("api/v1/shop")
     suspend fun getShop(): Response<ApiEnvelope<ShopResponseDto>>
 
+    @POST("api/v1/shop/checkout")
+    suspend fun createShopCheckout(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Body request: ShopCheckoutRequestDto,
+    ): Response<ApiEnvelope<ShopCheckoutDto>>
+
+    @POST("api/v1/shop/verify")
+    suspend fun verifyShopPayment(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Body request: ShopVerifyRequestDto,
+    ): Response<ApiEnvelope<ShopVerifyResultDto>>
+
+    @GET("api/v1/me/orders")
+    suspend fun getShopOrders(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+    ): Response<ApiEnvelope<List<ShopOrderDto>>>
+
     @GET("api/v1/payment/config")
     suspend fun getPaymentConfig(): Response<PaymentConfigDto>
 

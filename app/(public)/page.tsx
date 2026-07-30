@@ -2,7 +2,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { HistoricalChart } from "@/components/HistoricalChart";
 import { HomeRateExperience } from "@/components/HomeRateExperience";
-import { MajorCityRates } from "@/components/MajorCityRates";
+import { ShopCatalogue } from "@/components/shop/ShopCatalogue";
 import {
   getCityDisplayRates,
   getPublicLocations,
@@ -33,7 +33,7 @@ export default async function Home() {
           initialSnapshot={initialSnapshot}
         />
         <HistoricalChart />
-        <MajorCityRates />
+        <ShopCatalogue embedded />
       </main>
       <Footer />
     </>

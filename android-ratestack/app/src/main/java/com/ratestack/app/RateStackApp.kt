@@ -117,7 +117,6 @@ import com.ratestack.app.ui.components.ErrorPanel
 import com.ratestack.app.ui.components.LastUpdatedBadge
 import com.ratestack.app.ui.components.PriceDeltaBadge
 import com.ratestack.app.ui.components.ProminentGoldHeroCard
-import com.ratestack.app.ui.components.QuickActionsBar
 import com.ratestack.app.ui.components.SilverRateCard
 import com.ratestack.app.ui.components.SkeletonListCard
 import com.ratestack.app.ui.components.SkeletonMarketCard
@@ -172,9 +171,8 @@ fun RateStackApp(
         splashVisible = false
     }
 
-    val citiesForLink by viewModel.cities.collectAsState()
-    LaunchedEffect(initialUrl, citiesForLink) {
-        if (!initialUrl.isNullOrBlank()) navigateLink(navController, initialUrl, citiesForLink, viewModel)
+    LaunchedEffect(initialUrl) {
+        if (!initialUrl.isNullOrBlank()) navigateLink(navController, initialUrl)
     }
 
     RateStackTheme(themeMode = themeMode) {
@@ -211,7 +209,8 @@ fun RateStackApp(
                 composable(Routes.HOME) {
                     val home by viewModel.home.collectAsState()
                     val rates by viewModel.rates.collectAsState()
-                    HomeScreen(home, rates, selection, viewModel, navController, onShare)
+                    val userToken by schemeViewModel.userToken.collectAsState()
+                    HomeScreen(home, rates, selection, userToken, viewModel, navController)
                 }
 
                 composable(Routes.SCHEMES) {
@@ -521,23 +520,20 @@ fun RateStackApp(
                 }
 
                 composable(Routes.STATES) {
-                    val states by viewModel.states.collectAsState()
-                    LaunchedEffect(Unit) { viewModel.loadLocations() }
-                    StateSelectionScreen(states) { state ->
-                        navController.navigate("cities/${state.slug}")
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Routes.SCHEMES) {
+                            popUpTo(Routes.STATES) { inclusive = true }
+                        }
                     }
                 }
                 composable(
                     Routes.CITIES,
                     arguments = listOf(navArgument("state") { type = NavType.StringType }),
-                ) { entry ->
-                    val stateSlug = entry.arguments?.getString("state").orEmpty()
-                    val cities by viewModel.cities.collectAsState()
-                    val states by viewModel.states.collectAsState()
-                    LaunchedEffect(Unit) { viewModel.loadLocations() }
-                    CitySelectionScreen(stateSlug, states, cities) { city ->
-                        viewModel.select(city.state.slug, city.slug)
-                        navController.navigate("rates/${city.state.slug}/${city.slug}")
+                ) {
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Routes.SCHEMES) {
+                            popUpTo(Routes.CITIES) { inclusive = true }
+                        }
                     }
                 }
                 composable(
@@ -546,17 +542,19 @@ fun RateStackApp(
                         navArgument("state") { type = NavType.StringType },
                         navArgument("city") { type = NavType.StringType },
                     ),
-                ) { entry ->
-                    val state = entry.arguments?.getString("state").orEmpty()
-                    val city = entry.arguments?.getString("city").orEmpty()
-                    LaunchedEffect(state, city) { viewModel.loadRates(state, city) }
-                    val rates by viewModel.rates.collectAsState()
-                    val favorites by viewModel.favorites.collectAsState()
-                    RateDetailsScreen(rates, favorites, viewModel, onShare)
+                ) {
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Routes.SCHEMES) {
+                            popUpTo(Routes.RATES) { inclusive = true }
+                        }
+                    }
                 }
                 composable(Routes.FAVORITES) {
-                    val favorites by viewModel.favorites.collectAsState()
-                    FavoritesScreen(favorites, viewModel, navController)
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Routes.SCHEMES) {
+                            popUpTo(Routes.FAVORITES) { inclusive = true }
+                        }
+                    }
                 }
                 composable(Routes.MY_ORDERS) {
                     val userToken by schemeViewModel.userToken.collectAsState()
@@ -702,17 +700,6 @@ private fun AppTopBar(
                 }
             }
         },
-        actions = {
-            if (route == Routes.HOME) {
-                IconButton(onClick = { navController.navigate(Routes.STATES) }) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Choose Location",
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-        },
         colors = TopAppBarDefaults.smallTopAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
@@ -748,9 +735,9 @@ private fun HomeScreen(
     home: LoadState<HomeData>,
     rates: LoadState<RateDetails>?,
     selection: Pair<String?, String?>,
+    userToken: String?,
     viewModel: RateStackViewModel,
     navController: NavHostController,
-    onShare: (String) -> Unit,
 ) {
     val isRefreshing = home is LoadState.Loading || rates is LoadState.Loading
     val refreshState = rememberPullRefreshState(isRefreshing, viewModel::refreshHome)
@@ -783,26 +770,6 @@ private fun HomeScreen(
                         )
                     }
                 }
-            }
-
-            item {
-                QuickActionsBar(
-                    onChooseCity = { navController.navigate(Routes.STATES) },
-                    onOpenFavorites = { navController.navigate(Routes.FAVORITES) },
-                    onShare = {
-                        val goldRate = when (rates) {
-                            is LoadState.Ready -> rates.data.goldRates.firstOrNull { it.purity == "22K" } ?: rates.data.goldRates.firstOrNull { it.purity == "24K" }
-                            else -> (home as? LoadState.Ready)?.data?.latestGoldRates?.firstOrNull { it.purity == "22K" } ?: (home as? LoadState.Ready)?.data?.latestGoldRates?.firstOrNull { it.purity == "24K" }
-                        }
-                        val shareText = if (goldRate != null) {
-                            "RateStack Today's ${goldRate.purity} Gold Rate: ${formatInr(goldRate.pricePerGram)}/g. Check latest rates on RateStack!"
-                        } else {
-                            "Check live Gold & Silver rates on RateStack: ${BuildConfig.WEBSITE_URL}"
-                        }
-                        onShare(shareText)
-                    },
-                    onRefresh = { viewModel.refreshHome() },
-                )
             }
 
             when {
@@ -886,15 +853,18 @@ private fun HomeScreen(
             }
 
             item {
-                LocationCard(selection = selection, navController = navController)
-            }
-
-            item {
                 com.ratestack.app.ui.components.RealRateHistorySection()
             }
 
             item {
-                com.ratestack.app.ui.components.CityComparisonSection()
+                com.ratestack.app.ui.shop.NativeShopScreen(
+                    token = userToken,
+                    onLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                    onRegister = { navController.navigate(Routes.CUSTOMER_REGISTER) },
+                    onGoogleLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                    onOrders = { navController.navigate(Routes.MY_ORDERS) },
+                    embedded = true,
+                )
             }
 
             item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -1779,18 +1749,10 @@ private fun routeTitle(route: String?): String = when {
 private fun navigateLink(
     navController: NavHostController,
     raw: String,
-    citiesState: LoadState<List<CityOption>>,
-    viewModel: RateStackViewModel,
 ) {
     when (val destination = NativeDeepLinkResolver(BuildConfig.TRUSTED_HOST).resolve(raw)) {
         NativeDestination.Home -> navController.navigate(Routes.HOME)
-        is NativeDestination.State -> navController.navigate("cities/${destination.slug}")
-        is NativeDestination.Rate -> navController.navigate("rates/${destination.stateSlug}/${destination.citySlug}")
-        is NativeDestination.CityLookup -> {
-            val match = (citiesState as? LoadState.Ready)?.data?.firstOrNull { it.slug == destination.citySlug }
-            if (match != null) navController.navigate("rates/${match.state.slug}/${match.slug}")
-            else viewModel.loadLocations()
-        }
+        NativeDestination.Shop -> navController.navigate(Routes.SCHEMES)
         is NativeDestination.External -> Unit
     }
 }

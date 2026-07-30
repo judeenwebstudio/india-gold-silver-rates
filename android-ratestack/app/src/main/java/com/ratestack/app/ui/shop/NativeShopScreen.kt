@@ -1,9 +1,9 @@
 package com.ratestack.app.ui.shop
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
@@ -24,7 +24,15 @@ import java.text.NumberFormat
 import java.util.Locale
 
 @Composable
-fun NativeShopScreen(token: String?, onLogin: () -> Unit, onRegister: () -> Unit, onGoogleLogin: () -> Unit, onOrders: () -> Unit) {
+fun NativeShopScreen(
+    token: String?,
+    onLogin: () -> Unit,
+    onRegister: () -> Unit,
+    onGoogleLogin: () -> Unit,
+    onOrders: () -> Unit,
+    modifier: Modifier = Modifier,
+    embedded: Boolean = false,
+) {
     var products by remember { mutableStateOf<List<ShopProductDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -68,18 +76,28 @@ fun NativeShopScreen(token: String?, onLogin: () -> Unit, onRegister: () -> Unit
             } catch (exception: Exception) { errorMessage = exception.message ?: "Checkout failed."; busy = null }
         }
     }
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 112.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item {
-            Text("Shop", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Black)
-            Text("Gold and Silver coins priced using the live Tiruchirappalli rate.")
-            if (token.isNullOrBlank()) Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = onLogin) { Text("Login") }; OutlinedButton(onClick = onRegister) { Text("Register") } }
-                OutlinedButton(onClick = onGoogleLogin) { Text("Continue with Google") }
-            }
-            errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (loading) CircularProgressIndicator()
+    val catalogueModifier = if (embedded) {
+        modifier.fillMaxWidth()
+    } else {
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 112.dp)
+    }
+    Column(catalogueModifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            "Buy Certified Gold & Silver Coins at Live Trichy Rates",
+            style = if (embedded) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Black,
+        )
+        Text("Shop 22K Gold and Silver Coins at the current Tiruchirappalli market rate.")
+        if (token.isNullOrBlank()) Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = onLogin) { Text("Login") }; OutlinedButton(onClick = onRegister) { Text("Register") } }
+            OutlinedButton(onClick = onGoogleLogin) { Text("Continue with Google") }
         }
-        items(products, key = { it.productId.orEmpty() }) { product ->
+        errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        if (loading) CircularProgressIndicator()
+        products.forEach { product ->
             val id = product.productId.orEmpty()
             val weights = product.availableWeights.orEmpty()
             val selected = selections[id] ?: ((weights.firstOrNull() ?: 10.0) to 1)
@@ -99,6 +117,11 @@ private fun ShopCard(product: ShopProductDto, weights: List<Double>, weight: Dou
             AsyncImage(if (raw.startsWith("http")) raw else BuildConfig.WEBSITE_URL.trimEnd('/') + raw, product.name, Modifier.fillMaxWidth().height(220.dp).padding(22.dp), contentScale = ContentScale.Fit)
             Text(product.name.orEmpty(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
             Text(product.description.orEmpty())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Purity: ${product.purity ?: "Verified"}", fontWeight = FontWeight.Bold)
+                Text("In stock", color = Color(0xFF15803D), fontWeight = FontWeight.Bold)
+            }
+            Text("Weight: ${weight.toInt()}g", fontWeight = FontWeight.Bold)
             Text("Live Trichy rate: ${money(product.ratePerGram ?: 0.0)} / g", fontWeight = FontWeight.Bold)
             Text("Source: ${product.rateSource ?: "Previous verified rate"}")
             Text("${product.rateSourceType?.replace('_', ' ') ?: "Market reference rate"} - ${product.rateDate ?: "Date unavailable"}")

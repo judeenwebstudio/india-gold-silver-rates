@@ -11,7 +11,9 @@ test("header has premium top and sticky scroll states without route changes", ()
   assert.match(header, /sticky top-0 z-50/);
   assert.match(header, /border-amber-500\/70/);
   assert.match(header, /backdrop-blur-xl/);
-  for (const route of ["/#rates", "/shop", "/#cities", "/#calculator"]) assert.match(header, new RegExp(route.replace("/", "\\/")));
+  for (const route of ["/#rates", "/shop", "/#calculator"]) assert.match(header, new RegExp(route.replace("/", "\\/")));
+  assert.doesNotMatch(header, /\/#cities/);
+  assert.doesNotMatch(header, /label: "Cities"/);
 });
 
 test("navigation exposes active, hover, focus and reduced-motion states", () => {

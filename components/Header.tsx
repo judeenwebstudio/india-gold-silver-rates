@@ -9,7 +9,6 @@ import { AuthModal } from "@/components/AuthModal";
 const navigation = [
   { label: "Today’s rates", href: "/#rates" },
   { label: "Shop", href: "/shop" },
-  { label: "Cities", href: "/#cities" },
   { label: "Calculator", href: "/#calculator" },
 ];
 

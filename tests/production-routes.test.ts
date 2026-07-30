@@ -67,12 +67,22 @@ test("production homepage regression", async () => {
   assert.match(html, /RateStack/);
   assert.match(html, /Indicative city rates/);
   assert.match(html, /Gold price calculator/);
-  assert.match(html, /Live Rates Across Indian Cities/);
+  assert.match(html, /Buy Certified/);
+  assert.match(html, /Gold &amp; Silver Coins/);
+  assert.doesNotMatch(html, /Live Rates Across Indian Cities/);
   assert.doesNotMatch(html, /Know your gold hallmark/);
   assert.match(html, /href="https:\/\/facebook\.com\/"/);
   assert.match(html, /href="https:\/\/x\.com\/"/);
   assert.match(html, /href="https:\/\/instagram\.com\/"/);
   assert.match(html, /BIS Certificate No:.*HM\/C-6590483527/s);
+});
+
+test("legacy Cities routes redirect to the existing Shop", async () => {
+  for (const route of ["/cities", "/cities/tamil-nadu/chennai"]) {
+    const response = await fetch(`${BASE_URL}${route}`, { redirect: "manual" });
+    assert.equal(response.status, 307, route);
+    assert.equal(response.headers.get("location"), "/shop", route);
+  }
 });
 
 test("footer policy routes render without broken links", async () => {

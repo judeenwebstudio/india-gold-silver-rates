@@ -67,7 +67,10 @@ export async function getSchedulerStatus() {
   }
 
   return {
-    enabled: Boolean(process.env.CRON_SECRET) && sourceEnabled,
+    enabled:
+      process.env.VERCEL_CRON_ENABLED === "true" &&
+      Boolean(process.env.CRON_SECRET) &&
+      sourceEnabled,
     scheduleUtc: RATE_SYNC_CRON_SCHEDULE_UTC,
     scheduleLabelUtc: RATE_SYNC_CRON_LABEL_UTC,
     scheduleLabelIst: RATE_SYNC_CRON_LABEL_IST,

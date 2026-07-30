@@ -72,8 +72,8 @@ export default async function ApiLogsPage() {
           </p>
         </div>
         <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-500 shadow-sm">
-          <span className="block font-bold text-stone-800">Daily production schedule</span>
-          04:30, 08:30, and 12:30 UTC · 10:00 AM, 2:00 PM, and 6:00 PM IST
+          <span className="block font-bold text-stone-800">Manual worker mode</span>
+          Automatic Vercel scheduling is disabled for Hobby-plan compatibility.
         </div>
       </div>
 

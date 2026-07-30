@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { sanitizeAuthUrlEnvironment } from "../lib/auth-environment";
@@ -47,4 +48,29 @@ test("database URL errors never repeat the invalid value", () => {
       error.message.includes("DATABASE_URL is invalid") &&
       !error.message.includes(invalidValue),
   );
+});
+
+test("Vercel Hobby deployment does not register automatic cron jobs", async () => {
+  const config = JSON.parse(
+    await readFile(new URL("../vercel.json", import.meta.url), "utf8"),
+  ) as { crons?: unknown[] };
+
+  assert.equal(config.crons, undefined);
+});
+
+test("manual worker endpoints remain protected by CRON_SECRET", async () => {
+  const [rateSync, logistics] = await Promise.all([
+    readFile(
+      new URL("../app/api/cron/rate-sync/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/api/cron/logistics-reconcile/route.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(rateSync, /secret:\s*process\.env\.CRON_SECRET/);
+  assert.match(logistics, /process\.env\.CRON_SECRET/);
+  assert.match(logistics, /authorization!==`Bearer \$\{secret\}`/);
 });

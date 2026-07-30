@@ -366,7 +366,7 @@ tests/            Parser, city calculation, and rendered-page tests
 - National rates remain source-owned records with `cityId = null`
 - City display rates are calculated at read time without duplicated city-rate rows
 - Admin authentication, manual Gold/Silver CRUD, Rate History, IBJA scraper, and API logs are preserved
-- Daily Vercel Cron sync uses bearer authentication, database locking, retry/backoff, and no-change detection
+- Rate synchronization remains available through the authenticated admin action and protected worker endpoint; automatic Vercel Cron scheduling is disabled for Hobby-plan compatibility
 - Homepage state/city selectors use active PostgreSQL locations
 - Making charges and GST calculation are outside the current scope
 
@@ -396,5 +396,38 @@ pnpm prisma migrate status
 ```
 
 Vercel does not run Prisma migrations automatically in this project. Run the migration command
-once against production before enabling the upgraded scheduler. The cron schedule remains
-10:00 AM, 2:00 PM, and 6:00 PM Asia/Kolkata.
+once against production before enabling the upgraded scheduler.
+
+## Background workers on Vercel Hobby
+
+Automatic Vercel Cron registration is intentionally disabled in `vercel.json`. This keeps Hobby
+deployments compatible while preserving all worker code, notification outbox records, email
+delivery behavior, rate synchronization, and Shiprocket reconciliation logic.
+
+Administrators can run rate synchronization from **Admin → API Logs → Sync Rates Now**. The
+worker endpoints can also be called manually by trusted infrastructure using the production
+`CRON_SECRET`; they reject missing or incorrect bearer credentials:
+
+```powershell
+$headers = @{ Authorization = "Bearer $env:CRON_SECRET" }
+Invoke-RestMethod -Headers $headers -Uri "https://your-domain.example/api/cron/rate-sync"
+Invoke-RestMethod -Headers $headers -Uri "https://your-domain.example/api/cron/logistics-reconcile"
+```
+
+Do not place `CRON_SECRET` in client code. Rotate it if it is ever exposed.
+
+To restore automatic scheduling after upgrading to a Vercel plan that supports the required
+frequency, set `VERCEL_CRON_ENABLED=true` and add the following documented configuration back
+to `vercel.json`:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/cron/rate-sync?slot=MORNING_10_AM", "schedule": "30 4 * * *" },
+    { "path": "/api/cron/rate-sync?slot=AFTERNOON_2_PM", "schedule": "30 8 * * *" },
+    { "path": "/api/cron/rate-sync?slot=EVENING_6_PM", "schedule": "30 12 * * *" },
+    { "path": "/api/cron/logistics-reconcile", "schedule": "17 */2 * * *" }
+  ]
+}
+```

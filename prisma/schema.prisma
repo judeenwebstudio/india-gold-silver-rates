@@ -392,6 +392,7 @@ model SchemeUser {
   redemptionRequests RedemptionRequest[]
   auditLogs          AuditLog[]
   shopOrders         ShopOrder[]
+  deliveryAddresses DeliveryAddress[]
   authAccounts       AuthAccount[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
@@ -457,6 +458,21 @@ model ShopOrder {
   shippingAmountPaise        BigInt    @default(0)
   totalAmountPaise           BigInt
   currency                   String    @default("INR")
+  customerName               String?
+  customerPhone              String?
+  customerEmail              String?
+  addressLine1               String?
+  addressLine2               String?
+  landmark                   String?
+  deliveryCity               String?
+  deliveryDistrict           String?
+  deliveryState              String?
+  deliveryPincode            String?
+  deliveryCountry            String?   @default("India")
+  addressType                String?
+  rateSource                 String?
+  rateDate                   DateTime?
+  idempotencyKey             String?   @unique
   gateway                    String
   gatewayOrderId             String?
   gatewayPaymentId           String?
@@ -473,6 +489,26 @@ model ShopOrder {
   @@index([userId, createdAt])
   @@index([gatewayOrderId])
   @@index([paymentStatus, orderStatus])
+}
+
+model DeliveryAddress {
+  id           String     @id @default(cuid())
+  userId       String
+  user         SchemeUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addressLine1 String
+  addressLine2 String?
+  landmark     String?
+  city         String
+  district     String
+  state        String
+  pincode      String
+  country      String     @default("India")
+  addressType  String     @default("HOME")
+  isDefault    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([userId, isDefault])
 }
 
 model EmailAuthToken {

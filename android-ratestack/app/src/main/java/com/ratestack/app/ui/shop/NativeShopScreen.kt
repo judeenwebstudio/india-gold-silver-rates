@@ -22,6 +22,7 @@ import com.ratestack.app.data.*
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
+import java.util.UUID
 
 @Composable
 fun NativeShopScreen(
@@ -37,6 +38,7 @@ fun NativeShopScreen(
     var loading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf<String?>(null) }
+    var checkoutSelection by remember { mutableStateOf<Triple<ShopProductDto, Double, Int>?>(null) }
     val selections = remember { mutableStateMapOf<String, Pair<Double, Int>>() }
     val scope = rememberCoroutineScope()
     val activity = LocalContext.current as? MainActivity
@@ -47,7 +49,7 @@ fun NativeShopScreen(
         }.onFailure { errorMessage = "Unable to load Shop products." }
         loading = false
     }
-    fun checkout(product: ShopProductDto, weight: Double, quantity: Int) {
+    fun checkout(product: ShopProductDto, request: ShopCheckoutRequestDto) {
         if (token.isNullOrBlank()) { onLogin(); return }
         val productId = product.productId ?: return
         if (busy != null) return
@@ -56,7 +58,7 @@ fun NativeShopScreen(
             try {
                 val config = ApiProvider.service.getPaymentConfig().body()
                 if (config?.activeGateway.isNullOrBlank()) throw IllegalStateException("Payment service is not configured yet.")
-                val response = ApiProvider.service.createShopCheckout("Bearer $token", ShopCheckoutRequestDto(productId, weight, quantity))
+                val response = ApiProvider.service.createShopCheckout("Bearer $token", request)
                 val order = response.body()?.data
                 if (!response.isSuccessful || order == null) throw IllegalStateException(response.body()?.error?.message ?: "Unable to create Shop order.")
                 if (order.gateway == "RAZORPAY") {
@@ -104,9 +106,78 @@ fun NativeShopScreen(
             val key = if (selected.first % 1.0 == 0.0) selected.first.toInt().toString() else selected.first.toString()
             ShopCard(product, weights, selected.first, selected.second, product.prices?.get(key), busy == id,
                 { selections[id] = it to selected.second }, { selections[id] = selected.first to it.coerceIn(1, 10) },
-                { checkout(product, selected.first, selected.second) })
+                { if (token.isNullOrBlank()) onLogin() else checkoutSelection = Triple(product, selected.first, selected.second) })
         }
     }
+    checkoutSelection?.let { selected ->
+        ShopCheckoutDialog(
+            token = token.orEmpty(), product = selected.first, weight = selected.second, quantity = selected.third,
+            onDismiss = { checkoutSelection = null },
+            onConfirm = { request -> checkoutSelection = null; checkout(selected.first, request) },
+        )
+    }
+}
+
+@Composable
+private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: Double, quantity: Int, onDismiss: () -> Unit, onConfirm: (ShopCheckoutRequestDto) -> Unit) {
+    var profile by remember { mutableStateOf(CustomerProfileDto(null, null, null, null, null, null)) }
+    var saved by remember { mutableStateOf<List<ShopAddressDto>>(emptyList()) }
+    var address by remember { mutableStateOf(ShopAddressDto(addressLine1="", city="", district="", state="", pincode="")) }
+    var name by remember { mutableStateOf("") }; var mobile by remember { mutableStateOf("") }; var email by remember { mutableStateOf("") }
+    var review by remember { mutableStateOf(false) }; var error by remember { mutableStateOf<String?>(null) }
+    var gateway by remember { mutableStateOf("RAZORPAY") }
+    LaunchedEffect(Unit) {
+        runCatching {
+            val auth = "Bearer $token"
+            profile = ApiProvider.service.getCustomerProfile(auth).body()?.data ?: profile
+            saved = ApiProvider.service.getDeliveryAddresses(auth).body()?.data.orEmpty()
+        }.onSuccess {
+            name = profile.fullName.orEmpty(); mobile = profile.phone.orEmpty(); email = profile.email.orEmpty()
+            saved.firstOrNull()?.let { address = it }
+            gateway = ApiProvider.service.getPaymentConfig().body()?.activeGateway ?: "RAZORPAY"
+        }
+    }
+    val valid = name.trim().length >= 2 && Regex("^(?:\\+91)?[6-9]\\d{9}$").matches(mobile.trim()) &&
+        android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() && address.addressLine1.trim().length >= 3 &&
+        address.city.isNotBlank() && address.district.isNotBlank() && address.state.isNotBlank() && Regex("^[1-9]\\d{5}$").matches(address.pincode)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (review) "Review & Payment" else "Checkout Details", fontWeight = FontWeight.Black) },
+        text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text("Customer Details • Delivery Address • Order Review • Payment", style = MaterialTheme.typography.bodySmall)
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (!review) {
+                CheckoutField("Full Name", name) { name = it }; CheckoutField("Indian Mobile Number", mobile) { mobile = it }
+                CheckoutField("Email Address", email) { email = it }
+                if (saved.isNotEmpty()) {
+                    Text("Saved addresses", fontWeight = FontWeight.Bold)
+                    saved.forEach { item -> OutlinedButton({ address = item }, Modifier.fillMaxWidth()) { Text("${item.addressType}: ${item.addressLine1}, ${item.city}") } }
+                    OutlinedButton({ address = ShopAddressDto(addressLine1="", city="", district="", state="", pincode="") }, Modifier.fillMaxWidth()) { Text("Add a new address") }
+                }
+                CheckoutField("Address Line 1", address.addressLine1) { address = address.copy(addressLine1=it) }
+                CheckoutField("Address Line 2 (optional)", address.addressLine2) { address = address.copy(addressLine2=it) }
+                CheckoutField("Landmark (optional)", address.landmark) { address = address.copy(landmark=it) }
+                CheckoutField("City", address.city) { address = address.copy(city=it) }; CheckoutField("District", address.district) { address = address.copy(district=it) }
+                CheckoutField("State", address.state) { address = address.copy(state=it) }; CheckoutField("PIN Code", address.pincode) { address = address.copy(pincode=it.filter(Char::isDigit).take(6)) }
+            } else {
+                Text("${product.name} • ${weight.toInt()}g × $quantity", fontWeight = FontWeight.Black)
+                Text("Purity: ${product.purity} • Live Trichy rate: ${money(product.ratePerGram ?: 0.0)}/g")
+                Text("Source: ${product.rateSource ?: "Previous verified rate"} • ${product.rateDate ?: "Latest"}")
+                Text("$name • $mobile • $email"); Text("${address.addressLine1}, ${address.city}, ${address.district}, ${address.state} – ${address.pincode}, India")
+                Text("Payment method: $gateway", fontWeight = FontWeight.Bold)
+                Text("Gateway opens only after you confirm below.", style = MaterialTheme.typography.bodySmall)
+            }
+        } },
+        confirmButton = { Button({
+            if (!review) { if (valid) { error = null; review = true } else error = "Complete all required fields with a valid mobile number and six-digit PIN code." }
+            else onConfirm(ShopCheckoutRequestDto(product.productId.orEmpty(), weight, quantity, gateway, UUID.randomUUID().toString(), ShopCustomerDto(name.trim(), mobile.trim(), email.trim()), address.copy(saveAddress = address.id == null)))
+        }, enabled = review || valid) { Text(if (review) "Confirm & Pay" else "Review Order") } },
+        dismissButton = { TextButton(if (review) ({ review = false }) else onDismiss) { Text(if (review) "Edit Details" else "Cancel") } },
+    )
+}
+
+@Composable private fun CheckoutField(label: String, value: String, onValue: (String) -> Unit) {
+    OutlinedTextField(value, onValue, Modifier.fillMaxWidth(), label = { Text(label) }, singleLine = true)
 }
 
 @Composable

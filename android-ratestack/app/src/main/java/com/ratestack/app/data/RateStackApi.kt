@@ -28,6 +28,11 @@ interface RateStackApi {
         @retrofit2.http.Header("Authorization") authHeader: String,
     ): Response<ApiEnvelope<List<ShopOrderDto>>>
 
+    @GET("api/v1/me/addresses")
+    suspend fun getDeliveryAddresses(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+    ): Response<ApiEnvelope<List<ShopAddressDto>>>
+
     @GET("api/v1/payment/config")
     suspend fun getPaymentConfig(): Response<PaymentConfigDto>
 

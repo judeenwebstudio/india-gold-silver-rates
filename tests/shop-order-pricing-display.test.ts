@@ -6,7 +6,7 @@ import test from 'node:test';
 const root = process.cwd();
 
 test('website Shop customer labels hide the service percentage and show free shipping', async () => {
-  const shop = await readFile(path.join(root, 'app/(public)/shop/page.tsx'), 'utf8');
+  const shop = await readFile(path.join(root, 'components/shop/ShopCatalogue.tsx'), 'utf8');
   assert.match(shop, />Metal Value</);
   assert.match(shop, />Service Charge</);
   assert.doesNotMatch(shop, /Service Charge[^<]*(?:5%|\{product\.serviceChargePercent\})/);
@@ -44,7 +44,7 @@ test('checkout persists numeric zero shipping and returns numeric pricing fields
     'utf8',
   );
   assert.match(checkout, /shippingAmountPaise: price\.shippingAmountPaise/);
-  assert.match(checkout, /shippingAmount: Number\(price\.shippingAmountPaise\) \/ 100/);
+  assert.match(checkout, /shippingAmount: Number\(order\.shippingAmountPaise\) \/ 100/);
   assert.doesNotMatch(checkout, /shippingAmount:\s*['"]FREE['"]/);
   assert.match(migration, /"shippingAmountPaise" BIGINT NOT NULL DEFAULT 0/);
 });

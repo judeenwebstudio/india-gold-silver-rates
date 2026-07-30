@@ -10,18 +10,6 @@ type Product = {
   imageUrl: string | null; weights: number[]; enabled: boolean; ratePerGram: number;
   prices: Record<string, Price>;
 };
-declare global { interface Window { Razorpay?: new (options: Record<string, unknown>) => { open(): void } } }
-
-async function loadRazorpay() {
-  if (window.Razorpay) return;
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Unable to load Razorpay."));
-    document.head.appendChild(script);
-  });
-}
 
 function ProductImage({ product }: { product: Product }) {
   const fallback = product.metalType === "GOLD" ? "/products/gold-22k-coin.webp" : "/products/silver-coin.webp";
@@ -53,43 +41,14 @@ export function ShopCatalogue({ embedded = false }: { embedded?: boolean }) {
     }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Shop is temporarily unavailable."));
   }, []);
 
-  async function buy(product: Product) {
+  function buy(product: Product) {
     if (busy) return;
     const token = localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token");
     if (!token) { setAuthOpen(true); return; }
     const selection = selections[product.id];
     if (!selection) return;
-    setBusy(product.id); setError("");
-    try {
-      const response = await fetch("/api/v1/shop/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ productId: product.id, weightGrams: selection.weight, quantity: selection.quantity }),
-      });
-      const body = await response.json();
-      if (!response.ok || !body.success) throw new Error(body.error?.message || "Checkout failed.");
-      const order = body.data;
-      if (order.gateway === "PHONEPE") {
-        if (!order.redirectUrl) throw new Error("PhonePe is unavailable.");
-        window.location.assign(order.redirectUrl); return;
-      }
-      await loadRazorpay();
-      new window.Razorpay!({
-        key: order.keyId, order_id: order.gatewayOrderId, amount: Math.round(order.amount * 100), currency: order.currency,
-        name: "RateStack Shop", description: `${product.name} — ${selection.weight}g`,
-        handler: async (result: Record<string, string>) => {
-          const verification = await fetch("/api/v1/shop/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ shopOrderId: order.shopOrderId, gatewayPaymentId: result.razorpay_payment_id, gatewaySignature: result.razorpay_signature }),
-          });
-          const verified = await verification.json();
-          window.location.href = verified.success ? "/shop/orders" : "/shop";
-        },
-      }).open();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Checkout failed.");
-    } finally { setBusy(""); }
+    setBusy(product.id);
+    window.location.assign(`/shop/checkout?productId=${encodeURIComponent(product.id)}&weight=${selection.weight}&quantity=${selection.quantity}`);
   }
 
   return <section id={embedded ? "shop-catalogue" : undefined} className={embedded ? "bg-[#fbfaf7] py-14 sm:py-20" : undefined} aria-labelledby={embedded ? "home-shop-heading" : "shop-heading"}>
@@ -118,7 +77,7 @@ export function ShopCatalogue({ embedded = false }: { embedded?: boolean }) {
             {price && <div className="space-y-2 rounded-2xl bg-stone-950 p-4 text-sm text-white">
               <div className="flex justify-between"><span>Metal Value</span><span>₹{price.metalValue.toLocaleString("en-IN")}</span></div><div className="flex justify-between"><span>Service Charge</span><span>₹{price.serviceCharge.toLocaleString("en-IN")}</span></div><div className="flex justify-between"><span>GST (3%)</span><span>₹{price.gst.toLocaleString("en-IN")}</span></div><div className="flex justify-between"><span>Shipping Cost</span><span className="font-black text-emerald-300">{price.shipping === 0 ? "FREE" : `₹${price.shipping.toLocaleString("en-IN")}`}</span></div><div className="flex justify-between border-t border-stone-700 pt-3 text-lg font-black text-amber-300"><span>Total Payable</span><span>₹{price.total.toLocaleString("en-IN")}</span></div>
             </div>}
-            <button onClick={() => buy(product)} disabled={Boolean(busy) || !product.enabled} className="premium-buy-button flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-black text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-600 disabled:cursor-not-allowed disabled:opacity-60" aria-busy={busy === product.id}>{busy === product.id ? "Preparing secure payment…" : "Buy Now"}</button>
+            <button onClick={() => buy(product)} disabled={Boolean(busy) || !product.enabled} className="premium-buy-button flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-black text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-600 disabled:cursor-not-allowed disabled:opacity-60" aria-busy={busy === product.id}>{busy === product.id ? "Opening checkout…" : "Buy Now"}</button>
           </div>
         </article>;
       })}</div>

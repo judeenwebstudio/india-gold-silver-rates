@@ -34,7 +34,7 @@ test('metadata declares favicons, touch icon, manifest, Open Graph and Twitter i
 });
 
 test('Shop uses bundled coin fallbacks without changing pricing logic', async () => {
-  const shop = await readFile(path.join(root, 'app/(public)/shop/page.tsx'), 'utf8');
+  const shop = await readFile(path.join(root, 'components/shop/ShopCatalogue.tsx'), 'utf8');
   assert.match(shop, /gold-22k-coin\.webp/);
   assert.match(shop, /silver-coin\.webp/);
   assert.match(shop, /object-contain/);
@@ -58,10 +58,10 @@ test('Android Shop keeps both backend product images compact and contained', asy
 });
 
 test('Shop premium effects preserve dimensions, loading safety and reduced motion', async () => {
-  const shop = await readFile(path.join(root, 'app/(public)/shop/page.tsx'), 'utf8');
+  const shop = await readFile(path.join(root, 'components/shop/ShopCatalogue.tsx'), 'utf8');
   const styles = await readFile(path.join(root, 'app/globals.css'), 'utf8');
   assert.match(shop, /if \(busy\) return/);
-  assert.match(shop, /disabled=\{Boolean\(busy\)\}/);
+  assert.match(shop, /disabled=\{Boolean\(busy\) \|\| !product\.enabled\}/);
   assert.match(shop, /aria-busy/);
   assert.match(shop, /premium-buy-button/);
   assert.match(shop, /shop-product-card/);
@@ -72,12 +72,12 @@ test('Shop premium effects preserve dimensions, loading safety and reduced motio
 });
 
 test('Shop uses the compact premium live-rate hero', async () => {
-  const shop = await readFile(path.join(root, 'app/(public)/shop/page.tsx'), 'utf8');
+  const shop = await readFile(path.join(root, 'components/shop/ShopCatalogue.tsx'), 'utf8');
   const styles = await readFile(path.join(root, 'app/globals.css'), 'utf8');
   assert.match(shop, /Buy Certified/);
   assert.match(shop, /Gold &amp; Silver Coins/);
   assert.match(shop, /at Live Trichy Rates/);
-  assert.match(shop, /same live \{location === "Trichy" \? "Tiruchirappalli" : location\} rate/);
+  assert.match(shop, /current \{location === "Trichy" \? "Tiruchirappalli" : location\} market rate/);
   assert.doesNotMatch(shop, />Direct Coin Purchase</);
   assert.doesNotMatch(shop, />RateStack Shop</);
   assert.match(styles, /\.shop-hero-gold/);

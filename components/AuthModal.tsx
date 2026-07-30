@@ -286,7 +286,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectT
         <div className="flex justify-between items-center border-b border-stone-800 pb-4">
           <div>
             <span className="text-xs font-bold text-amber-400 uppercase tracking-widest block">
-              RateStack Scheme Portal
+              RateStack Customer Account
             </span>
             <h2 className="font-display text-xl font-bold text-stone-100 mt-1">
               {mode === "login" && "Customer Account Login"}

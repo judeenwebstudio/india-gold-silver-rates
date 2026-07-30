@@ -17,11 +17,11 @@ test('website Shop customer labels hide the service percentage and show free shi
 });
 
 test('My Orders and invoice summary use the required pricing wording', async () => {
-  const orders = await readFile(path.join(root, 'app/(public)/shop/orders/page.tsx'), 'utf8');
+  const orders = await readFile(path.join(root, 'components/customer/CustomerDashboard.tsx'), 'utf8');
   for (const label of ['Metal Value', 'Service Charge', 'GST (3%)', 'Shipping Cost', 'Total Payable']) {
     assert.match(orders, new RegExp(`>${label.replace(/[()]/g, '\\$&')}<`));
   }
-  assert.match(orders, /o\.shippingAmount === 0 \? "FREE"/);
+  assert.match(orders, /order\.shipping===0\?"FREE"/);
   assert.doesNotMatch(orders, /Service Charge[^<]*5%/);
 });
 

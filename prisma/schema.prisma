@@ -483,12 +483,21 @@ model ShopOrder {
   failureCode                String?
   failureMessage             String?
   paidAt                     DateTime?
+  courierPartner             String?
+  trackingNumber             String?
+  shipmentStatus             String?
+  expectedDeliveryAt         DateTime?
+  shipmentTimelineJson       Json?
+  shiprocketOrderId          String?
+  shiprocketShipmentId       String?
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 
   @@index([userId, createdAt])
   @@index([gatewayOrderId])
   @@index([paymentStatus, orderStatus])
+  @@index([trackingNumber])
+  @@index([shipmentStatus])
 }
 
 model DeliveryAddress {

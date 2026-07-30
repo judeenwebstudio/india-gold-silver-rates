@@ -10,10 +10,10 @@ const shop = read('android-ratestack/app/src/main/java/com/ratestack/app/ui/shop
 const api = read('android-ratestack/app/src/main/java/com/ratestack/app/data/RateStackApi.kt');
 const gradle = read('android-ratestack/app/build.gradle.kts');
 
-test('Android primary navigation uses native Shop and My Orders', () => {
+test('Android primary navigation uses native Shop and customer Dashboard', () => {
   assert.match(app, /com\.ratestack\.app\.ui\.shop\.NativeShopScreen/);
   assert.match(app, /com\.ratestack\.app\.ui\.shop\.MyOrdersScreen/);
-  assert.match(app, /BottomItem\(Routes\.MY_ORDERS, "My Orders"/);
+  assert.match(app, /BottomItem\(Routes\.MY_ORDERS, "Dashboard"/);
   assert.doesNotMatch(app, /BottomItem\(Routes\.FAVORITES, "Favorites"/);
   assert.doesNotMatch(app, /com\.ratestack\.app\.ui\.schemes\.ShopLandingScreen\(/);
 });

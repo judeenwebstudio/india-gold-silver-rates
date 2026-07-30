@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -196,8 +197,7 @@ fun RateStackApp(
                 NavigationBar {
                     BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
                     BottomItem(Routes.SCHEMES, "Shop", Icons.Default.Star, currentRoute, navController)
-                    BottomItem(Routes.MY_ORDERS, "My Orders", Icons.Default.ShoppingCart, currentRoute, navController)
-                    BottomItem(Routes.SETTINGS, "Settings", Icons.Default.Settings, currentRoute, navController)
+                    BottomItem(Routes.MY_ORDERS, "Dashboard", Icons.Default.Person, currentRoute, navController)
                 }
             },
         ) { padding ->
@@ -495,28 +495,11 @@ fun RateStackApp(
                 }
 
                 composable(Routes.CUSTOMER_PROFILE) {
-                    val userName by schemeViewModel.userName.collectAsState()
-                    val userPhone by schemeViewModel.userPhone.collectAsState()
-                    val mySchemesState by schemeViewModel.mySchemes.collectAsState()
-                    val customerProfile by schemeViewModel.customerProfile.collectAsState()
-                    val schemesList = (mySchemesState as? LoadState.Ready)?.data ?: emptyList()
-                    LaunchedEffect(Unit) { schemeViewModel.loadCustomerProfile() }
-
-                    com.ratestack.app.ui.schemes.CustomerProfileScreen(
-                        userName = userName,
-                        userPhone = userPhone,
-                        googleConnected = customerProfile?.googleConnected == true,
-                        googleEmail = customerProfile?.googleEmail,
-                        totalSchemesCount = schemesList.size,
-                        onConnectGoogle = { schemeViewModel.connectGoogleAccount(it) },
-                        onDisconnectGoogle = { schemeViewModel.disconnectGoogleAccount() },
-                        onLogoutClick = {
-                            schemeViewModel.logout()
-                            navController.navigate(Routes.SCHEMES) {
-                                popUpTo(Routes.CUSTOMER_PROFILE) { inclusive = true }
-                            }
+                    LaunchedEffect(Unit) {
+                        navController.navigate(Routes.MY_ORDERS) {
+                            popUpTo(Routes.CUSTOMER_PROFILE) { inclusive = true }
                         }
-                    )
+                    }
                 }
 
                 composable(Routes.STATES) {
@@ -563,6 +546,8 @@ fun RateStackApp(
                         onLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
                         onRegister = { navController.navigate(Routes.CUSTOMER_REGISTER) },
                         onGoogleLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                        onLogout = { schemeViewModel.logout() },
+                        onShop = { navController.navigate(Routes.SCHEMES) },
                     )
                 }
                 composable(Routes.SETTINGS) {
@@ -577,7 +562,7 @@ fun RateStackApp(
                         openExternal = onOpenExternal,
                         onShare = onShare,
                         onRateApp = onRateApp,
-                        onProfileClick = { navController.navigate(Routes.CUSTOMER_PROFILE) },
+                        onProfileClick = { navController.navigate(Routes.MY_ORDERS) },
                         onLogoutClick = { schemeViewModel.logout() },
                         onLoginClick = { navController.navigate(Routes.CUSTOMER_LOGIN) },
                         onRegisterClick = { navController.navigate(Routes.CUSTOMER_REGISTER) },
@@ -1416,8 +1401,8 @@ private fun SettingsScreen(
                 item {
                     SettingsCategoryCard(title = "Customer Account") {
                         SettingTile(
-                            title = "Profile (${userName ?: "Customer"})",
-                            subtitle = "View your coin orders and account details",
+                            title = "My Dashboard (${userName ?: "Customer"})",
+                            subtitle = "Orders, addresses, payments and account details",
                             icon = Icons.Default.Info,
                             onClick = onProfileClick,
                         )
@@ -1740,7 +1725,7 @@ private fun routeTitle(route: String?): String = when {
     route?.startsWith("cities") == true -> "Select City"
     route?.startsWith("rates") == true -> "Rate Details"
     route == Routes.FAVORITES -> "Favorites"
-    route == Routes.MY_ORDERS -> "My Orders"
+    route == Routes.MY_ORDERS -> "My Dashboard"
     route == Routes.SCHEMES -> "Shop"
     route == Routes.SETTINGS -> "Settings"
     else -> "RateStack"

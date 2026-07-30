@@ -5,7 +5,7 @@ import { createMockPaymentOrder } from '../../lib/schemes/mock-gateway';
 test('mock-gateway: forbid mock gateway in production environment', () => {
   const originalEnv = process.env.NODE_ENV;
   try {
-    process.env.NODE_ENV = 'production';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
     assert.throws(
       () => {
         createMockPaymentOrder({
@@ -19,6 +19,6 @@ test('mock-gateway: forbid mock gateway in production environment', () => {
       }
     );
   } finally {
-    process.env.NODE_ENV = originalEnv;
+    (process.env as Record<string, string | undefined>).NODE_ENV = originalEnv;
   }
 });

@@ -514,6 +514,24 @@ data class ShopOrderDto(
     val quantity: Int?, val total: Double?, val paymentStatus: String?, val orderStatus: String?,
     val invoiceNumber: String?, val createdAt: String?,
 )
+data class DashboardCustomerDto(val fullName:String?,val phone:String?,val email:String?,val emailVerified:Boolean?,val mobileVerified:Boolean?,val googleConnected:Boolean?,val memberSince:String?)
+data class DashboardSummaryDto(val totalOrders:Int?,val paidOrders:Int?,val activeShipments:Int?,val totalSpent:Double?)
+data class DashboardTimelineDto(val label:String?,val at:String?)
+data class DashboardShipmentDto(val courierPartner:String?,val trackingNumber:String?,val status:String?,val expectedDelivery:String?,val timeline:List<DashboardTimelineDto>?,val trackingUrl:String?)
+data class DashboardOrderDto(
+    val id:String?,val orderNumber:String?,val productId:String?,val productName:String?,val imageUrl:String?,val metalType:String?,val purity:String?,
+    val weightGrams:Double?,val quantity:Int?,val metalValue:Double?,val serviceCharge:Double?,val gst:Double?,val shipping:Double?,val total:Double?,
+    val gateway:String?,val paymentStatus:String?,val orderStatus:String?,val paymentId:String?,val invoiceNumber:String?,val createdAt:String?,
+    val deliveryAddress:ShopAddressDto?,val shipment:DashboardShipmentDto?,
+)
+data class DashboardPaymentDto(val orderNumber:String?,val gateway:String?,val paymentId:String?,val status:String?,val amount:Double?,val date:String?)
+data class DashboardRewardDto(val points:Int?,val tier:String?,val message:String?)
+data class DashboardNotificationDto(val id:String?,val title:String?,val date:String?)
+data class CustomerDashboardDto(
+    val customer:DashboardCustomerDto?,val summary:DashboardSummaryDto?,val orders:List<DashboardOrderDto>?,
+    val addresses:List<ShopAddressDto>?,val paymentHistory:List<DashboardPaymentDto>?,val rewards:DashboardRewardDto?,
+    val notifications:List<DashboardNotificationDto>?,val wishlist:List<Map<String,Any>>?,
+)
 
 sealed interface PaymentActionState {
     object Idle : PaymentActionState

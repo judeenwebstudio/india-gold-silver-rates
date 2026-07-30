@@ -1,15 +1,7 @@
-"use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { AuthModal } from "@/components/AuthModal";
+import { Header } from "@/components/Header";
+import { CustomerDashboard } from "@/components/customer/CustomerDashboard";
 
-type Order = { id: string; orderNumber: string; product: string; weightGrams: number; quantity: number; rateUsed: number; metalValue: number; serviceCharge: number; gst: number; shippingAmount: number; total: number; gateway: string; transactionId: string | null; paymentStatus: string; orderStatus: string; invoiceNumber: string | null; createdAt: string };
-export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [login, setLogin] = useState(false);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => { const token = localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token"); if (!token) { Promise.resolve().then(() => { setLogin(true); setLoading(false); }); return; } fetch("/api/v1/me/orders", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).then((b) => setOrders(b.data || [])).finally(() => setLoading(false)); }, []);
-  return <div className="min-h-screen bg-[#fbfaf7]"><Header/><main className="mx-auto max-w-6xl px-4 py-12"><div className="flex items-end justify-between"><div><h1 className="text-3xl font-black">My Orders</h1><p className="text-stone-600">Direct gold and silver coin purchases.</p></div><Link href="/shop" className="rounded-xl bg-amber-500 px-4 py-3 font-bold">Continue Shopping</Link></div>{loading ? <p className="py-20 text-center">Loading orders…</p> : orders.length === 0 ? <div className="my-10 rounded-2xl border bg-white p-10 text-center">No shop orders yet.</div> : <div className="mt-8 space-y-4">{orders.map((o) => <article key={o.id} className="rounded-2xl border bg-white p-5 shadow-sm"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-black">{o.product} · {o.weightGrams}g × {o.quantity}</h2><p className="text-xs text-stone-500">{o.orderNumber} · {new Date(o.createdAt).toLocaleString("en-IN")}</p></div><div className="text-right"><p className="font-black text-amber-800">₹{o.total.toLocaleString("en-IN")}</p><p className="text-xs font-bold">{o.paymentStatus} · {o.orderStatus}</p></div></div><div className="mt-4 grid gap-5 border-t pt-4 text-sm md:grid-cols-2"><div className="space-y-1 text-stone-600"><p>Trichy rate: ₹{o.rateUsed}/g</p><p>Gateway: {o.gateway}</p><p>Transaction: {o.transactionId || "Pending"}</p><p>Invoice: {o.invoiceNumber || "Pending"}</p></div><div className="space-y-2 rounded-xl bg-stone-50 p-4"><div className="flex justify-between"><span>Metal Value</span><span>₹{o.metalValue.toLocaleString("en-IN")}</span></div><div className="flex justify-between"><span>Service Charge</span><span>₹{o.serviceCharge.toLocaleString("en-IN")}</span></div><div className="flex justify-between"><span>GST (3%)</span><span>₹{o.gst.toLocaleString("en-IN")}</span></div><div className="flex justify-between"><span>Shipping Cost</span><span className="font-black text-emerald-700">{o.shippingAmount === 0 ? "FREE" : `₹${o.shippingAmount.toLocaleString("en-IN")}`}</span></div><div className="flex justify-between border-t pt-2 font-black"><span>Total Payable</span><span>₹{o.total.toLocaleString("en-IN")}</span></div></div></div></article>)}</div>}</main><Footer/>{login && <AuthModal initialMode="login" redirectTo="/shop/orders" onClose={() => setLogin(false)} onSuccess={() => setLogin(false)}/>}</div>;
+export default function Page() {
+  return <div className="min-h-screen bg-[#0f0d0b] text-stone-100"><Header/><CustomerDashboard/><Footer/></div>;
 }

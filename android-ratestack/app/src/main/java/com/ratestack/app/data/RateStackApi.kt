@@ -1,5 +1,6 @@
 package com.ratestack.app.data
 
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.DELETE
@@ -27,6 +28,17 @@ interface RateStackApi {
     suspend fun getShopOrders(
         @retrofit2.http.Header("Authorization") authHeader: String,
     ): Response<ApiEnvelope<List<ShopOrderDto>>>
+
+    @GET("api/v1/me/dashboard")
+    suspend fun getCustomerDashboard(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+    ): Response<ApiEnvelope<CustomerDashboardDto>>
+
+    @GET("api/v1/me/orders/{orderId}/invoice")
+    suspend fun downloadShopInvoice(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Path("orderId") orderId: String,
+    ): Response<ResponseBody>
 
     @GET("api/v1/me/addresses")
     suspend fun getDeliveryAddresses(

@@ -133,7 +133,7 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
             val auth = "Bearer $token"
             profile = ApiProvider.service.getCustomerProfile(auth).body()?.data ?: profile
             saved = ApiProvider.service.getDeliveryAddresses(auth).body()?.data.orEmpty()
-            ApiProvider.service.getGstProfile(auth).body()?.data?.let { gstEnabled=it.isActive==true;gstBusiness=it.businessName.orEmpty();gstNumber=it.gstNumber.orEmpty();gstAddress=it.billingAddress.orEmpty() }
+            ApiProvider.service.getGstProfile(auth).body()?.data?.let { gstEnabled=false;gstBusiness=it.businessName.orEmpty();gstNumber=it.gstNumber.orEmpty();gstAddress=it.billingAddress.orEmpty() }
         }.onSuccess {
             name = profile.fullName.orEmpty(); mobile = profile.phone.orEmpty(); email = profile.email.orEmpty()
             address = saved.firstOrNull { it.isDefault == true } ?: saved.firstOrNull()
@@ -200,9 +200,9 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
                     val result = ApiProvider.service.updateDeliveryAddress("Bearer $token", address.id.orEmpty(), address)
                     result.body()?.data?.let { updated -> saved = saved.map { if (it.id == updated.id) updated else it }; address = updated }
                 } }) { Text("Edit / Save Address") }
-                Text("Business Purchase (GST Invoice Required?)",fontWeight=FontWeight.Black)
-                Text("Do you have a GST Number?")
-                Row(verticalAlignment=Alignment.CenterVertically){RadioButton(gstEnabled,{gstEnabled=true});Text("Yes");RadioButton(!gstEnabled,{gstEnabled=false});Text("No")}
+                Text("3. GST Billing Details",fontWeight=FontWeight.Black)
+                Text("GST Invoice Required?")
+                Row(verticalAlignment=Alignment.CenterVertically){RadioButton(!gstEnabled,{gstEnabled=false});Text("No");RadioButton(gstEnabled,{gstEnabled=true});Text("Yes")}
                 if(gstEnabled){CheckoutField("GST Registered Business Name",gstBusiness){gstBusiness=it.take(150)};Row(verticalAlignment=Alignment.CenterVertically){Checkbox(gstSameAsDelivery,{gstSameAsDelivery=it});Text("Billing Address same as Delivery Address")};OutlinedTextField(if(gstSameAsDelivery)deliveryBillingAddress else gstAddress,{gstAddress=it.take(500);gstSameAsDelivery=false},Modifier.fillMaxWidth(),label={Text("GST Billing Address")},minLines=3);CheckoutField("GST Number",gstNumber){gstNumber=it.trim().uppercase(Locale.ENGLISH).take(15)};if(gstNumber.isNotEmpty()&&!gstValid)Text("Enter a valid 15-character GSTIN.",color=MaterialTheme.colorScheme.error)}
             } else {
                 Text("${product.name} • ${weight.toInt()}g × $quantity", fontWeight = FontWeight.Black)
@@ -215,7 +215,7 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
             }
         } },
         confirmButton = { Button({
-            if (!review) { if (valid) { error = null; review = true } else error = "Complete all required fields with a valid mobile number and six-digit PIN code." }
+            if (!review) { if (valid) { error = null; review = true } else error = if(gstEnabled&&!gstValid)"Complete all required GST billing fields and enter a valid 15-character GSTIN." else "Complete all required fields with a valid mobile number and six-digit PIN code." }
             else checkoutScope.launch {
                 var selected = address
                 if (address.id == null && (saveFuture || saved.isEmpty())) {

@@ -494,13 +494,13 @@ data class ShopPriceDto(
 
 data class ShopCustomerDto(val fullName: String, val mobile: String, val email: String)
 data class ShopAddressDto(
-    val id: String? = null, val addressLine1: String, val addressLine2: String = "", val landmark: String = "",
+    val id: String? = null, val fullName: String, val mobile: String, val addressLine1: String, val addressLine2: String = "", val landmark: String = "",
     val city: String, val district: String, val state: String, val pincode: String, val country: String = "India",
     val addressType: String = "HOME", val isDefault: Boolean? = null, val saveAddress: Boolean = false,
 )
 data class ShopCheckoutRequestDto(
     val productId: String, val weightGrams: Double, val quantity: Int, val gateway: String,
-    val idempotencyKey: String, val customer: ShopCustomerDto, val address: ShopAddressDto,
+    val idempotencyKey: String, val customer: ShopCustomerDto, val addressId: String? = null, val newAddress: ShopAddressDto? = null,
 )
 data class ShopCheckoutDto(
     val shopOrderId: String?, val orderNumber: String?, val gateway: String?,

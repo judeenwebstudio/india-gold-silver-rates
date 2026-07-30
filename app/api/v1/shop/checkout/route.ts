@@ -15,14 +15,16 @@ const schema = z.object({
     mobile: z.string().trim().regex(/^(?:\+91)?[6-9]\d{9}$/, 'Enter a valid Indian mobile number.'),
     email: z.string().trim().email(),
   }),
-  address: z.object({
+  addressId: z.string().min(1).optional(),
+  newAddress: z.object({
+    fullName: z.string().trim().min(2).max(100),
+    mobile: z.string().trim().regex(/^(?:\+91)?[6-9]\d{9}$/),
     addressLine1: z.string().trim().min(3).max(200), addressLine2: z.string().trim().max(200).optional().default(''),
     landmark: z.string().trim().max(120).optional().default(''), city: z.string().trim().min(2).max(100),
     district: z.string().trim().min(2).max(100), state: z.string().trim().min(2).max(100),
-    pincode: z.string().regex(/^[1-9]\d{5}$/, 'Enter a valid six-digit Indian PIN code.'),
-    country: z.literal('India'), addressType: z.enum(['HOME', 'OFFICE', 'OTHER']), saveAddress: z.boolean().optional().default(false),
-  }),
-});
+    pincode: z.string().regex(/^[1-9]\d{5}$/, 'Enter a valid six-digit Indian PIN code.'), country: z.literal('India'), addressType: z.enum(['HOME', 'OFFICE', 'OTHER']),
+  }).optional(),
+}).refine((value) => Boolean(value.addressId) !== Boolean(value.newAddress), { message: 'Select one valid delivery address.' });
 
 export async function POST(request: Request) {
   const authUser = await authenticateSchemeUserFromRequest(request);
@@ -32,6 +34,10 @@ export async function POST(request: Request) {
   const existing = await prisma.shopOrder.findUnique({ where: { idempotencyKey: parsed.data.idempotencyKey } });
   if (existing && existing.userId !== authUser.userId) return NextResponse.json({ success: false, error: { message: 'Invalid checkout request.' } }, { status: 409 });
   if (existing?.gatewayOrderId) return shopOrderResponse(existing);
+  const selectedAddress = parsed.data.addressId
+    ? await prisma.deliveryAddress.findFirst({ where: { id: parsed.data.addressId, userId: authUser.userId } })
+    : parsed.data.newAddress;
+  if (!selectedAddress) return NextResponse.json({ success: false, error: { code: 'ADDRESS_NOT_FOUND', message: 'Select a valid delivery address.' } }, { status: 400 });
   const product = await prisma.shopProduct.findUnique({ where: { id: parsed.data.productId } });
   if (!product?.isActive) return NextResponse.json({ success: false, error: { message: 'Product is unavailable.' } }, { status: 404 });
   const weights = product.availableWeightsGramsJson as number[];
@@ -54,10 +60,10 @@ export async function POST(request: Request) {
       serviceChargePaise: price.serviceChargePaise, gstBasisPoints: product.gstBasisPoints, gstPaise: price.gstPaise,
       shippingAmountPaise: price.shippingAmountPaise, totalAmountPaise: price.totalPaise,
       customerName: parsed.data.customer.fullName, customerPhone: parsed.data.customer.mobile, customerEmail: parsed.data.customer.email,
-      addressLine1: parsed.data.address.addressLine1, addressLine2: parsed.data.address.addressLine2 || null,
-      landmark: parsed.data.address.landmark || null, deliveryCity: parsed.data.address.city,
-      deliveryDistrict: parsed.data.address.district, deliveryState: parsed.data.address.state,
-      deliveryPincode: parsed.data.address.pincode, deliveryCountry: 'India', addressType: parsed.data.address.addressType,
+      addressLine1: selectedAddress.addressLine1, addressLine2: selectedAddress.addressLine2 || null,
+      landmark: selectedAddress.landmark || null, deliveryCity: selectedAddress.city,
+      deliveryDistrict: selectedAddress.district, deliveryState: selectedAddress.state,
+      deliveryPincode: selectedAddress.pincode, deliveryCountry: selectedAddress.country, addressType: selectedAddress.addressType,
       gateway, paymentStatus: 'PENDING', orderStatus: 'PAYMENT_PENDING',
     },
   });
@@ -82,15 +88,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: { code: 'PAYMENT_INITIATION_FAILED', message: 'Order saved. Payment could not be started; please retry.' }, data: { shopOrderId: order.id, orderNumber } }, { status: 502 });
   }
   const updated = await prisma.shopOrder.update({ where: { id: order.id }, data: { gatewayOrderId } });
-  if (parsed.data.address.saveAddress) {
-    const count = await prisma.deliveryAddress.count({ where: { userId: authUser.userId } });
-    await prisma.deliveryAddress.create({ data: {
-      userId: authUser.userId, addressLine1: parsed.data.address.addressLine1,
-      addressLine2: parsed.data.address.addressLine2 || null, landmark: parsed.data.address.landmark || null,
-      city: parsed.data.address.city, district: parsed.data.address.district, state: parsed.data.address.state,
-      pincode: parsed.data.address.pincode, country: 'India', addressType: parsed.data.address.addressType, isDefault: count === 0,
-    } });
-  }
   return shopOrderResponse(updated, redirectUrl);
 }
 

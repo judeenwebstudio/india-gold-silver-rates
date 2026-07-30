@@ -27,6 +27,14 @@ export async function DELETE(request: Request, context: { params: Promise<{ addr
   const { addressId } = await context.params;
   const record = await owned(request, addressId);
   if (!record) return NextResponse.json({ success: false, error: { message: "Address not found." } }, { status: 404 });
-  await prisma.deliveryAddress.delete({ where: { id: addressId } });
+  const count = await prisma.deliveryAddress.count({ where: { userId: record.auth.userId } });
+  if (count <= 1) return NextResponse.json({ success: false, error: { code: "LAST_ADDRESS", message: "Add another valid address before deleting your only saved address." } }, { status: 409 });
+  await prisma.$transaction(async (tx) => {
+    await tx.deliveryAddress.delete({ where: { id: addressId } });
+    if (record.address.isDefault) {
+      const replacement = await tx.deliveryAddress.findFirst({ where: { userId: record.auth.userId }, orderBy: { updatedAt: "desc" } });
+      if (replacement) await tx.deliveryAddress.update({ where: { id: replacement.id }, data: { isDefault: true } });
+    }
+  });
   return NextResponse.json({ success: true });
 }

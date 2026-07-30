@@ -34,7 +34,7 @@ test("pending order and idempotent retry precede gateway initiation", () => {
 });
 
 test("website contains details, saved address, review and final payment steps", () => {
-  for (const wording of ["Customer Details", "Delivery Address", "Order Review", "Payment", "Saved address", "Confirm & Pay"]) assert.match(checkout, new RegExp(wording));
+  for (const wording of ["Customer Details", "Delivery Address", "Order Review", "Payment", "Saved Address", "Confirm & Pay"]) assert.match(checkout, new RegExp(wording));
 });
 
 test("Android reviews details before launching payment", () => {

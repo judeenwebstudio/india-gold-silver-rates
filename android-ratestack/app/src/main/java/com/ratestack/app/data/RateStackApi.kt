@@ -33,6 +33,31 @@ interface RateStackApi {
         @retrofit2.http.Header("Authorization") authHeader: String,
     ): Response<ApiEnvelope<List<ShopAddressDto>>>
 
+    @POST("api/v1/me/addresses")
+    suspend fun createDeliveryAddress(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Body request: ShopAddressDto,
+    ): Response<ApiEnvelope<ShopAddressDto>>
+
+    @retrofit2.http.PUT("api/v1/me/addresses/{addressId}")
+    suspend fun updateDeliveryAddress(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Path("addressId") addressId: String,
+        @retrofit2.http.Body request: ShopAddressDto,
+    ): Response<ApiEnvelope<ShopAddressDto>>
+
+    @DELETE("api/v1/me/addresses/{addressId}")
+    suspend fun deleteDeliveryAddress(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Path("addressId") addressId: String,
+    ): Response<ApiEnvelope<Map<String, String>>>
+
+    @POST("api/v1/me/addresses/{addressId}/default")
+    suspend fun setDefaultDeliveryAddress(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Path("addressId") addressId: String,
+    ): Response<ApiEnvelope<ShopAddressDto>>
+
     @GET("api/v1/payment/config")
     suspend fun getPaymentConfig(): Response<PaymentConfigDto>
 

@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { authenticateSchemeUserFromRequest } from "@/lib/schemes/user-auth";
 
 export const addressSchema = z.object({
+  fullName: z.string().trim().min(2).max(100),
+  mobile: z.string().trim().regex(/^(?:\+91)?[6-9]\d{9}$/, "Enter a valid Indian mobile number."),
   addressLine1: z.string().trim().min(3).max(200),
   addressLine2: z.string().trim().max(200).optional().default(""),
   landmark: z.string().trim().max(120).optional().default(""),
@@ -30,9 +32,13 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ success: false, error: { message: parsed.error.issues[0]?.message || "Invalid address." } }, { status: 400 });
   const count = await prisma.deliveryAddress.count({ where: { userId: auth.userId } });
   const makeDefault = parsed.data.isDefault || count === 0;
-  const address = await prisma.$transaction(async (tx) => {
-    if (makeDefault) await tx.deliveryAddress.updateMany({ where: { userId: auth.userId }, data: { isDefault: false } });
-    return tx.deliveryAddress.create({ data: { ...parsed.data, isDefault: makeDefault, userId: auth.userId } });
-  });
-  return NextResponse.json({ success: true, data: address }, { status: 201 });
+  try {
+    const address = await prisma.$transaction(async (tx) => {
+      if (makeDefault) await tx.deliveryAddress.updateMany({ where: { userId: auth.userId }, data: { isDefault: false } });
+      return tx.deliveryAddress.create({ data: { ...parsed.data, isDefault: makeDefault, userId: auth.userId } });
+    });
+    return NextResponse.json({ success: true, data: address }, { status: 201 });
+  } catch {
+    return NextResponse.json({ success: false, error: { code: "ADDRESS_SAVE_FAILED", message: "The address could not be saved. Please try again." } }, { status: 409 });
+  }
 }

@@ -122,10 +122,11 @@ fun NativeShopScreen(
 private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: Double, quantity: Int, onDismiss: () -> Unit, onConfirm: (ShopCheckoutRequestDto) -> Unit) {
     var profile by remember { mutableStateOf(CustomerProfileDto(null, null, null, null, null, null)) }
     var saved by remember { mutableStateOf<List<ShopAddressDto>>(emptyList()) }
-    var address by remember { mutableStateOf(ShopAddressDto(addressLine1="", city="", district="", state="", pincode="")) }
+    var address by remember { mutableStateOf(ShopAddressDto(fullName="", mobile="", addressLine1="", city="", district="", state="", pincode="")) }
     var name by remember { mutableStateOf("") }; var mobile by remember { mutableStateOf("") }; var email by remember { mutableStateOf("") }
     var review by remember { mutableStateOf(false) }; var error by remember { mutableStateOf<String?>(null) }
-    var gateway by remember { mutableStateOf("RAZORPAY") }
+    var gateway by remember { mutableStateOf("RAZORPAY") }; var saveFuture by remember { mutableStateOf(true) }; var makeDefault by remember { mutableStateOf(false) }
+    val checkoutScope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         runCatching {
             val auth = "Bearer $token"
@@ -133,12 +134,14 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
             saved = ApiProvider.service.getDeliveryAddresses(auth).body()?.data.orEmpty()
         }.onSuccess {
             name = profile.fullName.orEmpty(); mobile = profile.phone.orEmpty(); email = profile.email.orEmpty()
-            saved.firstOrNull()?.let { address = it }
+            address = saved.firstOrNull { it.isDefault == true } ?: saved.firstOrNull()
+                ?: address.copy(fullName = name, mobile = mobile)
             gateway = ApiProvider.service.getPaymentConfig().body()?.activeGateway ?: "RAZORPAY"
         }
     }
     val valid = name.trim().length >= 2 && Regex("^(?:\\+91)?[6-9]\\d{9}$").matches(mobile.trim()) &&
-        android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() && address.addressLine1.trim().length >= 3 &&
+        android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() && address.fullName.trim().length >= 2 &&
+        Regex("^(?:\\+91)?[6-9]\\d{9}$").matches(address.mobile.trim()) && address.addressLine1.trim().length >= 3 &&
         address.city.isNotBlank() && address.district.isNotBlank() && address.state.isNotBlank() && Regex("^[1-9]\\d{5}$").matches(address.pincode)
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -150,15 +153,48 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
                 CheckoutField("Full Name", name) { name = it }; CheckoutField("Indian Mobile Number", mobile) { mobile = it }
                 CheckoutField("Email Address", email) { email = it }
                 if (saved.isNotEmpty()) {
-                    Text("Saved addresses", fontWeight = FontWeight.Bold)
-                    saved.forEach { item -> OutlinedButton({ address = item }, Modifier.fillMaxWidth()) { Text("${item.addressType}: ${item.addressLine1}, ${item.city}") } }
-                    OutlinedButton({ address = ShopAddressDto(addressLine1="", city="", district="", state="", pincode="") }, Modifier.fillMaxWidth()) { Text("Add a new address") }
+                    Text("Choose Delivery Address", fontWeight = FontWeight.Bold)
+                    saved.forEach { item ->
+                        Card(Modifier.fillMaxWidth(), border = BorderStroke(if (address.id == item.id) 2.dp else 1.dp, if (address.id == item.id) Color(0xFFE2AD3D) else MaterialTheme.colorScheme.outlineVariant)) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("${item.fullName} • ${item.mobile}", fontWeight = FontWeight.Black)
+                                Text("${item.addressLine1}${if (item.addressLine2.isNotBlank()) ", ${item.addressLine2}" else ""}")
+                                if (item.landmark.isNotBlank()) Text("Near ${item.landmark}")
+                                Text("${item.city}, ${item.district}, ${item.state} – ${item.pincode}")
+                                Text("${item.addressType}${if (item.isDefault == true) " • Default" else ""}", fontWeight = FontWeight.Bold)
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    TextButton({ address = item }) { Text("Deliver here") }
+                                    if (item.isDefault != true) TextButton({ checkoutScope.launch {
+                                        val result = ApiProvider.service.setDefaultDeliveryAddress("Bearer $token", item.id.orEmpty())
+                                        result.body()?.data?.let { updated -> saved = saved.map { it.copy(isDefault = it.id == updated.id) }; address = updated }
+                                    } }) { Text("Set default") }
+                                    TextButton({
+                                        if (saved.size <= 1) error = "Add another valid address before deleting your only saved address."
+                                        else checkoutScope.launch {
+                                            val result = ApiProvider.service.deleteDeliveryAddress("Bearer $token", item.id.orEmpty())
+                                            if (result.isSuccessful) { saved = saved.filterNot { it.id == item.id }; address = saved.firstOrNull { it.id != item.id } ?: address }
+                                        }
+                                    }) { Text("Delete") }
+                                }
+                            }
+                        }
+                    }
+                    OutlinedButton({ address = ShopAddressDto(fullName=name, mobile=mobile, addressLine1="", city="", district="", state="", pincode=""); saveFuture = true; makeDefault = false }, Modifier.fillMaxWidth()) { Text("Add New Delivery Address") }
                 }
+                CheckoutField("Delivery Full Name", address.fullName) { address = address.copy(fullName=it) }
+                CheckoutField("Delivery Mobile", address.mobile) { address = address.copy(mobile=it) }
                 CheckoutField("Address Line 1", address.addressLine1) { address = address.copy(addressLine1=it) }
                 CheckoutField("Address Line 2 (optional)", address.addressLine2) { address = address.copy(addressLine2=it) }
                 CheckoutField("Landmark (optional)", address.landmark) { address = address.copy(landmark=it) }
                 CheckoutField("City", address.city) { address = address.copy(city=it) }; CheckoutField("District", address.district) { address = address.copy(district=it) }
                 CheckoutField("State", address.state) { address = address.copy(state=it) }; CheckoutField("PIN Code", address.pincode) { address = address.copy(pincode=it.filter(Char::isDigit).take(6)) }
+                if (address.id == null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(saveFuture || saved.isEmpty(), { saveFuture = it }, enabled = saved.isNotEmpty()); Text("Save this address for future orders") }
+                    Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(makeDefault || saved.isEmpty(), { makeDefault = it }, enabled = saved.isNotEmpty()); Text("Make this my default address") }
+                } else OutlinedButton({ checkoutScope.launch {
+                    val result = ApiProvider.service.updateDeliveryAddress("Bearer $token", address.id.orEmpty(), address)
+                    result.body()?.data?.let { updated -> saved = saved.map { if (it.id == updated.id) updated else it }; address = updated }
+                } }) { Text("Edit / Save Address") }
             } else {
                 Text("${product.name} • ${weight.toInt()}g × $quantity", fontWeight = FontWeight.Black)
                 Text("Purity: ${product.purity} • Live Trichy rate: ${money(product.ratePerGram ?: 0.0)}/g")
@@ -170,7 +206,14 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
         } },
         confirmButton = { Button({
             if (!review) { if (valid) { error = null; review = true } else error = "Complete all required fields with a valid mobile number and six-digit PIN code." }
-            else onConfirm(ShopCheckoutRequestDto(product.productId.orEmpty(), weight, quantity, gateway, UUID.randomUUID().toString(), ShopCustomerDto(name.trim(), mobile.trim(), email.trim()), address.copy(saveAddress = address.id == null)))
+            else checkoutScope.launch {
+                var selected = address
+                if (address.id == null && (saveFuture || saved.isEmpty())) {
+                    val result = ApiProvider.service.createDeliveryAddress("Bearer $token", address.copy(isDefault = makeDefault || saved.isEmpty()))
+                    selected = result.body()?.data ?: run { error = result.body()?.error?.message ?: "Unable to save address."; return@launch }
+                }
+                onConfirm(ShopCheckoutRequestDto(product.productId.orEmpty(), weight, quantity, gateway, UUID.randomUUID().toString(), ShopCustomerDto(name.trim(), mobile.trim(), email.trim()), addressId = selected.id, newAddress = if (selected.id == null) selected else null))
+            }
         }, enabled = review || valid) { Text(if (review) "Confirm & Pay" else "Review Order") } },
         dismissButton = { TextButton(if (review) ({ review = false }) else onDismiss) { Text(if (review) "Edit Details" else "Cancel") } },
     )

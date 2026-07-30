@@ -16,8 +16,77 @@ model AdminUser {
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @default(now()) @updatedAt
+  role         AdminRole @default(ORDER_MANAGER)
+  orderNotes   AdminOrderNote[]
+  orderHistory OrderStatusHistory[]
+  trackingEvents ShipmentTrackingEvent[]
+  paymentVerifications PaymentVerification[]
+  refunds      ShopRefund[]
+  adminAuditLogs AdminAuditLog[]
 
   @@index([isActive, email])
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ORDER_MANAGER
+  FINANCE
+  FULFILLMENT
+  SUPPORT
+  VIEWER
+}
+
+enum ShopOrderStatus {
+  PAYMENT_PENDING
+  PAYMENT_FAILED
+  PAYMENT_VERIFIED
+  ORDER_CONFIRMED
+  PROCESSING
+  PACKED
+  READY_TO_SHIP
+  SHIPPED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCEL_REQUESTED
+  CANCELLED
+  RETURN_REQUESTED
+  RETURNED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum ShopShipmentStatus {
+  NOT_CREATED
+  READY_TO_SHIP
+  PICKUP_SCHEDULED
+  SHIPPED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum TrackingEventSource {
+  ADMIN
+  PAYMENT_GATEWAY
+  SHIPROCKET
+  SYSTEM
+}
+
+enum PaymentVerificationResult {
+  VERIFIED
+  FAILED
+  MANUAL_REVIEW
+}
+
+enum ShopRefundStatus {
+  NOT_REQUIRED
+  PENDING
+  PARTIALLY_REFUNDED
+  FULLY_REFUNDED
+  FAILED
 }
 
 enum MetalType {
@@ -478,26 +547,131 @@ model ShopOrder {
   gatewayPaymentId           String?
   gatewaySignature           String?
   paymentStatus              String    @default("CREATED")
-  orderStatus                String    @default("PAYMENT_PENDING")
+  orderStatus                ShopOrderStatus @default(PAYMENT_PENDING)
   invoiceNumber              String?   @unique
   failureCode                String?
   failureMessage             String?
   paidAt                     DateTime?
   courierPartner             String?
   trackingNumber             String?
-  shipmentStatus             String?
+  shipmentStatus             ShopShipmentStatus @default(NOT_CREATED)
   expectedDeliveryAt         DateTime?
+  pickupAt                   DateTime?
+  deliveredAt                DateTime?
+  publicTrackingUrl          String?
+  shipmentId                 String?
+  discountAmountPaise        BigInt @default(0)
+  cancellationReason         String?
+  cancellationPaymentCaptured Boolean?
+  cancellationRefundRequired Boolean?
+  cancellationShipmentCreated Boolean?
   shipmentTimelineJson       Json?
   shiprocketOrderId          String?
   shiprocketShipmentId       String?
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
+  statusHistory              OrderStatusHistory[]
+  trackingEvents             ShipmentTrackingEvent[]
+  adminNotes                 AdminOrderNote[]
+  paymentVerification        PaymentVerification?
+  refunds                    ShopRefund[]
 
   @@index([userId, createdAt])
   @@index([gatewayOrderId])
   @@index([paymentStatus, orderStatus])
   @@index([trackingNumber])
   @@index([shipmentStatus])
+}
+
+model OrderStatusHistory {
+  id            String              @id @default(cuid())
+  orderId       String
+  order         ShopOrder           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status        ShopOrderStatus
+  publicMessage String
+  internalNote  String?
+  source        TrackingEventSource
+  adminUserId   String?
+  adminUser     AdminUser?          @relation(fields: [adminUserId], references: [id])
+  createdAt     DateTime            @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+model ShipmentTrackingEvent {
+  id            String              @id @default(cuid())
+  orderId       String
+  order         ShopOrder           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status        String
+  publicMessage String
+  internalNote  String?
+  source        TrackingEventSource
+  adminUserId   String?
+  adminUser     AdminUser?          @relation(fields: [adminUserId], references: [id])
+  createdAt     DateTime            @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+model AdminOrderNote {
+  id          String    @id @default(cuid())
+  orderId     String
+  order       ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  body        String
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+model PaymentVerification {
+  id                  String                    @id @default(cuid())
+  orderId             String                    @unique
+  order               ShopOrder                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gateway             String
+  gatewayOrderId      String?
+  gatewayPaymentId    String?
+  verifiedAmountPaise BigInt?
+  signatureValid      Boolean?
+  result              PaymentVerificationResult
+  resultMessage       String
+  responseJson        Json?
+  adminUserId         String?
+  adminUser           AdminUser?                @relation(fields: [adminUserId], references: [id])
+  verifiedAt          DateTime                  @default(now())
+}
+
+model ShopRefund {
+  id                 String           @id @default(cuid())
+  orderId            String
+  order              ShopOrder        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amountPaise        BigInt
+  gatewayRefundId    String?
+  status             ShopRefundStatus @default(PENDING)
+  reason             String
+  initiatedAt        DateTime         @default(now())
+  completedAt        DateTime?
+  failureReason      String?
+  adminUserId        String
+  adminUser          AdminUser        @relation(fields: [adminUserId], references: [id])
+
+  @@index([orderId, initiatedAt])
+}
+
+model AdminAuditLog {
+  id           String    @id @default(cuid())
+  adminUserId  String
+  adminUser    AdminUser @relation(fields: [adminUserId], references: [id])
+  action       String
+  targetEntity String
+  targetId     String
+  detailsJson  Json?
+  ipAddress    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([targetEntity, targetId, createdAt])
+  @@index([adminUserId, createdAt])
 }
 
 model DeliveryAddress {

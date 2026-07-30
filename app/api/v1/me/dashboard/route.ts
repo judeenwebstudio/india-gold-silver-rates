@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   if (!auth) return NextResponse.json({ success: false, error: { message: "Authentication required." } }, { status: 401 });
   const [user, orders, addresses] = await Promise.all([
     prisma.schemeUser.findUnique({ where: { id: auth.userId }, include: { authAccounts: { select: { provider: true, providerEmail: true } } } }),
-    prisma.shopOrder.findMany({ where: { userId: auth.userId }, include: { product: { select: { imageUrl: true, imageMimeType: true } } }, orderBy: { createdAt: "desc" } }),
+    prisma.shopOrder.findMany({ where: { userId: auth.userId }, include: { product: { select: { imageUrl: true, imageMimeType: true } }, trackingEvents: { select: { status: true, publicMessage: true, createdAt: true }, orderBy: { createdAt: "asc" } } }, orderBy: { createdAt: "desc" } }),
     prisma.deliveryAddress.findMany({ where: { userId: auth.userId }, orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }] }),
   ]);
   if (!user) return NextResponse.json({ success: false, error: { message: "Account not found." } }, { status: 404 });
@@ -31,11 +31,11 @@ export async function GET(request: Request) {
       courierPartner: order.courierPartner, trackingNumber: order.trackingNumber,
       status: order.shipmentStatus || (order.paymentStatus === "SUCCESS" ? "Processing" : "Awaiting payment"),
       expectedDelivery: order.expectedDeliveryAt,
-      timeline: Array.isArray(order.shipmentTimelineJson) ? order.shipmentTimelineJson : [
+      timeline: order.trackingEvents.length ? order.trackingEvents.map(event => ({ label: event.publicMessage || event.status, at: event.createdAt })) : Array.isArray(order.shipmentTimelineJson) ? order.shipmentTimelineJson : [
         { label: "Order placed", at: order.createdAt },
         ...(order.paidAt ? [{ label: "Payment confirmed", at: order.paidAt }] : []),
       ],
-      trackingUrl: order.trackingNumber ? `https://shiprocket.co/tracking/${encodeURIComponent(order.trackingNumber)}` : null,
+      trackingUrl: order.publicTrackingUrl || (order.trackingNumber ? `https://shiprocket.co/tracking/${encodeURIComponent(order.trackingNumber)}` : null),
     },
   }));
   const paid = rows.filter(order => order.paymentStatus === "SUCCESS");

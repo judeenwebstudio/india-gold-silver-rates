@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 async function getDashboardMetrics() {
-  const [totalOrders, successfulOrders, pendingOrders, failedOrders, sales, goldSales, silverSales, customers, pendingShipments] = await Promise.all([
+  const now=new Date(),ist=new Date(now.getTime()+330*60_000),today=new Date(Date.UTC(ist.getUTCFullYear(),ist.getUTCMonth(),ist.getUTCDate())-330*60_000),month=new Date(Date.UTC(ist.getUTCFullYear(),ist.getUTCMonth(),1)-330*60_000);
+  const [totalOrders, successfulOrders, pendingOrders, failedOrders, sales, goldSales, silverSales, customers, pendingShipments,newToday,processing,packed,ready,shipped,delivered,cancelRequests,refundPending,todaySales,monthSales,recentActivity] = await Promise.all([
     prisma.shopOrder.count(),
     prisma.shopOrder.count({ where: { paymentStatus: "SUCCESS" } }),
     prisma.shopOrder.count({ where: { paymentStatus: { in: ["CREATED", "PENDING"] } } }),
@@ -20,14 +21,22 @@ async function getDashboardMetrics() {
     prisma.shopOrder.aggregate({ where: { paymentStatus: "SUCCESS", metalType: "GOLD" }, _sum: { totalAmountPaise: true } }),
     prisma.shopOrder.aggregate({ where: { paymentStatus: "SUCCESS", metalType: "SILVER" }, _sum: { totalAmountPaise: true } }),
     prisma.schemeUser.count({ where: { shopOrders: { some: {} } } }),
-    prisma.shopOrder.count({ where: { paymentStatus: "SUCCESS", orderStatus: { in: ["CONFIRMED", "PROCESSING"] } } }),
+    prisma.shopOrder.count({ where: { paymentStatus: "SUCCESS", orderStatus: { in: ["ORDER_CONFIRMED", "PROCESSING"] } } }),
+    prisma.shopOrder.count({where:{createdAt:{gte:today}}}),
+    prisma.shopOrder.count({where:{orderStatus:"PROCESSING"}}),prisma.shopOrder.count({where:{orderStatus:"PACKED"}}),prisma.shopOrder.count({where:{orderStatus:"READY_TO_SHIP"}}),
+    prisma.shopOrder.count({where:{orderStatus:{in:["SHIPPED","IN_TRANSIT","OUT_FOR_DELIVERY"]}}}),prisma.shopOrder.count({where:{orderStatus:"DELIVERED"}}),
+    prisma.shopOrder.count({where:{orderStatus:"CANCEL_REQUESTED"}}),prisma.shopOrder.count({where:{orderStatus:"REFUND_PENDING"}}),
+    prisma.shopOrder.aggregate({where:{paymentStatus:"SUCCESS",paidAt:{gte:today}},_sum:{totalAmountPaise:true}}),
+    prisma.shopOrder.aggregate({where:{paymentStatus:"SUCCESS",paidAt:{gte:month}},_sum:{totalAmountPaise:true}}),
+    prisma.orderStatusHistory.findMany({include:{order:{select:{orderNumber:true}},adminUser:{select:{name:true,email:true}}},orderBy:{createdAt:"desc"},take:10}),
   ]);
 
   return {
     totalOrders, successfulOrders, pendingOrders, failedOrders, customers, pendingShipments,
     totalSales: Number(sales._sum.totalAmountPaise ?? 0n) / 100,
     goldSales: Number(goldSales._sum.totalAmountPaise ?? 0n) / 100,
-    silverSales: Number(silverSales._sum.totalAmountPaise ?? 0n) / 100,
+    silverSales: Number(silverSales._sum.totalAmountPaise ?? 0n) / 100,newToday,processing,packed,ready,shipped,delivered,cancelRequests,refundPending,
+    todaySales:Number(todaySales._sum.totalAmountPaise??0n)/100,monthSales:Number(monthSales._sum.totalAmountPaise??0n)/100,recentActivity,
   };
 }
 
@@ -63,6 +72,7 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <DashboardCard label="New Orders Today" value={metrics.newToday.toLocaleString("en-IN")} description="Orders created today" marker="NW" tone="gold"/>
           <DashboardCard
             label="Total Orders" value={metrics.totalOrders.toLocaleString("en-IN")} description="All direct Shop orders" marker="OR"
           />
@@ -82,8 +92,19 @@ export default async function AdminDashboardPage() {
           <DashboardCard label="Silver Coin Sales" value={`₹${metrics.silverSales.toLocaleString("en-IN")}`} description="Successful silver orders" marker="AG" tone="silver" />
           <DashboardCard label="Total Customers" value={metrics.customers.toLocaleString("en-IN")} description="Customers with Shop orders" marker="CU" />
           <DashboardCard label="Pending Shipments" value={metrics.pendingShipments.toLocaleString("en-IN")} description="Paid orders awaiting dispatch" marker="SH" />
+          <DashboardCard label="Processing" value={metrics.processing.toLocaleString("en-IN")} description="Orders being prepared" marker="PR"/>
+          <DashboardCard label="Packed" value={metrics.packed.toLocaleString("en-IN")} description="Packed orders" marker="PK"/>
+          <DashboardCard label="Ready to Ship" value={metrics.ready.toLocaleString("en-IN")} description="Awaiting courier handover" marker="RS"/>
+          <DashboardCard label="Shipped" value={metrics.shipped.toLocaleString("en-IN")} description="Active delivery journey" marker="TR"/>
+          <DashboardCard label="Delivered" value={metrics.delivered.toLocaleString("en-IN")} description="Completed deliveries" marker="DL" tone="green"/>
+          <DashboardCard label="Cancel Requests" value={metrics.cancelRequests.toLocaleString("en-IN")} description="Requires review" marker="CX"/>
+          <DashboardCard label="Refund Pending" value={metrics.refundPending.toLocaleString("en-IN")} description="Finance queue" marker="RF"/>
+          <DashboardCard label="Sales Today" value={`₹${metrics.todaySales.toLocaleString("en-IN")}`} description="Verified payments today" marker="₹" tone="gold"/>
+          <DashboardCard label="Sales This Month" value={`₹${metrics.monthSales.toLocaleString("en-IN")}`} description="Verified monthly sales" marker="₹" tone="gold"/>
         </div>
       </section>
+
+      <section className="mt-8 rounded-2xl border bg-white p-6 shadow-sm"><h2 className="text-xl font-black">Recent order activity</h2><div className="mt-4 divide-y">{metrics.recentActivity.map(item=><div key={item.id} className="flex flex-wrap justify-between gap-3 py-3 text-sm"><span><b>{item.order.orderNumber}</b> moved to {item.status}<br/><span className="text-stone-500">{item.publicMessage}</span></span><span className="text-right text-xs text-stone-500">{item.adminUser?.name||item.adminUser?.email||item.source}<br/>{item.createdAt.toLocaleString("en-IN",{timeZone:"Asia/Kolkata"})}</span></div>)}{!metrics.recentActivity.length&&<p className="py-6 text-stone-500">No lifecycle activity yet.</p>}</div></section>
 
       <section className="mt-8 grid gap-4 lg:grid-cols-2" aria-label="Admin stage status">
         <article className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">

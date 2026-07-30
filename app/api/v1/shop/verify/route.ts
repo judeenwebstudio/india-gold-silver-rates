@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const invoiceNumber = `INV-${order.orderNumber}`;
   await prisma.shopOrder.update({ where: { id: order.id }, data: {
     gatewayPaymentId: parsed.data.gatewayPaymentId, gatewaySignature: parsed.data.gatewaySignature,
-    paymentStatus: 'SUCCESS', orderStatus: 'CONFIRMED', invoiceNumber, paidAt: new Date(),
+    paymentStatus: 'SUCCESS', orderStatus: 'PAYMENT_VERIFIED', invoiceNumber, paidAt: new Date(),
   } });
   return NextResponse.json({ success: true, data: { orderNumber: order.orderNumber, invoiceNumber } });
 }

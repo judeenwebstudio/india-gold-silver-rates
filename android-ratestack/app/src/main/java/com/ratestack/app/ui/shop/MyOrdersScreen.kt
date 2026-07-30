@@ -112,7 +112,7 @@ fun MyOrdersScreen(
             val tracked = data?.orders?.firstOrNull { !it.shipment?.trackingNumber.isNullOrBlank() } ?: data?.orders?.firstOrNull()
             DashboardSection("Live Order Tracking") {
                 Text(tracked?.orderNumber ?: "No active shipment", fontWeight = FontWeight.Black)
-                Text("Status: ${tracked?.shipment?.status ?: "Tracking begins after dispatch"}")
+                Text("Status: ${displayStatus(tracked?.shipment?.status) ?: "Tracking begins after dispatch"}")
                 Text("Expected Delivery: ${tracked?.shipment?.expectedDelivery ?: "To be confirmed"}")
                 tracked?.shipment?.timeline.orEmpty().forEach { event ->
                     Text("• ${event.label.orEmpty()}${event.at?.let { " — $it" }.orEmpty()}")
@@ -124,7 +124,7 @@ fun MyOrdersScreen(
             DashboardSection("Shiprocket Integration") {
                 Text("Courier Partner: ${shipment?.courierPartner ?: "Assignment pending"}")
                 Text("Tracking Number: ${shipment?.trackingNumber ?: "Not assigned"}")
-                Text("Shipment Status: ${shipment?.status ?: "No shipment"}")
+                Text("Shipment Status: ${displayStatus(shipment?.status) ?: "No shipment"}")
                 Button({ context.startActivity(Intent(Intent.ACTION_VIEW, (shipment?.trackingUrl ?: "https://www.shiprocket.in/shipment-tracking/").toUri())) }, enabled = !shipment?.trackingNumber.isNullOrBlank()) { Text("Open Tracking") }
             }
         }
@@ -212,7 +212,7 @@ private fun OrderCard(
         Text("GST (3%): ${money(order.gst ?: 0.0)}")
         Text("Shipping Cost: ${if (order.shipping == 0.0) "FREE" else money(order.shipping ?: 0.0)}")
         Text("Total Payable: ${money(order.total ?: 0.0)}", fontWeight = FontWeight.Black)
-        Text("Payment Status: ${order.paymentStatus} • Shipment: ${order.shipment?.status}")
+        Text("Payment Status: ${displayStatus(order.paymentStatus)} • Order: ${displayStatus(order.orderStatus)} • Shipment: ${displayStatus(order.shipment?.status)}")
         order.deliveryAddress?.let { address ->
             Text("Delivery Address: ${address.addressLine1}, ${address.city}, ${address.state} – ${address.pincode}")
         }
@@ -227,3 +227,4 @@ private fun OrderCard(
 @Composable private fun AddressDialog(initial:ShopAddressDto,onClose:()->Unit,onSave:(ShopAddressDto)->Unit){var value by remember(initial){mutableStateOf(initial)};AlertDialog(onDismissRequest=onClose,title={Text("Saved Address")},text={Column(Modifier.heightIn(max=500.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){AddressField("Full Name",value.fullName){value=value.copy(fullName=it)};AddressField("Mobile",value.mobile){value=value.copy(mobile=it)};AddressField("Address Line 1",value.addressLine1){value=value.copy(addressLine1=it)};AddressField("City",value.city){value=value.copy(city=it)};AddressField("District",value.district){value=value.copy(district=it)};AddressField("State",value.state){value=value.copy(state=it)};AddressField("PIN Code",value.pincode){value=value.copy(pincode=it)}}},confirmButton={Button({onSave(value)}){Text("Save")}},dismissButton={TextButton(onClose){Text("Cancel")}})}
 @Composable private fun AddressField(label:String,value:String,onChange:(String)->Unit){OutlinedTextField(value,onChange,label={Text(label)},singleLine=true)}
 private fun money(value:Double)=NumberFormat.getCurrencyInstance(Locale("en","IN")).format(value)
+internal fun displayStatus(value:String?):String?=value?.replace('_',' ')?.lowercase(Locale.ENGLISH)?.replaceFirstChar { if(it.isLowerCase())it.titlecase(Locale.ENGLISH) else it.toString() }

@@ -15,7 +15,7 @@ async function handle(request: Request) {
     if (status.success) {
       await prisma.shopOrder.update({ where: { id: order.id }, data: {
         gatewayPaymentId: status.data?.transactionId || order.gatewayOrderId,
-        paymentStatus: 'SUCCESS', orderStatus: 'CONFIRMED',
+        paymentStatus: 'SUCCESS', orderStatus: 'PAYMENT_VERIFIED',
         invoiceNumber: `INV-${order.orderNumber}`, paidAt: new Date(),
       } });
     } else {

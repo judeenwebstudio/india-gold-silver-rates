@@ -16,6 +16,7 @@ const permissions: Record<string, AdminRole[]> = {
   shipment:["SUPER_ADMIN","ORDER_MANAGER","FULFILLMENT"],
   note:["SUPER_ADMIN","ORDER_MANAGER","FINANCE","FULFILLMENT","SUPPORT"],
   export:["SUPER_ADMIN","ORDER_MANAGER","FINANCE"],
+  shiprocket:["SUPER_ADMIN","ORDER_MANAGER","FULFILLMENT"],
 };
 const limits = new Map<string,{count:number;reset:number}>();
 

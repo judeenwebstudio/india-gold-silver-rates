@@ -9,6 +9,7 @@ import { verifyRazorpaySignature } from "@/lib/schemes/razorpay";
 import { checkPhonePePaymentStatus } from "@/lib/schemes/phonepe";
 import type { ShopOrderStatus, ShopShipmentStatus } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
+import { cancelShiprocketShipment } from "@/lib/shiprocket/service";
 
 const idSchema=z.string().cuid();
 const text=(value:FormDataEntryValue|null,max=500)=>z.string().trim().min(1).max(max).parse(value);
@@ -90,6 +91,7 @@ export async function cancelOrderAction(formData:FormData){
     if(order.orderStatus==="DELIVERED")throw new Error("Delivered orders require the return workflow.");
     if(!allowedNextStatuses(order.orderStatus).includes("CANCELLED"))throw new Error(`Cannot cancel an order in ${order.orderStatus}.`);
     const paymentCaptured=formData.get("paymentCaptured")==="on",refundRequired=formData.get("refundRequired")==="on",shipmentCreated=formData.get("shipmentCreated")==="on";
+    if(order.shiprocketOrderId){try{await cancelShiprocketShipment(orderId,admin)}catch(error){await prisma.shopOrder.update({where:{id:orderId},data:{shiprocketFailureReason:error instanceof Error?error.message.slice(0,500):"Provider cancellation failed."}});}}
     await prisma.shopOrder.update({where:{id:orderId},data:{cancellationReason:reason,cancellationPaymentCaptured:paymentCaptured,cancellationRefundRequired:refundRequired,cancellationShipmentCreated:shipmentCreated}});
     await transitionOrder(orderId,"CANCELLED",admin,reason);
     if(refundRequired&&allowedNextStatuses("CANCELLED").includes("REFUND_PENDING"))await transitionOrder(orderId,"REFUND_PENDING",admin,"Refund required after cancellation.");

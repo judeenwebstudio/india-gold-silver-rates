@@ -28,14 +28,17 @@ export async function GET(request: Request) {
       pincode: order.deliveryPincode, country: order.deliveryCountry, addressType: order.addressType,
     } : null,
     shipment: {
-      courierPartner: order.courierPartner, trackingNumber: order.trackingNumber,
+      courierPartner: order.courierName || order.courierPartner, trackingNumber: order.awbCode || order.trackingNumber,
       status: order.shipmentStatus || (order.paymentStatus === "SUCCESS" ? "Processing" : "Awaiting payment"),
-      expectedDelivery: order.expectedDeliveryAt,
+      pickupStatus: order.pickupScheduledAt ? "PICKUP_SCHEDULED" : order.shiprocketOrderId ? "AWAITING_PICKUP" : "NOT_CREATED",
+      expectedDelivery: order.estimatedDeliveryAt || order.expectedDeliveryAt, deliveredAt: order.deliveredAt,
+      lastUpdated: order.shiprocketLastSyncedAt || order.updatedAt,
       timeline: order.trackingEvents.length ? order.trackingEvents.map(event => ({ label: event.publicMessage || event.status, at: event.createdAt })) : Array.isArray(order.shipmentTimelineJson) ? order.shipmentTimelineJson : [
         { label: "Order placed", at: order.createdAt },
         ...(order.paidAt ? [{ label: "Payment confirmed", at: order.paidAt }] : []),
       ],
-      trackingUrl: order.publicTrackingUrl || (order.trackingNumber ? `https://shiprocket.co/tracking/${encodeURIComponent(order.trackingNumber)}` : null),
+      trackingUrl: order.publicTrackingUrl || (order.awbCode ? `https://shiprocket.co/tracking/${encodeURIComponent(order.awbCode)}` : null),
+      message: order.awbCode ? null : "Shipment will be created after payment verification and order processing.",
     },
   }));
   const paid = rows.filter(order => order.paymentStatus === "SUCCESS");

@@ -89,6 +89,40 @@ enum ShopRefundStatus {
   FAILED
 }
 
+enum ShiprocketIntegrationStatus {
+  DISABLED
+  NOT_CONFIGURED
+  READY
+  ORDER_CREATED
+  AWB_ASSIGNED
+  PICKUP_SCHEDULED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  RTO
+  FAILED
+  MANUAL
+}
+
+enum LogisticsOperationStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum LogisticsWebhookStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 enum MetalType {
   GOLD
   SILVER
@@ -568,6 +602,25 @@ model ShopOrder {
   shipmentTimelineJson       Json?
   shiprocketOrderId          String?
   shiprocketShipmentId       String?
+  shiprocketChannelOrderId   String?
+  shiprocketStatusCode       Int?
+  shiprocketStatusText       String?
+  courierId                  String?
+  courierName                String?
+  awbCode                    String?   @unique
+  pickupTokenNumber          String?
+  pickupScheduledAt          DateTime?
+  pickupExpectedAt           DateTime?
+  shipmentCreatedAt          DateTime?
+  labelUrl                   String?
+  manifestUrl                String?
+  shiprocketInvoiceUrl       String?
+  estimatedDeliveryAt        DateTime?
+  shiprocketLastSyncedAt     DateTime?
+  shiprocketLastWebhookAt    DateTime?
+  shiprocketRawStatus        String?
+  shiprocketIntegrationStatus ShiprocketIntegrationStatus @default(DISABLED)
+  shiprocketFailureReason    String?
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
   statusHistory              OrderStatusHistory[]
@@ -575,12 +628,76 @@ model ShopOrder {
   adminNotes                 AdminOrderNote[]
   paymentVerification        PaymentVerification?
   refunds                    ShopRefund[]
+  shiprocketOperations       ShiprocketOperation[]
+  logisticsWebhookEvents     LogisticsWebhookEvent[]
+  notificationOutbox         NotificationOutbox[]
 
   @@index([userId, createdAt])
   @@index([gatewayOrderId])
   @@index([paymentStatus, orderStatus])
   @@index([trackingNumber])
   @@index([shipmentStatus])
+  @@index([shiprocketShipmentId])
+  @@index([shiprocketIntegrationStatus, shiprocketLastSyncedAt])
+}
+
+model ShiprocketOperation {
+  id                 String                     @id @default(cuid())
+  shopOrderId        String
+  shopOrder          ShopOrder                  @relation(fields: [shopOrderId], references: [id], onDelete: Cascade)
+  operationType      String
+  idempotencyKey     String                     @unique
+  requestFingerprint String
+  status             LogisticsOperationStatus   @default(PENDING)
+  responseReference  String?
+  errorCode          String?
+  errorMessage       String?
+  attemptedAt        DateTime                   @default(now())
+  completedAt        DateTime?
+  retryCount         Int                        @default(0)
+
+  @@index([shopOrderId, operationType])
+  @@index([status, attemptedAt])
+}
+
+model LogisticsWebhookEvent {
+  id               String                   @id @default(cuid())
+  provider         String
+  eventIdentifier  String?
+  awb              String?
+  shipmentId       String?
+  statusText       String?
+  eventOccurredAt  DateTime?
+  payloadHash      String                   @unique
+  payloadJson      Json
+  receivedAt       DateTime                 @default(now())
+  processedAt      DateTime?
+  processingStatus LogisticsWebhookStatus   @default(RECEIVED)
+  failureReason    String?
+  shopOrderId      String?
+  shopOrder        ShopOrder?               @relation(fields: [shopOrderId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, eventIdentifier])
+  @@index([processingStatus, receivedAt])
+  @@index([awb])
+  @@index([shipmentId])
+}
+
+model NotificationOutbox {
+  id          String                   @id @default(cuid())
+  shopOrderId String
+  shopOrder   ShopOrder                @relation(fields: [shopOrderId], references: [id], onDelete: Cascade)
+  eventType   String
+  title       String
+  body        String
+  payloadJson Json?
+  status      NotificationOutboxStatus @default(PENDING)
+  createdAt   DateTime                 @default(now())
+  sentAt      DateTime?
+  lastError   String?
+
+  @@index([status, createdAt])
+  @@index([shopOrderId, createdAt])
 }
 
 model OrderStatusHistory {

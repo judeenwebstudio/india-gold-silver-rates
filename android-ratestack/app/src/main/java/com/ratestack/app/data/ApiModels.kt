@@ -517,7 +517,7 @@ data class ShopOrderDto(
 data class DashboardCustomerDto(val fullName:String?,val phone:String?,val email:String?,val emailVerified:Boolean?,val mobileVerified:Boolean?,val googleConnected:Boolean?,val memberSince:String?)
 data class DashboardSummaryDto(val totalOrders:Int?,val paidOrders:Int?,val activeShipments:Int?,val totalSpent:Double?)
 data class DashboardTimelineDto(val label:String?,val at:String?)
-data class DashboardShipmentDto(val courierPartner:String?,val trackingNumber:String?,val status:String?,val expectedDelivery:String?,val timeline:List<DashboardTimelineDto>?,val trackingUrl:String?)
+data class DashboardShipmentDto(val courierPartner:String?,val trackingNumber:String?,val status:String?,val pickupStatus:String?,val expectedDelivery:String?,val deliveredAt:String?,val lastUpdated:String?,val timeline:List<DashboardTimelineDto>?,val trackingUrl:String?,val message:String?)
 data class DashboardOrderDto(
     val id:String?,val orderNumber:String?,val productId:String?,val productName:String?,val imageUrl:String?,val metalType:String?,val purity:String?,
     val weightGrams:Double?,val quantity:Int?,val metalValue:Double?,val serviceCharge:Double?,val gst:Double?,val shipping:Double?,val total:Double?,

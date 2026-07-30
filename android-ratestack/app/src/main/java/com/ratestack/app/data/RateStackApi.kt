@@ -34,6 +34,12 @@ interface RateStackApi {
         @retrofit2.http.Header("Authorization") authHeader: String,
     ): Response<ApiEnvelope<CustomerDashboardDto>>
 
+    @POST("api/v1/me/orders/{orderId}/tracking")
+    suspend fun refreshOrderTracking(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Path("orderId") orderId: String,
+    ): Response<ApiEnvelope<Map<String, Any>>>
+
     @GET("api/v1/me/orders/{orderId}/invoice")
     suspend fun downloadShopInvoice(
         @retrofit2.http.Header("Authorization") authHeader: String,

@@ -125,7 +125,22 @@ fun MyOrdersScreen(
                 Text("Courier Partner: ${shipment?.courierPartner ?: "Assignment pending"}")
                 Text("Tracking Number: ${shipment?.trackingNumber ?: "Not assigned"}")
                 Text("Shipment Status: ${displayStatus(shipment?.status) ?: "No shipment"}")
-                Button({ context.startActivity(Intent(Intent.ACTION_VIEW, (shipment?.trackingUrl ?: "https://www.shiprocket.in/shipment-tracking/").toUri())) }, enabled = !shipment?.trackingNumber.isNullOrBlank()) { Text("Open Tracking") }
+                Text("Pickup Status: ${displayStatus(shipment?.pickupStatus) ?: "Not scheduled"}")
+                Text("Expected Delivery: ${shipment?.expectedDelivery ?: "To be confirmed"}")
+                Text("Delivered: ${shipment?.deliveredAt ?: "Not delivered"}")
+                Text("Last Updated: ${shipment?.lastUpdated ?: "Not synced"}")
+                shipment?.message?.let { Text(it, color = Color(0xFF78716C)) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton({
+                        val orderId = data?.orders?.firstOrNull { it.shipment?.trackingNumber == shipment?.trackingNumber }?.id
+                        if (!orderId.isNullOrBlank()) scope.launch {
+                            runCatching { ApiProvider.service.refreshOrderTracking("Bearer $token", orderId) }
+                                .onSuccess { refresh() }
+                                .onFailure { error = "Tracking is temporarily unavailable." }
+                        }
+                    }, enabled = !shipment?.trackingNumber.isNullOrBlank()) { Text("Refresh Tracking") }
+                    Button({ context.startActivity(Intent(Intent.ACTION_VIEW, shipment?.trackingUrl.orEmpty().toUri())) }, enabled = !shipment?.trackingUrl.isNullOrBlank()) { Text("Track Shipment") }
+                }
             }
         }
         item {

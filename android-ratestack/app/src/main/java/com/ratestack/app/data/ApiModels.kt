@@ -501,7 +501,10 @@ data class ShopAddressDto(
 data class ShopCheckoutRequestDto(
     val productId: String, val weightGrams: Double, val quantity: Int, val gateway: String,
     val idempotencyKey: String, val customer: ShopCustomerDto, val addressId: String? = null, val newAddress: ShopAddressDto? = null,
+    val gst: GstDetailsDto = GstDetailsDto(false),
 )
+data class GstDetailsDto(val enabled:Boolean,val businessName:String?=null,val gstNumber:String?=null,val billingAddress:String?=null)
+data class CustomerGstProfileDto(val id:String?,val businessName:String?,val gstNumber:String?,val billingAddress:String?,val isActive:Boolean?)
 data class ShopCheckoutDto(
     val shopOrderId: String?, val orderNumber: String?, val gateway: String?,
     val gatewayOrderId: String?, val redirectUrl: String?, val keyId: String?,
@@ -530,7 +533,7 @@ data class DashboardNotificationDto(val id:String?,val title:String?,val date:St
 data class CustomerDashboardDto(
     val customer:DashboardCustomerDto?,val summary:DashboardSummaryDto?,val orders:List<DashboardOrderDto>?,
     val addresses:List<ShopAddressDto>?,val paymentHistory:List<DashboardPaymentDto>?,val rewards:DashboardRewardDto?,
-    val notifications:List<DashboardNotificationDto>?,val wishlist:List<Map<String,Any>>?,
+    val notifications:List<DashboardNotificationDto>?,val wishlist:List<Map<String,Any>>?,val gstProfile:CustomerGstProfileDto?,
 )
 
 sealed interface PaymentActionState {

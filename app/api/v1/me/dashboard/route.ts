@@ -7,10 +7,11 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const auth = await authenticateSchemeUserFromRequest(request);
   if (!auth) return NextResponse.json({ success: false, error: { message: "Authentication required." } }, { status: 401 });
-  const [user, orders, addresses] = await Promise.all([
+  const [user, orders, addresses, gstProfile] = await Promise.all([
     prisma.schemeUser.findUnique({ where: { id: auth.userId }, include: { authAccounts: { select: { provider: true, providerEmail: true } } } }),
     prisma.shopOrder.findMany({ where: { userId: auth.userId }, include: { product: { select: { imageUrl: true, imageMimeType: true } }, trackingEvents: { select: { status: true, publicMessage: true, createdAt: true }, orderBy: { createdAt: "asc" } } }, orderBy: { createdAt: "desc" } }),
     prisma.deliveryAddress.findMany({ where: { userId: auth.userId }, orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }] }),
+    prisma.customerGSTProfile.findFirst({where:{customerId:auth.userId,isDefault:true},orderBy:{updatedAt:"desc"}}),
   ]);
   if (!user) return NextResponse.json({ success: false, error: { message: "Account not found." } }, { status: 404 });
   const money = (value: bigint) => Number(value) / 100;
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
       memberSince: user.createdAt,
     },
     summary: { totalOrders: rows.length, paidOrders: paid.length, activeShipments: rows.filter(order => order.shipment.trackingNumber && !["Delivered", "Cancelled"].includes(order.shipment.status)).length, totalSpent: paid.reduce((sum, order) => sum + order.total, 0) },
-    orders: rows, addresses, paymentHistory: rows.map(order => ({ orderNumber: order.orderNumber, gateway: order.gateway, paymentId: order.paymentId, status: order.paymentStatus, amount: order.total, date: order.paidAt || order.createdAt })),
+    orders: rows, addresses, gstProfile, paymentHistory: rows.map(order => ({ orderNumber: order.orderNumber, gateway: order.gateway, paymentId: order.paymentId, status: order.paymentStatus, amount: order.total, date: order.paidAt || order.createdAt })),
     rewards: { points: 0, tier: "Classic", message: "Reward points will appear here when the rewards programme is enabled." },
     notifications: rows.slice(0, 5).map(order => ({ id: order.id, title: `${order.orderNumber}: ${order.orderStatus}`, date: order.createdAt })),
     wishlist: [],

@@ -6,6 +6,7 @@ import { createRazorpayOrder } from '@/lib/schemes/razorpay';
 import { createPhonePeOrder } from '@/lib/schemes/phonepe';
 import { calculateShopPrice, getTrichyShopRates, validateShopWeight } from '@/lib/shop';
 import { z } from 'zod';
+import { optionalGstSchema } from '@/lib/gst';
 
 const schema = z.object({
   productId: z.string().min(1), weightGrams: z.number().positive(), quantity: z.number().int().min(1).max(10),
@@ -24,6 +25,7 @@ const schema = z.object({
     district: z.string().trim().min(2).max(100), state: z.string().trim().min(2).max(100),
     pincode: z.string().regex(/^[1-9]\d{5}$/, 'Enter a valid six-digit Indian PIN code.'), country: z.literal('India'), addressType: z.enum(['HOME', 'OFFICE', 'OTHER']),
   }).optional(),
+  gst: optionalGstSchema.optional().default({ enabled: false }),
 }).refine((value) => Boolean(value.addressId) !== Boolean(value.newAddress), { message: 'Select one valid delivery address.' });
 
 export async function POST(request: Request) {
@@ -65,8 +67,18 @@ export async function POST(request: Request) {
       deliveryDistrict: selectedAddress.district, deliveryState: selectedAddress.state,
       deliveryPincode: selectedAddress.pincode, deliveryCountry: selectedAddress.country, addressType: selectedAddress.addressType,
       gateway, paymentStatus: 'PENDING', orderStatus: 'PAYMENT_PENDING',
+      gstInvoiceRequested: parsed.data.gst.enabled,
+      gstBusinessName: parsed.data.gst.enabled ? parsed.data.gst.businessName : null,
+      gstNumber: parsed.data.gst.enabled ? parsed.data.gst.gstNumber : null,
+      gstBillingAddress: parsed.data.gst.enabled ? parsed.data.gst.billingAddress : null,
     },
   });
+  if(parsed.data.gst.enabled){
+    const current=await prisma.customerGSTProfile.findFirst({where:{customerId:authUser.userId,isDefault:true}});
+    const profileData={businessName:parsed.data.gst.businessName,gstNumber:parsed.data.gst.gstNumber,billingAddress:parsed.data.gst.billingAddress,isActive:true,isDefault:true};
+    const profile=current?await prisma.customerGSTProfile.update({where:{id:current.id},data:profileData}):await prisma.customerGSTProfile.create({data:{customerId:authUser.userId,...profileData}});
+    await prisma.auditLog.create({data:{actorType:"CUSTOMER",actorId:authUser.userId,action:"GST_PROFILE_SAVED_DURING_CHECKOUT",targetEntity:"CustomerGSTProfile",targetId:profile.id,detailsJson:{gstLastFour:profile.gstNumber.slice(-4)}}});
+  }
   let gatewayOrderId = '';
   let redirectUrl: string | undefined;
   try {

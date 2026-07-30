@@ -126,12 +126,14 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
     var name by remember { mutableStateOf("") }; var mobile by remember { mutableStateOf("") }; var email by remember { mutableStateOf("") }
     var review by remember { mutableStateOf(false) }; var error by remember { mutableStateOf<String?>(null) }
     var gateway by remember { mutableStateOf("RAZORPAY") }; var saveFuture by remember { mutableStateOf(true) }; var makeDefault by remember { mutableStateOf(false) }
+    var gstEnabled by remember { mutableStateOf(false) };var gstBusiness by remember { mutableStateOf("") };var gstNumber by remember { mutableStateOf("") };var gstAddress by remember { mutableStateOf("") };var gstSameAsDelivery by remember { mutableStateOf(false) }
     val checkoutScope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         runCatching {
             val auth = "Bearer $token"
             profile = ApiProvider.service.getCustomerProfile(auth).body()?.data ?: profile
             saved = ApiProvider.service.getDeliveryAddresses(auth).body()?.data.orEmpty()
+            ApiProvider.service.getGstProfile(auth).body()?.data?.let { gstEnabled=it.isActive==true;gstBusiness=it.businessName.orEmpty();gstNumber=it.gstNumber.orEmpty();gstAddress=it.billingAddress.orEmpty() }
         }.onSuccess {
             name = profile.fullName.orEmpty(); mobile = profile.phone.orEmpty(); email = profile.email.orEmpty()
             address = saved.firstOrNull { it.isDefault == true } ?: saved.firstOrNull()
@@ -139,10 +141,13 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
             gateway = ApiProvider.service.getPaymentConfig().body()?.activeGateway ?: "RAZORPAY"
         }
     }
+    val deliveryBillingAddress="${address.addressLine1}${if(address.addressLine2.isNotBlank())", ${address.addressLine2}" else ""}, ${address.city}, ${address.district}, ${address.state} - ${address.pincode}, India"
+    val effectiveGstAddress=if(gstSameAsDelivery)deliveryBillingAddress else gstAddress
+    val gstValid=!gstEnabled||(gstBusiness.trim().isNotEmpty()&&gstBusiness.length<=150&&effectiveGstAddress.trim().isNotEmpty()&&effectiveGstAddress.length<=500&&Regex("^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$").matches(gstNumber))
     val valid = name.trim().length >= 2 && Regex("^(?:\\+91)?[6-9]\\d{9}$").matches(mobile.trim()) &&
         android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() && address.fullName.trim().length >= 2 &&
         Regex("^(?:\\+91)?[6-9]\\d{9}$").matches(address.mobile.trim()) && address.addressLine1.trim().length >= 3 &&
-        address.city.isNotBlank() && address.district.isNotBlank() && address.state.isNotBlank() && Regex("^[1-9]\\d{5}$").matches(address.pincode)
+        address.city.isNotBlank() && address.district.isNotBlank() && address.state.isNotBlank() && Regex("^[1-9]\\d{5}$").matches(address.pincode) && gstValid
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (review) "Review & Payment" else "Checkout Details", fontWeight = FontWeight.Black) },
@@ -195,12 +200,17 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
                     val result = ApiProvider.service.updateDeliveryAddress("Bearer $token", address.id.orEmpty(), address)
                     result.body()?.data?.let { updated -> saved = saved.map { if (it.id == updated.id) updated else it }; address = updated }
                 } }) { Text("Edit / Save Address") }
+                Text("Business Purchase (GST Invoice Required?)",fontWeight=FontWeight.Black)
+                Text("Do you have a GST Number?")
+                Row(verticalAlignment=Alignment.CenterVertically){RadioButton(gstEnabled,{gstEnabled=true});Text("Yes");RadioButton(!gstEnabled,{gstEnabled=false});Text("No")}
+                if(gstEnabled){CheckoutField("GST Registered Business Name",gstBusiness){gstBusiness=it.take(150)};Row(verticalAlignment=Alignment.CenterVertically){Checkbox(gstSameAsDelivery,{gstSameAsDelivery=it});Text("Billing Address same as Delivery Address")};OutlinedTextField(if(gstSameAsDelivery)deliveryBillingAddress else gstAddress,{gstAddress=it.take(500);gstSameAsDelivery=false},Modifier.fillMaxWidth(),label={Text("GST Billing Address")},minLines=3);CheckoutField("GST Number",gstNumber){gstNumber=it.trim().uppercase(Locale.ENGLISH).take(15)};if(gstNumber.isNotEmpty()&&!gstValid)Text("Enter a valid 15-character GSTIN.",color=MaterialTheme.colorScheme.error)}
             } else {
                 Text("${product.name} • ${weight.toInt()}g × $quantity", fontWeight = FontWeight.Black)
                 Text("Purity: ${product.purity} • Live Trichy rate: ${money(product.ratePerGram ?: 0.0)}/g")
                 Text("Source: ${product.rateSource ?: "Previous verified rate"} • ${product.rateDate ?: "Latest"}")
                 Text("$name • $mobile • $email"); Text("${address.addressLine1}, ${address.city}, ${address.district}, ${address.state} – ${address.pincode}, India")
                 Text("Payment method: $gateway", fontWeight = FontWeight.Bold)
+                if(gstEnabled){Text("GST Invoice",fontWeight=FontWeight.Black);Text(gstBusiness);Text(gstNumber);Text(effectiveGstAddress)}
                 Text("Gateway opens only after you confirm below.", style = MaterialTheme.typography.bodySmall)
             }
         } },
@@ -212,7 +222,7 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
                     val result = ApiProvider.service.createDeliveryAddress("Bearer $token", address.copy(isDefault = makeDefault || saved.isEmpty()))
                     selected = result.body()?.data ?: run { error = result.body()?.error?.message ?: "Unable to save address."; return@launch }
                 }
-                onConfirm(ShopCheckoutRequestDto(product.productId.orEmpty(), weight, quantity, gateway, UUID.randomUUID().toString(), ShopCustomerDto(name.trim(), mobile.trim(), email.trim()), addressId = selected.id, newAddress = if (selected.id == null) selected else null))
+                onConfirm(ShopCheckoutRequestDto(product.productId.orEmpty(), weight, quantity, gateway, UUID.randomUUID().toString(), ShopCustomerDto(name.trim(), mobile.trim(), email.trim()), addressId = selected.id, newAddress = if (selected.id == null) selected else null,gst=if(gstEnabled)GstDetailsDto(true,gstBusiness.trim(),gstNumber,effectiveGstAddress.trim())else GstDetailsDto(false)))
             }
         }, enabled = review || valid) { Text(if (review) "Confirm & Pay" else "Review Order") } },
         dismissButton = { TextButton(if (review) ({ review = false }) else onDismiss) { Text(if (review) "Edit Details" else "Cancel") } },

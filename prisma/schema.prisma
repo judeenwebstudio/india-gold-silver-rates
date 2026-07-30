@@ -497,6 +497,7 @@ model SchemeUser {
   shopOrders         ShopOrder[]
   deliveryAddresses DeliveryAddress[]
   authAccounts       AuthAccount[]
+  gstProfiles        CustomerGSTProfile[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -599,6 +600,10 @@ model ShopOrder {
   cancellationPaymentCaptured Boolean?
   cancellationRefundRequired Boolean?
   cancellationShipmentCreated Boolean?
+  gstInvoiceRequested          Boolean   @default(false)
+  gstBusinessName              String?
+  gstNumber                    String?
+  gstBillingAddress            String?
   shipmentTimelineJson       Json?
   shiprocketOrderId          String?
   shiprocketShipmentId       String?
@@ -639,6 +644,23 @@ model ShopOrder {
   @@index([shipmentStatus])
   @@index([shiprocketShipmentId])
   @@index([shiprocketIntegrationStatus, shiprocketLastSyncedAt])
+  @@index([gstNumber])
+}
+
+model CustomerGSTProfile {
+  id             String     @id @default(cuid())
+  customerId     String
+  customer       SchemeUser @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  businessName   String
+  gstNumber      String
+  billingAddress String
+  isDefault      Boolean    @default(true)
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([customerId, gstNumber])
+  @@index([customerId, isActive, isDefault])
 }
 
 model ShiprocketOperation {

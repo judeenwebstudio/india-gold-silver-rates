@@ -81,6 +81,25 @@ export type GoodReturnsMappingReport = {
   unsupportedCities: Array<{ cityId: string; city: string; state: string; providerSlug: string; reason: string }>;
   failedCities: Array<{ cityId: string; city: string; state: string; providerSlug: string; reason: string }>;
   duplicates: ReturnType<typeof duplicateGoodReturnsMappings>;
+  correctMappings: GoodReturnsMappingRow[];
+  incorrectMappings: GoodReturnsMappingRow[];
+  aliasMappings: GoodReturnsMappingRow[];
+  missingMappings: GoodReturnsMappingRow[];
+  first100Mismatches: GoodReturnsMappingRow[];
+  csv: string;
+};
+
+type GoodReturnsMappingRow = {
+  rateStackState: string;
+  rateStackCity: string;
+  providerSlug: string;
+  parsedCity: string;
+  status: "CORRECT" | "ALIAS" | "CITY_MISMATCH" | "MISSING" | "FAILED" | "DUPLICATE";
+  resolvedCityId: string;
+  finalUrl?: string;
+  title?: string;
+  h1?: string;
+  reason?: string;
 };
 
 type SelectedMappedRate = {
@@ -698,6 +717,17 @@ function addDatabaseSummary(target: ScraperDatabaseSummary, source: ScraperDatab
   target.metadataUpdated += source.metadataUpdated;
 }
 
+function csvCell(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+function mappingCsv(rows: GoodReturnsMappingRow[]) {
+  return [
+    "RateStack City,Provider Slug,Parsed City,Status",
+    ...rows.map((row) => [row.rateStackCity, row.providerSlug, row.parsedCity, row.status].map(csvCell).join(",")),
+  ].join("\n");
+}
+
 async function synchronizeAllGoodReturnsCities(
   config: ScraperProviderConfig,
   mode: ScraperMode,
@@ -722,6 +752,12 @@ async function synchronizeAllGoodReturnsCities(
     unsupportedCities: [],
     failedCities: [],
     duplicates,
+    correctMappings: [],
+    incorrectMappings: [],
+    aliasMappings: [],
+    missingMappings: [],
+    first100Mismatches: [],
+    csv: "",
   };
   const database = emptyDatabaseSummary();
   const parsedResults: ScrapedRateResult[] = [];
@@ -734,12 +770,42 @@ async function synchronizeAllGoodReturnsCities(
       if (duplicateCityIds.has(target.cityId)) {
         report.unsupported += 1;
         report.unsupportedCities.push({ ...target, reason: "Duplicate provider slug; manual mapping required." });
+        report.incorrectMappings.push({
+          rateStackState: target.state, rateStackCity: target.city, providerSlug: target.providerSlug,
+          parsedCity: "", status: "DUPLICATE", resolvedCityId: target.cityId,
+          reason: "Duplicate provider slug; manual mapping required.",
+        });
         continue;
       }
       const provider = new GoodReturnsRateProvider(config, target);
       try {
         const parsed = await provider.scrape();
         await validateChangeThreshold(provider.config, parsed);
+        const diagnostics = parsed.providerDiagnostics;
+        const row: GoodReturnsMappingRow = {
+          rateStackState: target.state,
+          rateStackCity: target.city,
+          providerSlug: target.providerSlug,
+          parsedCity: diagnostics?.parsedGoldCity ?? "",
+          status: target.citySlug === target.providerSlug ? "CORRECT" : "ALIAS",
+          resolvedCityId: target.cityId,
+          finalUrl: diagnostics?.goldFinalUrl,
+          title: diagnostics?.goldTitle,
+          h1: diagnostics?.goldH1,
+        };
+        report.correctMappings.push(row);
+        if (row.status === "ALIAS") report.aliasMappings.push(row);
+        console.info("[rate-sync] GoodReturns city verified before save", {
+          rateStackState: target.state,
+          rateStackCity: target.city,
+          requestedGoodReturnsSlug: target.providerSlug,
+          finalUrl: diagnostics?.goldFinalUrl ?? null,
+          htmlPageTitle: diagnostics?.goldTitle ?? null,
+          htmlH1: diagnostics?.goldH1 ?? null,
+          parsedCityName: diagnostics?.parsedGoldCity ?? null,
+          resolvedCityId: target.cityId,
+          savedCityId: target.cityId,
+        });
         parsedResults.push(parsed);
         report.successfullyMapped += 1;
         if (mode !== "MANUAL_TEST") {
@@ -757,6 +823,8 @@ async function synchronizeAllGoodReturnsCities(
           addDatabaseSummary(database, synchronized.summary);
         }
       } catch (error) {
+        const details = error instanceof ScraperError ? error.details : undefined;
+        const diagnostics = details?.diagnostics as Record<string, unknown> | undefined;
         const item = {
           cityId: target.cityId,
           city: target.city,
@@ -764,18 +832,57 @@ async function synchronizeAllGoodReturnsCities(
           providerSlug: target.providerSlug,
           reason: error instanceof Error ? error.message : "Unknown provider error",
         };
-        if (isUnsupportedGoodReturnsCity(error)) {
+        const row: GoodReturnsMappingRow = {
+          rateStackState: target.state,
+          rateStackCity: target.city,
+          providerSlug: target.providerSlug,
+          parsedCity: String(details?.parsedGoldCity ?? details?.parsedSilverCity ?? ""),
+          status: details?.code === "CITY_MISMATCH"
+            ? "CITY_MISMATCH"
+            : isUnsupportedGoodReturnsCity(error) ? "MISSING" : "FAILED",
+          resolvedCityId: target.cityId,
+          finalUrl: typeof diagnostics?.goldFinalUrl === "string" ? diagnostics.goldFinalUrl : undefined,
+          title: typeof diagnostics?.goldTitle === "string" ? diagnostics.goldTitle : undefined,
+          h1: typeof diagnostics?.goldH1 === "string" ? diagnostics.goldH1 : undefined,
+          reason: item.reason,
+        };
+        if (row.status === "CITY_MISMATCH") {
           report.unsupported += 1;
           report.unsupportedCities.push(item);
+          report.incorrectMappings.push(row);
+        } else if (row.status === "MISSING") {
+          report.unsupported += 1;
+          report.unsupportedCities.push(item);
+          report.missingMappings.push(row);
         } else {
           report.failed += 1;
           report.failedCities.push(item);
         }
-        console.warn("[rate-sync] GoodReturns city skipped", item);
+        console.warn("[rate-sync] GoodReturns city skipped", {
+          ...item,
+          requestedGoodReturnsSlug: target.providerSlug,
+          finalUrl: row.finalUrl ?? null,
+          htmlPageTitle: row.title ?? null,
+          htmlH1: row.h1 ?? null,
+          parsedCityName: row.parsedCity || null,
+          resolvedCityId: target.cityId,
+          savedCityId: null,
+          errorCode: row.status,
+        });
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, worker));
+  report.first100Mismatches = report.incorrectMappings.filter(({ status }) => status === "CITY_MISMATCH").slice(0, 100);
+  report.csv = mappingCsv([
+    ...report.correctMappings,
+    ...report.incorrectMappings,
+    ...report.missingMappings,
+    ...report.failedCities.map((item) => ({
+      rateStackState: item.state, rateStackCity: item.city, providerSlug: item.providerSlug,
+      parsedCity: "", status: "FAILED" as const, resolvedCityId: item.cityId, reason: item.reason,
+    })),
+  ]);
 
   const log = await prisma.rateUpdateLog.create({
     data: {

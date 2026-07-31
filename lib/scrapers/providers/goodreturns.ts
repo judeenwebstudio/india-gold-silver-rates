@@ -38,6 +38,8 @@ export class GoodReturnsRateProvider implements RateScraperProvider {
       sourceUrl: urls.gold,
       fetchedAt: gold.fetchedAt > silver.fetchedAt ? gold.fetchedAt : silver.fetchedAt,
       city: this.city,
+      goldFinalUrl: gold.responseUrl,
+      silverFinalUrl: silver.responseUrl,
     });
     console.info("[rate-source] GoodReturns parse result", {
       provider: this.name,
@@ -52,6 +54,12 @@ export class GoodReturnsRateProvider implements RateScraperProvider {
       cityId: this.city.cityId,
       city: this.city.city,
       state: this.city.state,
+      requestedSlug: this.city.providerSlug,
+      finalUrl: parsed.providerDiagnostics?.goldFinalUrl,
+      htmlPageTitle: parsed.providerDiagnostics?.goldTitle,
+      htmlH1: parsed.providerDiagnostics?.goldH1,
+      parsedCityName: parsed.providerDiagnostics?.parsedGoldCity,
+      resolvedCityId: this.city.cityId,
     });
     return parsed;
   }

@@ -34,13 +34,27 @@ test("GoodReturns parser rejects another city and inconsistent Silver units", ()
     () => parseGoodReturnsRates(gold.replaceAll("Trichy", "Chennai"), silver, {
       provider: "GOODRETURNS", sourceUrl: "fixture", fetchedAt: "2026-07-29T06:00:00.000Z", city: trichy,
     }),
-    /requested Trichy/i,
+    /CITY_MISMATCH/,
   );
   assert.throws(
     () => parseGoodReturnsRates(gold, silver.replace("2,35,000", "2,45,000"), {
       provider: "GOODRETURNS", sourceUrl: "fixture", fetchedAt: "2026-07-29T06:00:00.000Z", city: trichy,
     }),
     /inconsistent/i,
+  );
+});
+
+test("GoodReturns parser rejects a different provider city before rates can be saved", () => {
+  assert.throws(
+    () => parseGoodReturnsRates(
+      gold.replaceAll("Trichy", "Madurai"),
+      silver.replaceAll("Trichy", "Madurai"),
+      {
+        provider: "GOODRETURNS", sourceUrl: "fixture", fetchedAt: "2026-07-29T06:00:00.000Z",
+        city: { ...trichy, city: "Chennai", citySlug: "chennai", providerCityName: "Chennai", providerSlug: "chennai" },
+      },
+    ),
+    (error: unknown) => error instanceof Error && error.message === "CITY_MISMATCH",
   );
 });
 

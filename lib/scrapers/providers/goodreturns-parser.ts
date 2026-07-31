@@ -1,7 +1,7 @@
 import { load } from "cheerio";
 import { createHash } from "node:crypto";
 import { ScraperRejectedError } from "@/lib/scrapers/errors";
-import type { ScrapedRateQuote, ScrapedRateResult, ScraperCityTarget } from "@/lib/scrapers/types";
+import type { ScrapedRateQuote, ScrapedRateResult, ScraperCityTarget, ScraperProviderDiagnostics } from "@/lib/scrapers/types";
 
 const MONTHS: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
@@ -11,6 +11,20 @@ const MONTHS: Record<string, number> = {
 function pageText(html: string) {
   const $ = load(`<body>${html.replace(/<[^>]*>/g, " ")}</body>`);
   return $("body").text().replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function normalizeProviderCity(value: string) {
+  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function pageIdentity(html: string, metal: "Gold" | "Silver") {
+  const $ = load(html);
+  const title = $("title").first().text().replace(/\s+/g, " ").trim();
+  const h1 = $("h1").first().text().replace(/\s+/g, " ").trim();
+  const heading = h1 || title;
+  const prefix = new RegExp(`^.*?${metal} Rate(?: Today)? in\\s+`, "i");
+  const parsedCity = heading.replace(prefix, "").split(/\s+(?:Today|on)\b|\s*[|,–—]\s*/i, 1)[0]?.trim() ?? "";
+  return { title, h1, parsedCity };
 }
 
 function parseDate(text: string) {
@@ -54,14 +68,44 @@ function quote(code: ScrapedRateQuote["code"], label: string, metalType: "GOLD" 
 export function parseGoodReturnsRates(
   goldHtml: string,
   silverHtml: string,
-  context: { provider: string; sourceUrl: string; fetchedAt: string; city: ScraperCityTarget },
+  context: {
+    provider: string;
+    sourceUrl: string;
+    fetchedAt: string;
+    city: ScraperCityTarget;
+    goldFinalUrl?: string;
+    silverFinalUrl?: string;
+  },
 ): ScrapedRateResult & { rawResponseHash: string } {
   const gold = pageText(goldHtml);
   const silver = pageText(silverHtml);
-  const escapedCity = context.city.providerCityName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (!new RegExp(`Gold Rate in ${escapedCity}\\b`, "i").test(gold) ||
-      !new RegExp(`Silver Rate in ${escapedCity}\\b`, "i").test(silver)) {
-    throw new ScraperRejectedError(`GoodReturns did not return the requested ${context.city.providerCityName} city pages.`);
+  const goldIdentity = pageIdentity(goldHtml, "Gold");
+  const silverIdentity = pageIdentity(silverHtml, "Silver");
+  const expected = normalizeProviderCity(context.city.providerCityName);
+  const parsedGold = normalizeProviderCity(goldIdentity.parsedCity);
+  const parsedSilver = normalizeProviderCity(silverIdentity.parsedCity);
+  const diagnostics: ScraperProviderDiagnostics = {
+    requestedSlug: context.city.providerSlug,
+    goldFinalUrl: context.goldFinalUrl ?? context.sourceUrl,
+    silverFinalUrl: context.silverFinalUrl ?? context.sourceUrl,
+    goldTitle: goldIdentity.title,
+    silverTitle: silverIdentity.title,
+    goldH1: goldIdentity.h1,
+    silverH1: silverIdentity.h1,
+    parsedGoldCity: goldIdentity.parsedCity,
+    parsedSilverCity: silverIdentity.parsedCity,
+  };
+  if (!parsedGold || !parsedSilver || parsedGold !== expected || parsedSilver !== expected) {
+    throw new ScraperRejectedError("CITY_MISMATCH", {
+      code: "CITY_MISMATCH",
+      expectedCity: context.city.providerCityName,
+      parsedGoldCity: goldIdentity.parsedCity || null,
+      parsedSilverCity: silverIdentity.parsedCity || null,
+      rateStackState: context.city.state,
+      rateStackCity: context.city.city,
+      resolvedCityId: context.city.cityId,
+      diagnostics,
+    });
   }
   const goldDate = parseDate(goldHtml);
   const silverDate = parseDate(silverHtml);
@@ -85,6 +129,7 @@ export function parseGoodReturnsRates(
     fetchedAt: context.fetchedAt,
     preferredSession: "AM",
     city: context.city,
+    providerDiagnostics: diagnostics,
     rawResponseHash: createHash("sha256").update(goldHtml).update(silverHtml).digest("hex"),
     quotes: [
       quote("GOLD_999", "Gold 24K", "GOLD", "999", "K24", gold24),

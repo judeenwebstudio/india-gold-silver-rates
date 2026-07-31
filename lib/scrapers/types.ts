@@ -42,6 +42,19 @@ export type ScrapedRateResult = {
   preferredSession: ScraperSession;
   quotes: ScrapedRateQuote[];
   city?: ScraperCityTarget;
+  providerDiagnostics?: ScraperProviderDiagnostics;
+};
+
+export type ScraperProviderDiagnostics = {
+  requestedSlug: string;
+  goldFinalUrl: string;
+  silverFinalUrl: string;
+  goldTitle: string;
+  silverTitle: string;
+  goldH1: string;
+  silverH1: string;
+  parsedGoldCity: string;
+  parsedSilverCity: string;
 };
 
 export type ScraperCityTarget = {

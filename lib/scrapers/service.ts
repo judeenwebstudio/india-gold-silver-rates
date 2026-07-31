@@ -950,7 +950,7 @@ async function synchronizeAllGoodReturnsCities(
 
 export async function executeScraper(
   mode: ScraperMode,
-  options: { cronSlot?: CronSlot } = {},
+  options: { cronSlot?: CronSlot; goodReturnsCatalogueOnly?: boolean } = {},
 ): Promise<ScraperExecutionResult> {
   const startedAtMs = Date.now();
   const attemptedAt = new Date().toISOString();
@@ -968,6 +968,9 @@ export async function executeScraper(
     }
 
     const providerOrder = logResolvedProviderOrder(`executeScraper:${mode}`);
+    if (options.goodReturnsCatalogueOnly && !providerOrder.enabled.includes("GOODRETURNS")) {
+      throw new ScraperRejectedError("GoodReturns catalogue synchronization is not enabled.");
+    }
     if (providerOrder.enabled.includes("GOODRETURNS")) {
       const lease = await acquireRateSyncLease();
       if (!lease) throw new RateSyncLockUnavailableError("Another rate synchronization is already running. This attempt was safely skipped.");
@@ -975,10 +978,12 @@ export async function executeScraper(
         const citySync = await synchronizeAllGoodReturnsCities(
           scraperConfig, mode, attemptedAt, startedAtMs, cronSlot,
         );
-        if (citySync.report.successfullyMapped > 0) {
+        if (citySync.report.successfullyMapped > 0 || options.goodReturnsCatalogueOnly) {
           return {
-            ok: true,
-            outcome: citySync.database.created + citySync.database.updated > 0 ? "SUCCESS" : "NO_CHANGE",
+            ok: citySync.report.failed === 0 || citySync.report.successfullyMapped > 0,
+            outcome: citySync.report.failed > 0 && citySync.report.successfullyMapped === 0
+              ? "FAILED"
+              : citySync.database.created + citySync.database.updated > 0 ? "SUCCESS" : "NO_CHANGE",
             message: `Processed ${citySync.report.totalActiveCities} active cities; ${citySync.report.successfullyMapped} GoodReturns mappings succeeded.`,
             logId: citySync.logId,
             parsed: citySync.parsed,
@@ -1149,4 +1154,11 @@ export async function executeScraper(
       };
     }
   }
+}
+
+export function executeGoodReturnsCatalogueSync(
+  mode: ScraperMode,
+  options: { cronSlot?: CronSlot } = {},
+) {
+  return executeScraper(mode, { ...options, goodReturnsCatalogueOnly: true });
 }

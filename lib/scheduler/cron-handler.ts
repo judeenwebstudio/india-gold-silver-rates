@@ -13,6 +13,7 @@ export type CronExecutionResult = {
   };
   locked?: boolean;
   cronSlot?: CronSlot;
+  mappingReport?: unknown;
 };
 
 export async function handleRateSyncCron(
@@ -82,6 +83,7 @@ export async function handleRateSyncCron(
       message: result.message,
       changedRates,
       cronSlot: result.cronSlot ?? cronSlot ?? undefined,
+      mappingReport: result.mappingReport,
     },
     { status },
   );

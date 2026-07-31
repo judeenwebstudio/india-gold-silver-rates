@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
 import {
+  executeGoodReturnsCatalogueSync,
   executeScraper,
+  type GoodReturnsMappingReport,
   type ScraperDatabaseSummary,
 } from "@/lib/scrapers/service";
 import type { ScrapedRateResult } from "@/lib/scrapers/types";
@@ -16,6 +18,7 @@ export type ScraperActionState = {
   message: string;
   parsed?: ScrapedRateResult;
   database?: ScraperDatabaseSummary;
+  mappingReport?: GoodReturnsMappingReport;
 };
 
 async function requireAdministrator(): Promise<ScraperActionState | null> {
@@ -41,6 +44,7 @@ function toActionState(
     message: result.message,
     parsed: result.parsed,
     database: result.database,
+    mappingReport: result.mappingReport,
   };
 }
 
@@ -67,7 +71,7 @@ export async function syncRatesAction(
   const sessionError = await requireAdministrator();
   if (sessionError) return sessionError;
 
-  const result = await executeScraper("MANUAL_SYNC");
+  const result = await executeGoodReturnsCatalogueSync("MANUAL_SYNC");
   revalidatePath("/admin/api-logs");
 
   if (result.ok) {

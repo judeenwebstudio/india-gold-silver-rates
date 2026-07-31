@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 
 import { handleRateSyncCron } from "@/lib/scheduler/cron-handler";
-import { executeScraper } from "@/lib/scrapers/service";
+import { executeGoodReturnsCatalogueSync } from "@/lib/scrapers/service";
 import { parseCronSlot } from "@/lib/scheduler/cron-slot";
 import { logResolvedProviderOrder } from "@/lib/scrapers/config";
 import { processRateAlerts } from "@/lib/notifications/rate-alerts";
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
     cronSlot,
     execute: async () => {
       try {
-        const result = await executeScraper("AUTOMATIC_CRON", {
+        const result = await executeGoodReturnsCatalogueSync("AUTOMATIC_CRON", {
           cronSlot: cronSlot ?? undefined,
         });
         console.info("[rate-sync-cron] database update result", {

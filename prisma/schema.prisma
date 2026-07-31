@@ -265,6 +265,7 @@ model MetalRate {
   source           String
   provider         RateProvider?
   sourceType       RateSourceType?
+  sourceSession    String?       @db.VarChar(2)
   sourceValue      Decimal?      @db.Decimal(18, 4)
   sourceUnit       RateSourceUnit?
   normalizedPer10Grams Decimal?  @db.Decimal(18, 4)
@@ -293,6 +294,7 @@ model MetalRate {
   @@index([metalType, purity, recordedAt])
   @@index([metalType, isActive, recordedAt])
   @@index([cityId, recordedAt])
+  @@index([provider, cityId, purity, sourceSession, recordedAt])
   @@index([source, recordedAt])
   @@index([isActive, recordedAt])
   @@index([recordedAt])

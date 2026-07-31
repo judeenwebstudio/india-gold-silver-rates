@@ -241,15 +241,34 @@ async function validateChangeThreshold(
       const baseline = await prisma.metalRate.findFirst({
         where: {
           cityId: sourceCityId ?? null,
+          provider: config.name === "GOODRETURNS" ? RateProvider.GOODRETURNS : RateProvider.IBJA,
+          sourceSession: result.preferredSession,
           isActive: true,
           metalType: toMetalType(quote.metalType),
           purity: purity as MetalPurity,
         },
         orderBy: [{ recordedAt: "desc" }, { updatedAt: "desc" }],
-        select: { pricePerGram: true, recordedAt: true },
+        select: { cityId: true, pricePerGram: true, recordedAt: true },
       });
 
       if (!baseline) return;
+      console.info("[rate-sync] city baseline comparison", {
+        provider: config.name,
+        session: result.preferredSession,
+        comparedCityId: sourceCityId,
+        comparedExistingRecordCityId: baseline.cityId,
+        purity,
+      });
+      if (baseline.cityId !== sourceCityId) {
+        throw new ScraperRejectedError("CITY_COMPARE_MISMATCH", {
+          code: "CITY_COMPARE_MISMATCH",
+          comparedCityId: sourceCityId,
+          comparedExistingRecordCityId: baseline.cityId,
+          provider: config.name,
+          session: result.preferredSession,
+          purity,
+        });
+      }
 
       const incomingRecordedAt = new Date(result.recordedAt);
       console.info("[rate-sync] source variance", {
@@ -460,6 +479,8 @@ async function writeSynchronizedRates(
             const existing = await transaction.metalRate.findFirst({
               where: {
                 cityId: sourceCityId ?? null,
+                provider,
+                sourceSession: parsed.preferredSession,
                 isActive: true,
                 metalType,
                 purity: purity as MetalPurity,
@@ -467,11 +488,31 @@ async function writeSynchronizedRates(
               orderBy: [{ recordedAt: "desc" }, { updatedAt: "desc" }],
             });
 
+            console.info("[rate-sync] city persistence comparison", {
+              provider,
+              session: parsed.preferredSession,
+              purity,
+              comparedCityId: sourceCityId,
+              comparedExistingRecordCityId: existing?.cityId ?? null,
+              existingRecordId: existing?.id ?? null,
+            });
+            if (existing && existing.cityId !== sourceCityId) {
+              throw new ScraperRejectedError("CITY_COMPARE_MISMATCH", {
+                code: "CITY_COMPARE_MISMATCH",
+                comparedCityId: sourceCityId,
+                comparedExistingRecordCityId: existing.cityId,
+                provider,
+                session: parsed.preferredSession,
+                purity,
+              });
+            }
+
             const pricePerKilogram = selected.pricePerKilogram;
             const sourceUnit = quote.sourceUnit as RateSourceUnit;
             const provenance = {
               provider,
               sourceType,
+              sourceSession: parsed.preferredSession,
               sourceValue: selected.sourceValue,
               sourceUnit,
               normalizedPer10Grams: (Number(selected.pricePerGram) * 10).toFixed(4),
@@ -590,7 +631,7 @@ async function writeSynchronizedRates(
               executionType: executionType as RateSyncExecutionType,
               message:
                 changedRates === 0
-                  ? `The ${parsed.preferredSession} source values matched the stored national rates; no records were changed.`
+                  ? `The ${parsed.preferredSession} source values matched the stored ${parsed.city?.city ?? "provider"} city rates; no records were changed.`
                   : `Synchronized ${changedRates} changed rates using the ${parsed.preferredSession} source session.`,
               changedRates,
               attemptCount,

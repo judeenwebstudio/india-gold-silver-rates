@@ -72,12 +72,14 @@ async function main() {
       name: "Default Administrator",
       passwordHash,
       isActive: true,
+      role: "SUPER_ADMIN",
     },
     create: {
       email: seededAdminEmail,
       name: "Default Administrator",
       passwordHash,
       isActive: true,
+      role: "SUPER_ADMIN",
     },
   });
 

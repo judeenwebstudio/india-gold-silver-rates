@@ -3,29 +3,22 @@ import "server-only";
 import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import type { AdminRole, ShopOrderStatus, ShopShipmentStatus, TrackingEventSource } from "@/generated/prisma/enums";
+import type { ShopOrderStatus, ShopShipmentStatus, TrackingEventSource } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 import { canTransitionOrder, publicStatusMessage } from "@/lib/admin-order-transitions";
 import { enqueueOrderEvent } from "@/lib/notifications/outbox";
+import { hasOrderAdminPermission, resolveAdminRole, type OrderAdminPermission } from "@/lib/admin-permissions";
 export { ORDER_STATUSES, SHIPMENT_STATUSES, allowedNextStatuses, canTransitionOrder, publicStatusMessage } from "@/lib/admin-order-transitions";
 
-const permissions: Record<string, AdminRole[]> = {
-  view:["SUPER_ADMIN","ORDER_MANAGER","FINANCE","FULFILLMENT","SUPPORT","VIEWER"],
-  status:["SUPER_ADMIN","ORDER_MANAGER","FULFILLMENT"],
-  payment:["SUPER_ADMIN","FINANCE"],
-  refund:["SUPER_ADMIN","FINANCE"],
-  shipment:["SUPER_ADMIN","ORDER_MANAGER","FULFILLMENT"],
-  note:["SUPER_ADMIN","ORDER_MANAGER","FINANCE","FULFILLMENT","SUPPORT"],
-  export:["SUPER_ADMIN","ORDER_MANAGER","FINANCE"],
-  shiprocket:["SUPER_ADMIN","ORDER_MANAGER","FULFILLMENT"],
-};
 const limits = new Map<string,{count:number;reset:number}>();
 
-export async function requireOrderAdmin(permission: keyof typeof permissions = "view") {
+export async function requireOrderAdmin(permission:OrderAdminPermission="view") {
   const session = await auth();
   if (!session?.user?.email) throw new Error("ADMIN_UNAUTHORIZED");
   const admin = await prisma.adminUser.findUnique({ where:{email:session.user.email}, select:{id:true,email:true,name:true,role:true,isActive:true} });
-  if (!admin?.isActive || !permissions[permission].includes(admin.role)) throw new Error("ADMIN_FORBIDDEN");
+  if (!admin?.isActive) throw new Error("ADMIN_FORBIDDEN");
+  const role=resolveAdminRole(admin.role,admin.email);
+  if (!hasOrderAdminPermission(role,permission)) throw new Error("ADMIN_FORBIDDEN");
   const requestHeaders = await headers();
   const origin = requestHeaders.get("origin");
   const host = requestHeaders.get("host");
@@ -34,7 +27,7 @@ export async function requireOrderAdmin(permission: keyof typeof permissions = "
   if (!current || current.reset < now) limits.set(key,{count:1,reset:now+60_000});
   else if (current.count >= 60) throw new Error("ADMIN_RATE_LIMITED");
   else current.count++;
-  return { ...admin, ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || null };
+  return { ...admin, role, ipAddress: requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || null };
 }
 
 export async function recordAdminAudit(admin:{id:string;ipAddress:string|null}, action:string, targetId:string, details:Prisma.InputJsonValue={}) {

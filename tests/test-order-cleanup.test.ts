@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { evaluateTestOrderCleanup, type TestOrderCleanupCandidate } from "../lib/test-order-cleanup";
+import { evaluateTestOrderCleanup, isDeleteConfirmation, parseIndiaCleanupCutoff, type TestOrderCleanupCandidate } from "../lib/test-order-cleanup";
 
 const cutoff = new Date("2026-07-31T06:30:00.000Z");
 const candidate = (overrides: Partial<TestOrderCleanupCandidate> = {}): TestOrderCleanupCandidate => ({
@@ -53,12 +53,13 @@ test("cleanup action is super-admin only and inherits authentication and CSRF", 
   assert.match(permissions, /cleanup:\["SUPER_ADMIN"\]/);
   assert.match(guard, /ADMIN_UNAUTHORIZED/); assert.match(guard, /CSRF_REJECTED/);
   assert.doesNotMatch(action, /export const initialCleanupState/);
-  assert.match(action, /export async function testOrderCleanupAction/);
+  assert.match(action, /export async function previewTestOrderCleanupAction/);
+  assert.match(action, /export async function deleteTestOrderCleanupAction/);
 });
 
 test("cleanup fails closed and transaction rollback protects the batch", async () => {
   const action = await readFile(new URL("../app/admin/(workspace)/orders/cleanup-actions.ts", import.meta.url), "utf8");
-  assert.match(action, /if \(blocked\.length\).*Nothing was deleted/s);
+  assert.match(action, /if \(blocked\.length\).*Order blocked/s);
   assert.match(action, /prisma\.\$transaction\(async tx =>/);
   assert.match(action, /CLEANUP_ELIGIBILITY_CHANGED/);
   assert.match(action, /deleted\.count !== ids\.length/);
@@ -84,4 +85,22 @@ test("orders page keeps existing controls and a valid client/server boundary", a
   assert.match(page, /Apply filters/); assert.match(page, /pageHref/); assert.match(page, /bulkOrderAction/);
   assert.match(actions, /verifyPaymentAction/); assert.match(actions, /updateShipmentAction/);
   assert.match(shipping, /createShiprocketAction/); assert.match(shipping, /assignAwbAction/); assert.match(shipping, /schedulePickupAction/);
+});
+
+test("India datetime-local parsing is exact and rejects invalid cutoffs",()=>{
+  assert.equal(parseIndiaCleanupCutoff("2026-07-31T13:30",new Date("2026-08-01T00:00:00Z")).toISOString(),"2026-07-31T08:00:00.000Z");
+  assert.throws(()=>parseIndiaCleanupCutoff("31/07/2026",new Date("2026-08-01T00:00:00Z")),/INVALID_CUTOFF/);
+});
+
+test("DELETE confirmation is exact",()=>{
+  assert.equal(isDeleteConfirmation("DELETE"),true);assert.equal(isDeleteConfirmation("delete"),false);assert.equal(isDeleteConfirmation(" DELETE "),false);
+});
+
+test("production form submits controlled IDs and dry-run approval",async()=>{
+  const client=await readFile(new URL("../components/admin/TestOrderCleanupPanel.tsx",import.meta.url),"utf8");
+  const action=await readFile(new URL("../app/admin/(workspace)/orders/cleanup-actions.ts",import.meta.url),"utf8");
+  assert.match(client,/selected\.map\(id=><input[^>]+name="cleanupOrderIds"/);
+  assert.match(client,/name="cleanupApprovalToken" value=\{preview\.approvalToken/);
+  assert.match(client,/formAction=\{previewAction\}/);assert.match(client,/action=\{deleteAction\}/);
+  assert.match(action,/validApproval/);assert.match(action,/revalidatePath\("\/admin\/orders","page"\)/);
 });

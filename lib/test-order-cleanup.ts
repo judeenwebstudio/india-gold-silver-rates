@@ -43,6 +43,14 @@ export type TestOrderCleanupResult = {
   reasons: string[];
 };
 
+export function parseIndiaCleanupCutoff(value:string,now=new Date()){
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))throw new Error("INVALID_CUTOFF");
+  const cutoff=new Date(`${value}:00+05:30`);
+  if(Number.isNaN(cutoff.getTime())||cutoff>now)throw new Error("INVALID_CUTOFF");
+  return cutoff;
+}
+export const isDeleteConfirmation=(value:FormDataEntryValue|null)=>value==="DELETE";
+
 export function evaluateTestOrderCleanup(
   order: TestOrderCleanupCandidate,
   cutoff: Date,

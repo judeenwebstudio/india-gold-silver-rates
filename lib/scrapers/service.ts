@@ -45,6 +45,8 @@ import type {
 } from "@/lib/scrapers/types";
 import { duplicateGoodReturnsMappings, resolveGoodReturnsCity } from "@/lib/scrapers/providers/goodreturns-city";
 import { GoodReturnsRateProvider } from "@/lib/scrapers/providers/goodreturns";
+import { getVerifiedGoodReturnsCatalogue } from "@/lib/scrapers/providers/goodreturns-catalogue";
+import { normalizeProviderCity } from "@/lib/scrapers/providers/goodreturns-parser";
 
 export type ScraperMode =
   | "MANUAL_TEST"
@@ -87,6 +89,10 @@ export type GoodReturnsMappingReport = {
   missingMappings: GoodReturnsMappingRow[];
   first100Mismatches: GoodReturnsMappingRow[];
   csv: string;
+  verifiedProviderCities: number;
+  mappedAutomatically: number;
+  requiresManualMapping: number;
+  notSupportedByGoodReturns: number;
 };
 
 type GoodReturnsMappingRow = {
@@ -741,7 +747,22 @@ async function synchronizeAllGoodReturnsCities(
     orderBy: [{ state: { name: "asc" } }, { name: "asc" }],
   });
   const targets = activeCities.map(resolveGoodReturnsCity);
-  const duplicates = duplicateGoodReturnsMappings(targets);
+  const catalogue = await getVerifiedGoodReturnsCatalogue(config, activeCities);
+  const verifiedBySlug = new Map(catalogue.cities.map((city) => [city.providerSlug, city]));
+  const verifiedNames = new Map<string, typeof catalogue.cities>();
+  for (const city of catalogue.cities) {
+    const key = normalizeProviderCity(city.providerCity);
+    verifiedNames.set(key, [...(verifiedNames.get(key) ?? []), city]);
+  }
+  const supportedTargets = targets.filter((target) => {
+    const verified = verifiedBySlug.get(target.providerSlug);
+    return Boolean(
+      verified && verified.goldSupported && verified.silverSupported &&
+      normalizeProviderCity(verified.providerCity) === normalizeProviderCity(target.providerCityName) &&
+      (!verified.state || verified.state === target.state),
+    );
+  });
+  const duplicates = duplicateGoodReturnsMappings(supportedTargets);
   const duplicateCityIds = new Set(duplicates.flatMap(({ cities }) => cities.map(({ cityId }) => cityId)));
   const report: GoodReturnsMappingReport = {
     totalActiveCities: targets.length,
@@ -758,15 +779,37 @@ async function synchronizeAllGoodReturnsCities(
     missingMappings: [],
     first100Mismatches: [],
     csv: "",
+    verifiedProviderCities: catalogue.cities.length,
+    mappedAutomatically: supportedTargets.filter((target) => target.citySlug === target.providerSlug).length,
+    requiresManualMapping: 0,
+    notSupportedByGoodReturns: 0,
   };
+  for (const target of targets) {
+    if (supportedTargets.some(({ cityId }) => cityId === target.cityId)) continue;
+    const possible = verifiedNames.get(normalizeProviderCity(target.city)) ?? [];
+    const manual = possible.length > 0;
+    if (manual) report.requiresManualMapping += 1;
+    else report.notSupportedByGoodReturns += 1;
+    report.unsupported += 1;
+    const reason = manual
+      ? "Verified provider city exists but requires an explicit state/city mapping."
+      : "NOT_SUPPORTED: no verified GoodReturns Gold and Silver city pages exist in the provider catalogue.";
+    report.unsupportedCities.push({
+      cityId: target.cityId, city: target.city, state: target.state, providerSlug: target.providerSlug, reason,
+    });
+    report.missingMappings.push({
+      rateStackState: target.state, rateStackCity: target.city, providerSlug: "", parsedCity: "",
+      status: "MISSING", resolvedCityId: target.cityId, reason,
+    });
+  }
   const database = emptyDatabaseSummary();
   const parsedResults: ScrapedRateResult[] = [];
   let cursor = 0;
   const concurrency = Math.max(1, Math.min(8, Number(process.env.GOODRETURNS_CONCURRENCY ?? "4") || 4));
 
   const worker = async () => {
-    while (cursor < targets.length) {
-      const target = targets[cursor++];
+    while (cursor < supportedTargets.length) {
+      const target = supportedTargets[cursor++];
       if (duplicateCityIds.has(target.cityId)) {
         report.unsupported += 1;
         report.unsupportedCities.push({ ...target, reason: "Duplicate provider slug; manual mapping required." });
@@ -872,7 +915,7 @@ async function synchronizeAllGoodReturnsCities(
       }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(concurrency, supportedTargets.length) }, worker));
   report.first100Mismatches = report.incorrectMappings.filter(({ status }) => status === "CITY_MISMATCH").slice(0, 100);
   report.csv = mappingCsv([
     ...report.correctMappings,

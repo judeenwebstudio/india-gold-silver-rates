@@ -8,6 +8,7 @@ import {
   type ScraperDatabaseSummary,
 } from "@/lib/scrapers/service";
 import type { ScrapedRateResult } from "@/lib/scrapers/types";
+import { processRateAlerts } from "@/lib/notifications/rate-alerts";
 
 export type ScraperActionState = {
   status: "idle" | "success" | "error";
@@ -70,6 +71,7 @@ export async function syncRatesAction(
   revalidatePath("/admin/api-logs");
 
   if (result.ok) {
+    await processRateAlerts();
     revalidatePath("/");
     revalidatePath("/admin/dashboard");
     revalidatePath("/admin/gold-rates");

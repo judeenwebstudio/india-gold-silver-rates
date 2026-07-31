@@ -431,3 +431,35 @@ to `vercel.json`:
   ]
 }
 ```
+
+## Firebase, email, and reporting modules
+
+Apply `20260731120000_add_notifications_email_and_reports` in production before enabling either
+delivery provider:
+
+```powershell
+npx prisma migrate deploy
+```
+
+Firebase push uses the official Admin SDK only on the server. Set `FIREBASE_ENABLED=true`,
+`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, and
+`FIREBASE_ANDROID_PACKAGE_NAME`. Vercel private keys may contain escaped `\n` sequences. Download
+the Android Firebase `google-services.json` from the Firebase console and place it locally at
+`android-ratestack/app/google-services.json`; it is intentionally excluded from source control.
+
+SMTP delivery requires `EMAIL_ENABLED=true`, `EMAIL_PROVIDER=SMTP`, `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM_EMAIL`. Branding and support values
+use the optional `SMTP_FROM_NAME`, `EMAIL_REPLY_TO`, `EMAIL_LOGO_URL`, `EMAIL_SUPPORT_EMAIL`, and
+`EMAIL_SUPPORT_PHONE` variables. Customer shipping labels remain disabled unless
+`EMAIL_ATTACH_SHIPPING_LABEL=true`.
+
+The asynchronous notification worker is:
+
+```text
+POST /api/cron/notifications
+Authorization: Bearer <CRON_SECRET>
+```
+
+It remains manually callable on Vercel Hobby. Add a supported schedule only after upgrading the
+Vercel plan. Provider-disabled events remain safely queued and do not interrupt payment, order, or
+shipment workflows.

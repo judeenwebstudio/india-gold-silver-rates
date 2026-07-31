@@ -4,6 +4,7 @@ import { handleRateSyncCron } from "@/lib/scheduler/cron-handler";
 import { executeScraper } from "@/lib/scrapers/service";
 import { parseCronSlot } from "@/lib/scheduler/cron-slot";
 import { logResolvedProviderOrder } from "@/lib/scrapers/config";
+import { processRateAlerts } from "@/lib/notifications/rate-alerts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
               })) ?? [],
         });
 
-        if (result.ok) revalidateRatePages();
+        if (result.ok) { revalidateRatePages(); await processRateAlerts(); }
         return result;
       } catch (error) {
         console.error("[rate-sync-cron] failure", {

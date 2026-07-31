@@ -656,13 +656,15 @@ class SchemeViewModel(
     }
 
     fun logout() {
-        repository.clearUserToken()
-        repository.clearUserDetails()
-        _userToken.value = null
-        _userName.value = null
-        _userPhone.value = null
-        _mySchemes.value = LoadState.Ready(emptyList())
-        _schemeDashboard.value = null
+        repository.revokePushToken {
+            repository.clearUserToken()
+            repository.clearUserDetails()
+            _userToken.value = null
+            _userName.value = null
+            _userPhone.value = null
+            _mySchemes.value = LoadState.Ready(emptyList())
+            _schemeDashboard.value = null
+        }
     }
 }
 

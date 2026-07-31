@@ -19,8 +19,10 @@ internal object NotificationHelper {
     const val DATA_KEY_URL = "url"
     const val DATA_KEY_LINK = "link"
     const val DATA_KEY_DEEP_LINK = "deeplink"
+    const val CHANNEL_ORDERS = "orders"
+    const val CHANNEL_DELIVERY = "delivery"
     const val CHANNEL_RATE_ALERTS = "rate_alerts"
-    const val CHANNEL_GENERAL_UPDATES = "general_updates"
+    const val CHANNEL_PROMOTIONS = "promotions"
 
     private val nextNotificationId = AtomicInteger(1000)
 
@@ -37,14 +39,19 @@ internal object NotificationHelper {
         ).apply {
             description = context.getString(R.string.notification_channel_rate_alerts_description)
         }
-        val generalUpdates = NotificationChannel(
-            CHANNEL_GENERAL_UPDATES,
-            context.getString(R.string.notification_channel_general),
+        val orders = NotificationChannel(CHANNEL_ORDERS, context.getString(R.string.notification_channel_orders), NotificationManager.IMPORTANCE_HIGH)
+        val delivery = NotificationChannel(CHANNEL_DELIVERY, context.getString(R.string.notification_channel_delivery), NotificationManager.IMPORTANCE_HIGH)
+        val promotions = NotificationChannel(
+            CHANNEL_PROMOTIONS,
+            context.getString(R.string.notification_channel_promotions),
             NotificationManager.IMPORTANCE_DEFAULT,
-        ).apply {
-            description = context.getString(R.string.notification_channel_general_description)
-        }
-        manager.createNotificationChannels(listOf(rateAlerts, generalUpdates))
+        )
+        manager.createNotificationChannels(listOf(orders, delivery, rateAlerts, promotions))
+    }
+
+    fun safeChannel(value: String?) = when (value) {
+        CHANNEL_ORDERS, CHANNEL_DELIVERY, CHANNEL_RATE_ALERTS, CHANNEL_PROMOTIONS -> value
+        else -> CHANNEL_ORDERS
     }
 
     fun showNotification(

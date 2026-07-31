@@ -6,6 +6,7 @@ import { getShiprocketConfig, requirePackageConfig, ShiprocketError } from "./co
 import { shiprocketRequest } from "./client";
 import { mapShiprocketStatus, shouldApplyTracking } from "./tracking";
 import type { Prisma } from "@/generated/prisma/client";
+import { enqueueNotification } from "@/lib/notifications/outbox";
 
 type Admin={id:string;ipAddress:string|null};
 const hash=(value:unknown)=>createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -22,7 +23,7 @@ async function beginOperation(orderId:string,type:string,payload:unknown,key=ope
 }
 async function finishOperation(id:string,success:boolean,reference?:string,error?:unknown){await prisma.shiprocketOperation.update({where:{id},data:{status:success?"SUCCESS":"FAILED",responseReference:reference?.slice(0,200),errorCode:error instanceof ShiprocketError?error.code:"PROVIDER_TEMPORARILY_UNAVAILABLE",errorMessage:error instanceof Error?error.message.slice(0,500):null,completedAt:new Date()}})}
 async function audit(admin:Admin|undefined,orderId:string,action:string,details:Record<string,unknown>){if(!admin)return;await prisma.adminAuditLog.create({data:{adminUserId:admin.id,action,targetEntity:"ShopOrder",targetId:orderId,detailsJson:details as Prisma.InputJsonValue,ipAddress:admin.ipAddress}})}
-async function notify(orderId:string,eventType:string,message:string){await prisma.notificationOutbox.create({data:{shopOrderId:orderId,eventType,title:"RateStack shipment update",body:message}})}
+async function notify(orderId:string,eventType:string,message:string){const order=await prisma.shopOrder.findUnique({where:{id:orderId},select:{userId:true,orderNumber:true}});if(!order)return;await enqueueNotification({customerId:order.userId,shopOrderId:orderId,eventType,title:"RateStack shipment update",body:message,payload:{deepLink:`/shop/orders/${orderId}`,orderId},deduplicationKey:`shipment:${orderId}:${eventType}:${message}`})}
 export function assertShipmentEligibility(order:{paymentStatus:string;orderStatus:string;shiprocketOrderId:string|null;customerName:string|null;customerPhone:string|null;addressLine1:string|null;deliveryCity:string|null;deliveryState:string|null;deliveryPincode:string|null;productName:string;quantity:number}){
   if(order.paymentStatus!=="SUCCESS"||!["PAYMENT_VERIFIED","ORDER_CONFIRMED","PROCESSING","PACKED","READY_TO_SHIP"].includes(order.orderStatus))throw new ShiprocketError("INVALID_SHIPMENT_STATE","Payment must be verified and the order confirmed before shipment creation.");
   if(order.shiprocketOrderId)throw new ShiprocketError("INVALID_SHIPMENT_STATE","An active Shiprocket order already exists.");

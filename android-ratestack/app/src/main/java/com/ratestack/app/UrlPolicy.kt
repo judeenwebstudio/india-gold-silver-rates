@@ -18,7 +18,16 @@ internal class UrlPolicy(
     private val trustedHost = trustedHost.lowercase().trim()
 
     fun classify(rawUrl: String): NavigationDestination {
-        val uri = runCatching { URI(rawUrl.trim()) }.getOrNull()
+        val trimmed = rawUrl.trim()
+        if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+            val path = trimmed.substringBefore("?").lowercase()
+            return if (path == "/admin" || path.startsWith("/admin/")) {
+                NavigationDestination.ADMIN_BLOCKED
+            } else {
+                NavigationDestination.INTERNAL
+            }
+        }
+        val uri = runCatching { URI(trimmed) }.getOrNull()
             ?: return NavigationDestination.BLOCKED
         val scheme = uri.scheme?.lowercase() ?: return NavigationDestination.BLOCKED
 

@@ -3,7 +3,11 @@ package com.ratestack.app.data
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.gson.Gson
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class SchemeRepository(
     private val api: RateStackApi,
@@ -22,6 +26,18 @@ class SchemeRepository(
 
     fun clearUserToken() {
         prefs.edit { remove("scheme_user_token") }
+    }
+
+    fun revokePushToken(onComplete: () -> Unit) {
+        val auth = getUserToken()
+        if (auth.isNullOrBlank()) { onComplete(); return }
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            val token = task.result
+            if (token.isNullOrBlank()) onComplete() else CoroutineScope(Dispatchers.IO).launch {
+                runCatching { api.revokePushDevice("Bearer $auth", mapOf("token" to token)) }
+                onComplete()
+            }
+        }
     }
 
     fun getUserName(): String? {

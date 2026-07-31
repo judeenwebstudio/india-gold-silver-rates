@@ -4,12 +4,9 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
 class RateStackMessagingService : FirebaseMessagingService() {
-    @Suppress("DEPRECATION")
-    @Deprecated("FCM invokes this callback; RateStack does not persist registration tokens.")
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        // Tokens are intentionally not logged, persisted, or sent to a server.
-        // Set a debugger breakpoint here when testing Firebase setup locally.
+        FcmTokenSync.register(this, token)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -24,11 +21,7 @@ class RateStackMessagingService : FirebaseMessagingService() {
         val url = message.data[NotificationHelper.DATA_KEY_URL]
             ?: message.data[NotificationHelper.DATA_KEY_LINK]
             ?: message.data[NotificationHelper.DATA_KEY_DEEP_LINK]
-        val channel = if (message.data["channel"] == NotificationHelper.CHANNEL_GENERAL_UPDATES) {
-            NotificationHelper.CHANNEL_GENERAL_UPDATES
-        } else {
-            NotificationHelper.CHANNEL_RATE_ALERTS
-        }
+        val channel = NotificationHelper.safeChannel(message.data["channel"])
 
         NotificationHelper.showNotification(
             context = this,

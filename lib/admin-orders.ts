@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { AdminRole, ShopOrderStatus, ShopShipmentStatus, TrackingEventSource } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 import { canTransitionOrder, publicStatusMessage } from "@/lib/admin-order-transitions";
+import { enqueueOrderEvent } from "@/lib/notifications/outbox";
 export { ORDER_STATUSES, SHIPMENT_STATUSES, allowedNextStatuses, canTransitionOrder, publicStatusMessage } from "@/lib/admin-order-transitions";
 
 const permissions: Record<string, AdminRole[]> = {
@@ -51,6 +52,7 @@ export async function transitionOrder(orderId:string, to:ShopOrderStatus, admin:
     await tx.shipmentTrackingEvent.create({data:{orderId,status:to,publicMessage:message,internalNote:internalNote||null,source,adminUserId:admin.id}});
     await tx.adminAuditLog.create({data:{adminUserId:admin.id,action:"ORDER_STATUS_CHANGED",targetEntity:"ShopOrder",targetId:orderId,detailsJson:{from:order.orderStatus,to},ipAddress:admin.ipAddress}});
   });
+  await enqueueOrderEvent(orderId,to);
 }
 
 export const shipmentToOrderStatus = (status:ShopShipmentStatus):ShopOrderStatus|null => ({

@@ -99,6 +99,7 @@ fun MyOrdersScreen(
             item { DashboardSection("Customer Information") { Text(customer.fullName.orEmpty(), fontWeight = FontWeight.Black); Text("${customer.phone ?: "No mobile"} • ${customer.email ?: "No email"}"); Text("Google Sign-In: ${if (customer.googleConnected == true) "Connected" else "Not connected"}") } }
         }
         item { DashboardSection("My GST Details") { val gst=data?.gstProfile;var edit by remember(gst?.id){mutableStateOf(false)};var business by remember(gst?.id){mutableStateOf(gst?.businessName.orEmpty())};var number by remember(gst?.id){mutableStateOf(gst?.gstNumber.orEmpty())};var billing by remember(gst?.id){mutableStateOf(gst?.billingAddress.orEmpty())};if(gst==null)Text("Add GST details during checkout to save them here.")else if(edit){OutlinedTextField(business,{business=it.take(150)},label={Text("Business Name")});OutlinedTextField(billing,{billing=it.take(500)},label={Text("Billing Address")},minLines=3);OutlinedTextField(number,{number=it.trim().uppercase(Locale.ENGLISH).take(15)},label={Text("GST Number")});Button({scope.launch{ApiProvider.service.saveGstProfile("Bearer $token",GstDetailsDto(true,business,number,billing));edit=false;refresh()}}){Text("Save")}}else{Text(gst.businessName.orEmpty(),fontWeight=FontWeight.Black);Text("GSTIN: ${gst.gstNumber}");Text(gst.billingAddress.orEmpty());Text(if(gst.isActive==true)"Enabled" else "Disabled",color=if(gst.isActive==true)Color(0xFF15803D) else Color.Gray);Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){TextButton({edit=true}){Text("Edit")};OutlinedButton({scope.launch{ApiProvider.service.toggleGstProfile("Bearer $token",mapOf("isActive" to (gst.isActive!=true)));refresh()}}){Text(if(gst.isActive==true)"Disable" else "Enable")};TextButton({scope.launch{ApiProvider.service.deleteGstProfile("Bearer $token");refresh()}}){Text("Delete")}}} } }
+        item { NotificationSettings(token.orEmpty()) }
         item { DashboardSection("Orders Summary") { Text("${data?.summary?.totalOrders ?: 0} total orders • ${money(data?.summary?.totalSpent ?: 0.0)} spent") } }
         item { Text("Recent Orders", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black) }
         items(data?.orders?.take(3).orEmpty(), key = { it.id.orEmpty() }) { order ->
@@ -204,6 +205,19 @@ fun MyOrdersScreen(
     }) }
 }
 
+@Composable
+private fun NotificationSettings(token:String){
+    val scope=rememberCoroutineScope()
+    var settings by remember{mutableStateOf(NotificationPreferencesDto())}
+    var message by remember{mutableStateOf("")}
+    LaunchedEffect(token){if(token.isNotBlank())runCatching{ApiProvider.service.getNotificationPreferences("Bearer $token").body()?.data}.getOrNull()?.let{settings=it}}
+    DashboardSection("Notification Settings"){
+        val values=listOf("Order notifications" to settings.orderPushEnabled,"Delivery notifications" to settings.deliveryPushEnabled,"Gold rate alerts" to settings.goldRateAlerts,"Silver rate alerts" to settings.silverRateAlerts,"Promotions" to settings.promotionalPushEnabled,"Email order updates" to settings.emailOrderUpdates)
+        values.forEachIndexed{index,(label,checked)->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(label);Switch(checked,{value->settings=when(index){0->settings.copy(orderPushEnabled=value);1->settings.copy(deliveryPushEnabled=value);2->settings.copy(goldRateAlerts=value);3->settings.copy(silverRateAlerts=value);4->settings.copy(promotionalPushEnabled=value);else->settings.copy(emailOrderUpdates=value)}})}}
+        Button({scope.launch{val ok=runCatching{ApiProvider.service.saveNotificationPreferences("Bearer $token",settings).isSuccessful}.getOrDefault(false);message=if(ok)"Preferences saved." else "Unable to save preferences."}}){Text("Save Preferences")}
+        if(message.isNotBlank())Text(message)
+    }
+}
 @Composable private fun Metric(label:String,value:String,modifier:Modifier=Modifier){Card(modifier){Column(Modifier.padding(12.dp)){Text(label,style=MaterialTheme.typography.labelSmall);Text(value,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=Color(0xFFB7791F))}}}
 @Composable private fun DashboardSection(title:String,content:@Composable ColumnScope.()->Unit){Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Color(0xFFFDFBF7)),border=BorderStroke(1.dp,Color(0x33B7791F))){Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){Text(title,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=Color(0xFF6B470C));content()}}}
 @Composable

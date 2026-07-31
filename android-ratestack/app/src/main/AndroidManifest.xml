@@ -29,7 +29,7 @@
             android:resource="@color/gold_primary" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="@string/notification_channel_rate_alerts_id" />
+            android:value="@string/notification_channel_orders_id" />
 
         <service
             android:name=".RateStackMessagingService"

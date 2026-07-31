@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 
-type Product = { id: string; name: string; metalType: string; description: string; imageUrl: string | null; weights: number[]; serviceChargePercent: number; gstPercent: number; isActive: boolean };
+type Product = { id: string; name: string; metalType: string; description: string; imageUrl: string | null; weights: number[]; serviceChargePercent: number; gstPercent: number; isActive: boolean;productCost:number|null;metalAcquisitionCost:number|null;packagingCost:number|null;shippingCost:number|null;gatewayFeePercent:number|null;otherCost:number|null };
 export default function ProductsAdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [message, setMessage] = useState("");

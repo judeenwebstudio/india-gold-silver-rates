@@ -126,6 +126,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             val sessions = PlayReviewCoordinator.recordSuccessfulSession(this)
             window.decorView.postDelayed({ PlayReviewCoordinator.requestIfEligible(this, sessions) }, 30_000)
         }
+        FcmTokenSync.refresh(this)
     }
 
     override fun onDestroy() {

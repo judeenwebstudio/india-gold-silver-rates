@@ -1,0 +1,6 @@
+"use server";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/prisma";
+import { requireOrderAdmin } from "@/lib/admin-orders";
+const paise=(data:FormData,key:string)=>{const value=String(data.get(key)||"").trim();return value===""?null:BigInt(Math.round(Number(value)*100))};
+export async function updateProductCosts(data:FormData){const admin=await requireOrderAdmin("status"),id=String(data.get("productId")||""),before=await prisma.shopProduct.findUniqueOrThrow({where:{id}}),update={productCostPaise:paise(data,"productCost"),metalAcquisitionCostPaise:paise(data,"metalAcquisitionCost"),packagingCostPaise:paise(data,"packagingCost"),shippingCostPaise:paise(data,"shippingCost"),gatewayFeeBasisPoints:String(data.get("gatewayFeePercent")||"").trim()===""?null:Math.round(Number(data.get("gatewayFeePercent"))*100),otherCostPaise:paise(data,"otherCost")},product=await prisma.shopProduct.update({where:{id},data:update}),keys=Object.keys(update) as (keyof typeof update)[];await prisma.productCostAudit.create({data:{productId:id,adminUserId:admin.id,beforeJson:Object.fromEntries(keys.map(key=>[key,before[key]?.toString()??null])),afterJson:Object.fromEntries(keys.map(key=>[key,product[key]?.toString()??null]))}});revalidatePath("/admin/products/costs")}

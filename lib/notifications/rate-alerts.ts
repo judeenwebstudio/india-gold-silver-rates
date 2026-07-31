@@ -1,0 +1,12 @@
+import "server-only";
+import { prisma } from "@/lib/prisma";
+import { enqueueNotification } from "./outbox";
+const istDay=(date=new Date())=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).format(date);
+export async function processRateAlerts(){
+  const [gold,silver]=await Promise.all([prisma.metalRate.findFirst({where:{metalType:"GOLD",purity:"K22",isActive:true},orderBy:{recordedAt:"desc"}}),prisma.metalRate.findFirst({where:{metalType:"SILVER",purity:"P999",isActive:true},orderBy:{recordedAt:"desc"}})]);
+  let queued=0;
+  for(const [metal,rate] of [["GOLD",gold],["SILVER",silver]] as const){if(!rate)continue;const ratePaise=BigInt(Math.round(Number(rate.pricePerGram)*100)),preferences=await prisma.rateAlertPreference.findMany({where:{metal,enabled:true},select:{id:true,customerId:true,alertType:true,targetPricePaise:true,lastTriggeredAt:true,lastRatePaise:true}});
+    for(const preference of preferences){const daily=preference.alertType==="DAILY_UPDATE",increase=preference.alertType==="PRICE_INCREASE"&&preference.lastRatePaise!=null&&ratePaise>preference.lastRatePaise,decrease=preference.alertType==="PRICE_DECREASE"&&preference.lastRatePaise!=null&&ratePaise<preference.lastRatePaise,below=preference.alertType==="TARGET_AT_OR_BELOW"&&preference.targetPricePaise!=null&&ratePaise<=preference.targetPricePaise,above=preference.alertType==="TARGET_AT_OR_ABOVE"&&preference.targetPricePaise!=null&&ratePaise>=preference.targetPricePaise;if(!(daily||increase||decrease||below||above))continue;if(preference.lastTriggeredAt&&daily&&istDay(preference.lastTriggeredAt)===istDay())continue;if(preference.lastTriggeredAt&&!daily&&Date.now()-preference.lastTriggeredAt.getTime()<12*3600_000)continue;const unit=metal==="GOLD"?"per gram":"per 10 grams",display=metal==="GOLD"?Number(rate.pricePerGram):Number(rate.pricePerGram)*10,title=`${metal==="GOLD"?"Gold":"Silver"} Rate Updated`,body=`${metal==="GOLD"?"22K gold rate in Tiruchirappalli":"Silver rate"} is now ₹${display.toLocaleString("en-IN")} ${unit}.`;await enqueueNotification({customerId:preference.customerId,eventType:`${metal}_RATE_ALERT`,title,body,channels:["PUSH"],payload:{deepLink:metal==="GOLD"?"/gold-rate":"/silver-rate",channel:"rate_alerts"},deduplicationKey:`rate:${preference.id}:${daily?istDay():rate.id}`});await prisma.rateAlertPreference.update({where:{id:preference.id},data:{lastTriggeredAt:new Date(),lastRatePaise:ratePaise}});queued++}
+  }
+  return {queued};
+}

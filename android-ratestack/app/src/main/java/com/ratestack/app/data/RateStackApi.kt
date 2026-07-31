@@ -9,6 +9,29 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface RateStackApi {
+    @POST("api/v1/me/devices")
+    suspend fun registerPushDevice(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Body request: Map<String, String>,
+    ): Response<ApiEnvelope<Map<String, Any>>>
+
+    @retrofit2.http.HTTP(method = "DELETE", path = "api/v1/me/devices", hasBody = true)
+    suspend fun revokePushDevice(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Body request: Map<String, String>,
+    ): Response<ApiEnvelope<Map<String, Any>>>
+
+    @GET("api/v1/me/notification-preferences")
+    suspend fun getNotificationPreferences(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+    ): Response<ApiEnvelope<NotificationPreferencesDto>>
+
+    @retrofit2.http.PUT("api/v1/me/notification-preferences")
+    suspend fun saveNotificationPreferences(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Body request: NotificationPreferencesDto,
+    ): Response<ApiEnvelope<NotificationPreferencesDto>>
+
     @GET("api/v1/shop")
     suspend fun getShop(): Response<ApiEnvelope<ShopResponseDto>>
 

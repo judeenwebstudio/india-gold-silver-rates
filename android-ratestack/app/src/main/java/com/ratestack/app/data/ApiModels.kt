@@ -578,3 +578,12 @@ data class GoogleConnectionDto(
     val googleConnected: Boolean?,
     val googleEmail: String? = null,
 )
+
+data class NotificationPreferencesDto(
+    val orderPushEnabled: Boolean = true,
+    val deliveryPushEnabled: Boolean = true,
+    val promotionalPushEnabled: Boolean = false,
+    val emailOrderUpdates: Boolean = true,
+    val goldRateAlerts: Boolean = false,
+    val silverRateAlerts: Boolean = false,
+)

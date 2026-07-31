@@ -23,6 +23,7 @@ model AdminUser {
   paymentVerifications PaymentVerification[]
   refunds      ShopRefund[]
   adminAuditLogs AdminAuditLog[]
+  productCostAudits ProductCostAudit[]
 
   @@index([isActive, email])
 }
@@ -119,8 +120,29 @@ enum LogisticsWebhookStatus {
 
 enum NotificationOutboxStatus {
   PENDING
+  PROCESSING
   SENT
   FAILED
+  CANCELLED
+}
+
+enum NotificationChannel {
+  PUSH
+  EMAIL
+}
+
+enum PushPlatform {
+  ANDROID
+  IOS
+  WEB
+}
+
+enum RateAlertType {
+  DAILY_UPDATE
+  PRICE_INCREASE
+  PRICE_DECREASE
+  TARGET_AT_OR_BELOW
+  TARGET_AT_OR_ABOVE
 }
 
 enum MetalType {
@@ -498,6 +520,10 @@ model SchemeUser {
   deliveryAddresses DeliveryAddress[]
   authAccounts       AuthAccount[]
   gstProfiles        CustomerGSTProfile[]
+  pushDeviceTokens   PushDeviceToken[]
+  notificationPreferences CustomerNotificationPreference?
+  rateAlertPreferences RateAlertPreference[]
+  notificationOutbox NotificationOutbox[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -533,8 +559,15 @@ model ShopProduct {
   availableWeightsGramsJson Json
   serviceChargeBasisPoints  Int         @default(500)
   gstBasisPoints            Int         @default(300)
+  productCostPaise          BigInt?
+  metalAcquisitionCostPaise BigInt?
+  packagingCostPaise        BigInt?
+  shippingCostPaise         BigInt?
+  gatewayFeeBasisPoints     Int?
+  otherCostPaise            BigInt?
   isActive                  Boolean     @default(true)
   orders                    ShopOrder[]
+  costAudits                ProductCostAudit[]
   createdAt                 DateTime    @default(now())
   updatedAt                 DateTime    @updatedAt
 
@@ -626,6 +659,13 @@ model ShopOrder {
   shiprocketRawStatus        String?
   shiprocketIntegrationStatus ShiprocketIntegrationStatus @default(DISABLED)
   shiprocketFailureReason    String?
+  productCostPaise           BigInt?
+  metalAcquisitionCostPaise  BigInt?
+  packagingCostPaise         BigInt?
+  shippingCostPaise          BigInt?
+  gatewayFeePaise            BigInt?
+  otherCostPaise             BigInt?
+  costSnapshotComplete       Boolean @default(false)
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
   statusHistory              OrderStatusHistory[]
@@ -645,6 +685,13 @@ model ShopOrder {
   @@index([shiprocketShipmentId])
   @@index([shiprocketIntegrationStatus, shiprocketLastSyncedAt])
   @@index([gstNumber])
+  @@index([createdAt])
+  @@index([paidAt])
+  @@index([deliveredAt])
+  @@index([orderStatus, createdAt])
+  @@index([paymentStatus, paidAt])
+  @@index([metalType, createdAt])
+  @@index([courierName, shipmentStatus])
 }
 
 model CustomerGSTProfile {
@@ -707,19 +754,89 @@ model LogisticsWebhookEvent {
 
 model NotificationOutbox {
   id          String                   @id @default(cuid())
-  shopOrderId String
-  shopOrder   ShopOrder                @relation(fields: [shopOrderId], references: [id], onDelete: Cascade)
+  customerId  String?
+  customer    SchemeUser?              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  shopOrderId String?
+  shopOrder   ShopOrder?               @relation(fields: [shopOrderId], references: [id], onDelete: Cascade)
   eventType   String
   title       String
   body        String
   payloadJson Json?
+  channel     NotificationChannel      @default(PUSH)
   status      NotificationOutboxStatus @default(PENDING)
+  attemptCount Int                     @default(0)
+  scheduledAt DateTime                 @default(now())
   createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
   sentAt      DateTime?
-  lastError   String?
+  failedAt    DateTime?
+  failureReason String?
+  providerMessageId String?
+  deduplicationKey String               @unique
 
-  @@index([status, createdAt])
+  @@index([channel, status, scheduledAt])
+  @@index([customerId, createdAt])
   @@index([shopOrderId, createdAt])
+}
+
+model PushDeviceToken {
+  id          String       @id @default(cuid())
+  customerId  String
+  customer    SchemeUser   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  token       String       @unique
+  platform    PushPlatform @default(ANDROID)
+  deviceName  String?
+  appVersion  String?
+  isActive    Boolean      @default(true)
+  lastSeenAt  DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  revokedAt   DateTime?
+
+  @@index([customerId, isActive, lastSeenAt])
+}
+
+model CustomerNotificationPreference {
+  id                    String     @id @default(cuid())
+  customerId            String     @unique
+  customer              SchemeUser @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderPushEnabled      Boolean    @default(true)
+  deliveryPushEnabled   Boolean    @default(true)
+  promotionalPushEnabled Boolean   @default(false)
+  emailOrderUpdates     Boolean    @default(true)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+}
+
+model RateAlertPreference {
+  id              String        @id @default(cuid())
+  customerId      String
+  customer        SchemeUser    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  metal           MetalType
+  alertType       RateAlertType
+  targetPricePaise BigInt?
+  citySlug        String?
+  enabled         Boolean       @default(false)
+  lastTriggeredAt DateTime?
+  lastRatePaise   BigInt?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([customerId, metal, alertType, citySlug])
+  @@index([metal, alertType, enabled])
+}
+
+model ProductCostAudit {
+  id          String      @id @default(cuid())
+  productId   String
+  product     ShopProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  adminUserId String
+  adminUser   AdminUser   @relation(fields: [adminUserId], references: [id])
+  beforeJson  Json
+  afterJson   Json
+  createdAt   DateTime    @default(now())
+
+  @@index([productId, createdAt])
 }
 
 model OrderStatusHistory {

@@ -9,7 +9,7 @@ import { AuthModal } from "@/components/AuthModal";
 const navigation = [
   { label: "Today’s rates", href: "/#rates" },
   { label: "Shop", href: "/shop" },
-  { label: "Calculator", href: "/#calculator" },
+  { label: "Calculator", href: "/calculator" },
 ];
 
 export function Header() {
@@ -51,6 +51,7 @@ export function Header() {
 
   const isActive = (href: string) => {
     if (href === "/shop") return pathname.startsWith("/shop");
+    if (href === "/calculator") return pathname === "/calculator";
     if (pathname !== "/") return false;
     const hash = href.split("#")[1];
     return activeHash === `#${hash}` || (!activeHash && hash === "rates");

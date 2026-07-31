@@ -12,7 +12,6 @@ export type CleanupActionState = {
   results: TestOrderCleanupResult[];
 };
 
-export const initialCleanupState: CleanupActionState = { kind: "idle", message: "", results: [] };
 const idSchema = z.string().cuid();
 
 function parseRequest(formData: FormData) {

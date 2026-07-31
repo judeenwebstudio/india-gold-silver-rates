@@ -52,6 +52,8 @@ test("cleanup action is super-admin only and inherits authentication and CSRF", 
   assert.match(action, /admin\.role !== "SUPER_ADMIN"/);
   assert.match(permissions, /cleanup:\["SUPER_ADMIN"\]/);
   assert.match(guard, /ADMIN_UNAUTHORIZED/); assert.match(guard, /CSRF_REJECTED/);
+  assert.doesNotMatch(action, /export const initialCleanupState/);
+  assert.match(action, /export async function testOrderCleanupAction/);
 });
 
 test("cleanup fails closed and transaction rollback protects the batch", async () => {
@@ -67,4 +69,19 @@ test("successful transaction records an immutable admin audit", async () => {
   assert.match(action, /tx\.adminAuditLog\.create/);
   assert.match(action, /TEST_ORDERS_DELETED/);
   assert.match(action, /orderIds: ids/);
+});
+
+test("orders page keeps existing controls and a valid client/server boundary", async () => {
+  const [client, page, actions, shipping] = await Promise.all([
+    readFile(new URL("../components/admin/TestOrderCleanupPanel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/admin/OrderManagementPage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/(workspace)/orders/actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/(workspace)/orders/shiprocket-actions.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(client, /const initialCleanupState: CleanupActionState/);
+  assert.doesNotMatch(client, /import \{ initialCleanupState/);
+  assert.match(page, /TestOrderCleanupPanel/); assert.match(page, /admin\.role==="SUPER_ADMIN"/);
+  assert.match(page, /Apply filters/); assert.match(page, /pageHref/); assert.match(page, /bulkOrderAction/);
+  assert.match(actions, /verifyPaymentAction/); assert.match(actions, /updateShipmentAction/);
+  assert.match(shipping, /createShiprocketAction/); assert.match(shipping, /assignAwbAction/); assert.match(shipping, /schedulePickupAction/);
 });

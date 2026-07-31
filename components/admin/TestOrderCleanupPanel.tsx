@@ -1,9 +1,10 @@
 "use client";
 
 import { useActionState } from "react";
-import { initialCleanupState, testOrderCleanupAction } from "@/app/admin/(workspace)/orders/cleanup-actions";
+import { testOrderCleanupAction, type CleanupActionState } from "@/app/admin/(workspace)/orders/cleanup-actions";
 
 type CleanupOrder = { id: string; orderNumber: string; email: string; createdAt: string; paymentStatus: string; orderStatus: string };
+const initialCleanupState: CleanupActionState = { kind: "idle", message: "", results: [] };
 
 export function TestOrderCleanupPanel({ orders }: { orders: CleanupOrder[] }) {
   const [state, action, pending] = useActionState(testOrderCleanupAction, initialCleanupState);

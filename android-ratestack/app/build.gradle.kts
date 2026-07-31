@@ -23,10 +23,13 @@ val trustedHost = providers.gradleProperty("RATESTACK_TRUSTED_HOST")
 val privacyPolicyUrl = providers.gradleProperty("RATESTACK_PRIVACY_POLICY_URL")
     .orElse("https://ratestack.in/privacy-policy")
     .get()
-val googleAndroidClientId = providers.gradleProperty("GOOGLE_ANDROID_CLIENT_ID")
+val googleServerClientId = providers.gradleProperty("GOOGLE_SERVER_CLIENT_ID")
+    .orElse(providers.environmentVariable("GOOGLE_SERVER_CLIENT_ID"))
+    .orElse(providers.gradleProperty("GOOGLE_ANDROID_CLIENT_ID"))
     .orElse(providers.environmentVariable("GOOGLE_ANDROID_CLIENT_ID"))
     .orElse("")
     .get()
+val buildCommit = providers.environmentVariable("RATESTACK_BUILD_COMMIT").orElse("unknown").get()
 val configuredVersionCode = providers.gradleProperty("RATESTACK_VERSION_CODE")
     .orElse("2")
     .get()
@@ -78,7 +81,9 @@ android {
             quotedBuildConfig(privacyPolicyUrl),
         )
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigPresent.toString())
-        buildConfigField("String", "GOOGLE_ANDROID_CLIENT_ID", quotedBuildConfig(googleAndroidClientId))
+        buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", quotedBuildConfig(googleServerClientId))
+        buildConfigField("String", "BUILD_COMMIT", quotedBuildConfig(buildCommit))
+        manifestPlaceholders["trustedHost"] = trustedHost
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

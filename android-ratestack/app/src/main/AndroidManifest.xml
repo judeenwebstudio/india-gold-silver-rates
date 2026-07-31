@@ -67,7 +67,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data
-                    android:host="india-gold-silver-rates.vercel.app"
+                    android:host="${trustedHost}"
                     android:path="/"
                     android:scheme="https" />
             </intent-filter>
@@ -79,7 +79,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="https" />
-                <data android:host="india-gold-silver-rates.vercel.app" />
+                <data android:host="${trustedHost}" />
                 <data android:path="/gold-rate" />
                 <data android:pathPrefix="/gold-rate/" />
             </intent-filter>
@@ -91,7 +91,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="https" />
-                <data android:host="india-gold-silver-rates.vercel.app" />
+                <data android:host="${trustedHost}" />
                 <data android:path="/silver-rate" />
                 <data android:pathPrefix="/silver-rate/" />
             </intent-filter>
@@ -103,7 +103,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="https" />
-                <data android:host="india-gold-silver-rates.vercel.app" />
+                <data android:host="${trustedHost}" />
                 <data android:path="/state" />
                 <data android:pathPrefix="/state/" />
             </intent-filter>
@@ -115,7 +115,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="https" />
-                <data android:host="india-gold-silver-rates.vercel.app" />
+                <data android:host="${trustedHost}" />
                 <data android:path="/city" />
                 <data android:pathPrefix="/city/" />
             </intent-filter>

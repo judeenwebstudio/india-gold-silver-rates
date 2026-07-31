@@ -207,7 +207,7 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
             } else {
                 Text("${product.name} • ${weight.toInt()}g × $quantity", fontWeight = FontWeight.Black)
                 Text("Purity: ${product.purity} • Live Trichy rate: ${money(product.ratePerGram ?: 0.0)}/g")
-                Text("Source: ${product.rateSource ?: "Previous verified rate"} • ${product.rateDate ?: "Latest"}")
+                Text("Source: ${friendlyRateSource(product.rateSource)} • ${formatRateDate(product.rateDate)}")
                 Text("$name • $mobile • $email"); Text("${address.addressLine1}, ${address.city}, ${address.district}, ${address.state} – ${address.pincode}, India")
                 Text("Payment method: $gateway", fontWeight = FontWeight.Bold)
                 if(gstEnabled){Text("GST Invoice",fontWeight=FontWeight.Black);Text(gstBusiness);Text(gstNumber);Text(effectiveGstAddress)}
@@ -247,8 +247,8 @@ private fun ShopCard(product: ShopProductDto, weights: List<Double>, weight: Dou
             }
             Text("Weight: ${weight.toInt()}g", fontWeight = FontWeight.Bold)
             Text("Live Trichy rate: ${money(product.ratePerGram ?: 0.0)} / g", fontWeight = FontWeight.Bold)
-            Text("Source: ${product.rateSource ?: "Previous verified rate"}")
-            Text("${product.rateSourceType?.replace('_', ' ') ?: "Market reference rate"} - ${product.rateDate ?: "Date unavailable"}")
+            Text("Source: ${friendlyRateSource(product.rateSource)}")
+            Text("${product.rateSourceType?.replace('_', ' ') ?: "Market reference rate"} - ${formatRateDate(product.rateDate)}")
             Text("Available weights", fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { weights.forEach { option -> if (option == weight) Button({ onWeight(option) }) { Text("${option.toInt()}g") } else OutlinedButton({ onWeight(option) }) { Text("${option.toInt()}g") } } }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -264,6 +264,26 @@ private fun ShopCard(product: ShopProductDto, weights: List<Double>, weight: Dou
             }
         }
     }
+}
+
+internal fun friendlyRateSource(value: String?): String = when (value?.uppercase(Locale.ENGLISH)) {
+    "GOODRETURNS" -> "GoodReturns Trichy"
+    "IBJA" -> "IBJA reference"
+    null, "" -> "Previous verified rate"
+    else -> value.replace('_', ' ')
+}
+
+internal fun formatRateDate(value: String?): String {
+    if (value.isNullOrBlank()) return "Latest verified rate"
+    return runCatching {
+        val parser = java.text.SimpleDateFormat(
+            if (value.contains('.')) "yyyy-MM-dd'T'HH:mm:ss.SSSX" else "yyyy-MM-dd'T'HH:mm:ssX",
+            Locale.ENGLISH,
+        ).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+        java.text.SimpleDateFormat("d MMM yyyy, h:mm a", Locale.ENGLISH).apply {
+            timeZone = java.util.TimeZone.getTimeZone("Asia/Kolkata")
+        }.format(requireNotNull(parser.parse(value)))
+    }.getOrElse { value }
 }
 @Composable private fun PriceRow(label: String, value: String, color: Color = Color.White) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = Color.White); Text(value, color = color, fontWeight = FontWeight.Bold) } }
 private fun money(value: Double) = NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(value)

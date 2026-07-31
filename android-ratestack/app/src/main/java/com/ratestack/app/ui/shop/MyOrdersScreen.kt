@@ -43,7 +43,10 @@ fun MyOrdersScreen(
         if (token.isNullOrBlank()) return
         scope.launch {
             runCatching { ApiProvider.service.getCustomerDashboard("Bearer $token") }
-                .onSuccess { response -> dashboard = response.body()?.data; if (!response.isSuccessful) error = response.body()?.error?.message }
+                .onSuccess { response ->
+                    if (response.isSuccessful) dashboard = response.body()?.data
+                    else error = ApiProvider.errorMessage(response, "Unable to load your Dashboard.")
+                }
                 .onFailure { error = "Unable to load your Dashboard." }
         }
     }
@@ -123,14 +126,17 @@ fun MyOrdersScreen(
         }
         item {
             val shipment = data?.orders?.firstOrNull { !it.shipment?.trackingNumber.isNullOrBlank() }?.shipment
-            DashboardSection("Shiprocket Integration") {
-                Text("Courier Partner: ${shipment?.courierPartner ?: "Assignment pending"}")
-                Text("Tracking Number: ${shipment?.trackingNumber ?: "Not assigned"}")
-                Text("Shipment Status: ${displayStatus(shipment?.status) ?: "No shipment"}")
-                Text("Pickup Status: ${displayStatus(shipment?.pickupStatus) ?: "Not scheduled"}")
-                Text("Expected Delivery: ${shipment?.expectedDelivery ?: "To be confirmed"}")
-                Text("Delivered: ${shipment?.deliveredAt ?: "Not delivered"}")
-                Text("Last Updated: ${shipment?.lastUpdated ?: "Not synced"}")
+            DashboardSection("Delivery & Tracking") {
+                if (shipment == null) {
+                    Text("Tracking details will appear after your order is dispatched.")
+                }
+                shipment?.courierPartner?.takeIf { it.isNotBlank() }?.let { Text("Courier Partner: $it") }
+                shipment?.trackingNumber?.takeIf { it.isNotBlank() }?.let { Text("Tracking Number: $it") }
+                shipment?.status?.takeIf { it.isNotBlank() }?.let { Text("Shipment Status: ${displayStatus(it)}") }
+                shipment?.pickupStatus?.takeIf { it.isNotBlank() }?.let { Text("Pickup Status: ${displayStatus(it)}") }
+                shipment?.expectedDelivery?.takeIf { it.isNotBlank() }?.let { Text("Expected Delivery: $it") }
+                shipment?.deliveredAt?.takeIf { it.isNotBlank() }?.let { Text("Delivered: $it") }
+                shipment?.lastUpdated?.takeIf { it.isNotBlank() }?.let { Text("Last Updated: $it") }
                 shipment?.message?.let { Text(it, color = Color(0xFF78716C)) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton({
@@ -149,7 +155,7 @@ fun MyOrdersScreen(
             DashboardSection("Saved Addresses") {
                 Button({ editing = ShopAddressDto(fullName=data?.customer?.fullName.orEmpty(), mobile=data?.customer?.phone.orEmpty(), addressLine1="", city="", district="", state="", pincode="") }) { Text("Add Address") }
                 data?.addresses.orEmpty().forEach { address ->
-                    Surface(Modifier.fillMaxWidth(), color = Color(0xFFF8F5EF), shape = MaterialTheme.shapes.large) {
+                    Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("${address.fullName} • ${address.mobile}", fontWeight = FontWeight.Black)
                             Text("${address.addressLine1}, ${address.city}, ${address.state} – ${address.pincode}")
@@ -198,9 +204,17 @@ fun MyOrdersScreen(
     }
     editing?.let { current -> AddressDialog(current, { editing = null }, { value ->
         scope.launch {
-            if (value.id == null) ApiProvider.service.createDeliveryAddress("Bearer $token", value)
-            else ApiProvider.service.updateDeliveryAddress("Bearer $token", value.id, value)
-            editing = null; refresh()
+            runCatching {
+                if (value.id == null) ApiProvider.service.createDeliveryAddress("Bearer $token", value)
+                else ApiProvider.service.updateDeliveryAddress("Bearer $token", value.id, value)
+            }.onSuccess { response ->
+                if (response.isSuccessful) {
+                    editing = null
+                    refresh()
+                } else {
+                    error = ApiProvider.errorMessage(response, "Unable to save address.")
+                }
+            }.onFailure { error = "Unable to save address. Check your connection and try again." }
         }
     }) }
 }
@@ -219,7 +233,7 @@ private fun NotificationSettings(token:String){
     }
 }
 @Composable private fun Metric(label:String,value:String,modifier:Modifier=Modifier){Card(modifier){Column(Modifier.padding(12.dp)){Text(label,style=MaterialTheme.typography.labelSmall);Text(value,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=Color(0xFFB7791F))}}}
-@Composable private fun DashboardSection(title:String,content:@Composable ColumnScope.()->Unit){Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Color(0xFFFDFBF7)),border=BorderStroke(1.dp,Color(0x33B7791F))){Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){Text(title,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=Color(0xFF6B470C));content()}}}
+@Composable private fun DashboardSection(title:String,content:@Composable ColumnScope.()->Unit){Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,Color(0x66B7791F))){Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){Text(title,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=MaterialTheme.colorScheme.primary);content()}}}
 @Composable
 private fun OrderCard(
     order: DashboardOrderDto,

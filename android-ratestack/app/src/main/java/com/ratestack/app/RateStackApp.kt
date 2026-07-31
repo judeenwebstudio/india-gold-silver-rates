@@ -1530,6 +1530,16 @@ private fun SettingsScreen(
                         subtitle = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                         icon = Icons.Default.Info,
                     )
+                    SettingTile(
+                        title = "Production Diagnostics",
+                        subtitle = "API: ${BuildConfig.TRUSTED_HOST} • Firebase: ${if (BuildConfig.FIREBASE_CONFIGURED) "configured" else "not configured"} • Push: ${FcmTokenSync.statusLabel()}",
+                        icon = Icons.Default.Info,
+                    )
+                    SettingTile(
+                        title = "Build Commit",
+                        subtitle = BuildConfig.BUILD_COMMIT.take(12),
+                        icon = Icons.Default.Info,
+                    )
                 }
             }
 

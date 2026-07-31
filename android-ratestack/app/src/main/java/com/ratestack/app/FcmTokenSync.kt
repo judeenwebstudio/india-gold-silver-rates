@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal object FcmTokenSync {
     private val syncInProgress = AtomicBoolean(false)
     @Volatile private var lastRegisteredKey: String? = null
+    @Volatile private var status = if (BuildConfig.FIREBASE_CONFIGURED) "Waiting for sign-in" else "Not configured"
+    fun statusLabel(): String = status
 
     private fun authToken(context: Context) = context
         .getSharedPreferences("ratestack_scheme_prefs", Context.MODE_PRIVATE)
@@ -19,10 +21,11 @@ internal object FcmTokenSync {
 
     fun refresh(context: Context) {
         if (!BuildConfig.FIREBASE_CONFIGURED) return
+        status = "Syncing"
         if (!syncInProgress.compareAndSet(false, true)) return
         FirebaseMessaging.getInstance().token
             .addOnSuccessListener { token -> registerClaimed(context, token) }
-            .addOnFailureListener { syncInProgress.set(false) }
+            .addOnFailureListener { status = "Token unavailable"; syncInProgress.set(false) }
     }
 
     fun register(context: Context, fcmToken: String) {
@@ -32,6 +35,7 @@ internal object FcmTokenSync {
 
     private fun registerClaimed(context: Context, fcmToken: String) {
         val auth = authToken(context) ?: run {
+            status = "Waiting for sign-in"
             syncInProgress.set(false)
             return
         }
@@ -52,7 +56,10 @@ internal object FcmTokenSync {
                     ),
                 )
             }.getOrNull()?.let { it.isSuccessful && it.body()?.success == true } == true
-            if (registered) lastRegisteredKey = registrationKey
+            if (registered) {
+                lastRegisteredKey = registrationKey
+                status = "Registered"
+            } else status = "Registration retry pending"
             syncInProgress.set(false)
         }
     }
@@ -68,6 +75,7 @@ internal object FcmTokenSync {
             if (token.isNullOrBlank()) onComplete() else CoroutineScope(Dispatchers.IO).launch {
                 runCatching { ApiProvider.service.revokePushDevice("Bearer $auth", mapOf("token" to token)) }
                 lastRegisteredKey = null
+                status = "Signed out"
                 onComplete()
             }
         }

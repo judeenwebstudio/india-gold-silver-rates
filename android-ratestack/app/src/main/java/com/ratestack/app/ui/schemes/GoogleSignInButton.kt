@@ -1,5 +1,6 @@
 package com.ratestack.app.ui.schemes
 
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
@@ -43,7 +44,8 @@ fun GoogleSignInButton(
         OutlinedButton(
             onClick = {
                 if (selecting || isLoading) return@OutlinedButton
-                if (BuildConfig.GOOGLE_ANDROID_CLIENT_ID.isBlank()) {
+                if (BuildConfig.GOOGLE_SERVER_CLIENT_ID.isBlank()) {
+                    Log.w("RateStackGoogleAuth", "Google sign-in unavailable: server OAuth client ID configured=false")
                     onError("Google sign-in is currently unavailable.")
                     return@OutlinedButton
                 }
@@ -51,7 +53,7 @@ fun GoogleSignInButton(
                 scope.launch {
                     try {
                         val option = GetGoogleIdOption.Builder()
-                            .setServerClientId(BuildConfig.GOOGLE_ANDROID_CLIENT_ID)
+                            .setServerClientId(BuildConfig.GOOGLE_SERVER_CLIENT_ID)
                             .setFilterByAuthorizedAccounts(false)
                             .setAutoSelectEnabled(false)
                             .build()
@@ -62,9 +64,11 @@ fun GoogleSignInButton(
                         } else {
                             onError("Google sign-in could not be completed. Please try again.")
                         }
-                    } catch (_: NoCredentialException) {
+                    } catch (exception: NoCredentialException) {
+                        Log.w("RateStackGoogleAuth", "Credential selection failed: ${exception::class.java.simpleName}")
                         onError("No eligible Google account was found on this device.")
-                    } catch (_: Exception) {
+                    } catch (exception: Exception) {
+                        Log.e("RateStackGoogleAuth", "Google sign-in failed: ${exception::class.java.simpleName}")
                         onError("Google sign-in could not be completed. Please try again.")
                     } finally {
                         selecting = false

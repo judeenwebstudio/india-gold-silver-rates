@@ -1,7 +1,7 @@
 import "server-only";
 import type { AdminRole } from "@/generated/prisma/enums";
 export type AdminPermission="REPORTS_VIEW"|"REPORTS_EXPORT"|"PROFIT_VIEW"|"GST_VIEW"|"COURIER_REPORT_VIEW"|"NOTIFICATION_VIEW"|"NOTIFICATION_SEND"|"EMAIL_RESEND";
-export type OrderAdminPermission="view"|"status"|"payment"|"refund"|"shipment"|"note"|"export"|"shiprocket";
+export type OrderAdminPermission="view"|"status"|"payment"|"refund"|"shipment"|"note"|"export"|"shiprocket"|"cleanup";
 const grants:Record<AdminPermission,AdminRole[]>={
   REPORTS_VIEW:["SUPER_ADMIN","ORDER_MANAGER","FINANCE","FULFILLMENT","VIEWER"],
   REPORTS_EXPORT:["SUPER_ADMIN","ORDER_MANAGER","FINANCE"],
@@ -21,6 +21,7 @@ const orderGrants:Record<OrderAdminPermission,AdminRole[]>={
   note:["SUPER_ADMIN","ORDER_MANAGER","FINANCE","FULFILLMENT","SUPPORT"],
   export:["SUPER_ADMIN","ORDER_MANAGER","FINANCE"],
   shiprocket:["SUPER_ADMIN","ORDER_MANAGER","FULFILLMENT"],
+  cleanup:["SUPER_ADMIN"],
 };
 export const DEFAULT_ADMIN_EMAIL="admin@indiagoldrates.local";
 export function isDefaultAdministrator(email:string){

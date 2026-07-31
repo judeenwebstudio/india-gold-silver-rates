@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { dateTime, paise } from "@/lib/admin-shop";
-import { ORDER_STATUSES, SHIPMENT_STATUSES } from "@/lib/admin-orders";
+import { ORDER_STATUSES, SHIPMENT_STATUSES, requireOrderAdmin } from "@/lib/admin-orders";
 import { bulkOrderAction } from "@/app/admin/(workspace)/orders/actions";
+import { TestOrderCleanupPanel } from "@/components/admin/TestOrderCleanupPanel";
 
 type Search={q?:string;payment?:string;status?:string;shipment?:string;product?:string;from?:string;to?:string;sort?:string;page?:string;notice?:string;error?:string};
 const badge=(value:string)=>`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black tracking-wide ${value.includes("FAILED")||value.includes("CANCEL")?"bg-red-100 text-red-800":value.includes("DELIVERED")||value.includes("VERIFIED")||value==="SUCCESS"?"bg-emerald-100 text-emerald-800":value.includes("PENDING")?"bg-amber-100 text-amber-900":"bg-stone-100 text-stone-700"}`;
 
 export async function OrderManagementPage({params}:{params:Search}){
+  const admin=await requireOrderAdmin("view");
   const p=params,page=Math.max(1,Number(p.page)||1),take=25;
   const where={
     ...(p.q?{OR:[{orderNumber:{contains:p.q,mode:"insensitive" as const}},{customerName:{contains:p.q,mode:"insensitive" as const}},{customerPhone:{contains:p.q}},{customerEmail:{contains:p.q,mode:"insensitive" as const}},{user:{is:{fullName:{contains:p.q,mode:"insensitive" as const}}}}]}:{}),
@@ -37,6 +39,7 @@ export async function OrderManagementPage({params}:{params:Search}){
       <div className="overflow-x-auto"><table className="min-w-[1700px] w-full text-left text-xs"><thead className="bg-stone-950 text-stone-200"><tr>{["","Order ID","Customer","Mobile","Product","Purity","Weight / Qty","Total","Payment","Order status","Shipment","Date","City","Courier","AWB",""].map((x,i)=><th key={`${x}-${i}`} className="p-3">{x}</th>)}</tr></thead><tbody className="divide-y">{orders.map(o=><tr key={o.id} className="hover:bg-amber-50/40"><td className="p-3"><input type="checkbox" name="orderIds" value={o.id} aria-label={`Select ${o.orderNumber}`}/></td><td className="p-3 font-black">{o.orderNumber}</td><td className="p-3">{o.customerName||o.user.fullName}<br/><span className="text-stone-500">{o.customerEmail||o.user.email}</span></td><td className="p-3">{o.customerPhone||o.user.phone||"—"}</td><td className="p-3">{o.productName}</td><td className="p-3">{o.purity}</td><td className="p-3">{o.weightGrams.toString()}g × {o.quantity}</td><td className="p-3 font-black">{paise(o.totalAmountPaise)}</td><td className="p-3">{o.gateway}<br/><span className={badge(o.paymentStatus)}>{o.paymentStatus}</span></td><td className="p-3"><span className={badge(o.orderStatus)}>{o.orderStatus}</span></td><td className="p-3"><span className={badge(o.shipmentStatus)}>{o.shipmentStatus}</span><br/><span className="text-stone-500">{o.shiprocketIntegrationStatus}</span></td><td className="p-3">{dateTime(o.createdAt)}</td><td className="p-3">{o.deliveryCity||"—"}</td><td className="p-3">{o.courierName||o.courierPartner||"—"}</td><td className="p-3">{o.awbCode||o.trackingNumber||"—"}</td><td className="p-3"><Link href={`/admin/orders/${o.id}`} className="rounded-lg bg-amber-400 px-3 py-2 font-black">Manage</Link></td></tr>)}</tbody></table></div>
       {!orders.length&&<p className="p-12 text-center text-stone-500">No orders match these filters.</p>}
     </form>
+    {admin.role==="SUPER_ADMIN"&&<TestOrderCleanupPanel orders={orders.filter(order=>["CREATED","PENDING","UNPAID"].includes(order.paymentStatus)&&order.orderStatus==="PAYMENT_PENDING").map(order=>({id:order.id,orderNumber:order.orderNumber,email:order.customerEmail||order.user.email||"",createdAt:dateTime(order.createdAt),paymentStatus:order.paymentStatus,orderStatus:order.orderStatus}))}/>}
     <nav className="mt-5 flex items-center justify-between text-sm"><Link aria-disabled={page===1} href={pageHref(Math.max(1,page-1))} className="rounded-lg border bg-white px-4 py-2">Previous</Link><span>Page {page} of {pages}</span><Link aria-disabled={page===pages} href={pageHref(Math.min(pages,page+1))} className="rounded-lg border bg-white px-4 py-2">Next</Link></nav>
   </div>;
 }

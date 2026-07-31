@@ -753,7 +753,7 @@ private fun HomeScreen(
                     }
 
                     item {
-                        SilverRateCard(silverRate = details.silverRate)
+                        SilverRateCard(silverRate = details.silverRate, cityName = details.city.name, sourceUpdatedAt = details.source.timestamp)
                     }
 
                     item {
@@ -772,7 +772,7 @@ private fun HomeScreen(
                     }
 
                     item {
-                        SilverRateCard(silverRate = data.latestSilverRate)
+                        SilverRateCard(silverRate = data.latestSilverRate, cityName = "All India", sourceUpdatedAt = data.source.timestamp)
                     }
 
                     item {
@@ -1168,7 +1168,7 @@ private fun RateDetailsScreen(
                 }
 
                 item {
-                    SilverRateCard(silverRate = details.silverRate)
+                    SilverRateCard(silverRate = details.silverRate, cityName = details.city.name, sourceUpdatedAt = details.source.timestamp)
                 }
 
                 item {

@@ -147,9 +147,9 @@ class RateRepository(
 
     private fun silverRateModel(dto: SilverRateDto): SilverRate? {
         val purity = dto.purity ?: return null
-        val price = dto.pricePerGram ?: return null
+        val price = dto.silverPerGram ?: dto.pricePerGram ?: dto.silverPer10Gram?.div(10.0) ?: return null
         if (price <= 0) return null
-        return SilverRate(purity, price, dto.pricePerKilogram, dto.previousPricePerGram, dto.changePerGram, dto.changePercent, dto.currency ?: "INR")
+        return SilverRate(purity, price, dto.silverPerKilogram ?: dto.pricePerKilogram, dto.silverPer10Gram ?: price * 10, dto.previousPricePerGram, dto.changePerGram, dto.changePercent, dto.currency ?: "INR")
     }
 
     private fun requireGoldRates(rates: List<RateDto>?): List<GoldRate> {

@@ -34,7 +34,7 @@ class NativeDataTest {
     @Test
     fun viewModelExposesRepositorySuccess() = runBlocking {
         Dispatchers.setMain(Dispatchers.Unconfined)
-        val home = HomeData(emptyList(), com.ratestack.app.data.SilverRate("999", 222.0, 222000.0, null, null, null, "INR"), "2026-07-23T13:18:00.814Z", SourceInfo("IBJA", "2026-07-23T12:30:00.000Z"), emptyList())
+        val home = HomeData(emptyList(), com.ratestack.app.data.SilverRate("999", 222.0, 222000.0, 2220.0, null, null, null, "INR"), "2026-07-23T13:18:00.814Z", SourceInfo("IBJA", "2026-07-23T12:30:00.000Z"), emptyList())
         val viewModel = RateStackViewModel(FakeSource(home), FakeStore())
         viewModel.refreshHome().join()
         assertTrue(viewModel.home.value is LoadState.Ready)
@@ -45,7 +45,7 @@ class NativeDataTest {
     @Test
     fun viewModelHandlesThemeModeChange() = runBlocking {
         Dispatchers.setMain(Dispatchers.Unconfined)
-        val home = HomeData(emptyList(), com.ratestack.app.data.SilverRate("999", 222.0, 222000.0, null, null, null, "INR"), "2026-07-23T13:18:00.814Z", SourceInfo("IBJA", "2026-07-23T12:30:00.000Z"), emptyList())
+        val home = HomeData(emptyList(), com.ratestack.app.data.SilverRate("999", 222.0, 222000.0, 2220.0, null, null, null, "INR"), "2026-07-23T13:18:00.814Z", SourceInfo("IBJA", "2026-07-23T12:30:00.000Z"), emptyList())
         val store = FakeStore()
         val viewModel = RateStackViewModel(FakeSource(home), store)
         assertEquals(AppThemeMode.SYSTEM, viewModel.themeMode.value)
@@ -53,6 +53,14 @@ class NativeDataTest {
         assertEquals(AppThemeMode.DARK, viewModel.themeMode.value)
         assertEquals(AppThemeMode.DARK, store.currentTheme)
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun selectedSilverWeightPreferencePersists() = runBlocking {
+        val store = FakeStore()
+        assertEquals(10, store.readSilverWeight())
+        store.saveSilverWeight(500)
+        assertEquals(500, store.readSilverWeight())
     }
 
     private class FakeSource(private val homeData: HomeData) : RatesDataSource {
@@ -64,6 +72,7 @@ class NativeDataTest {
 
     private class FakeStore : PreferencesStore {
         var currentTheme = AppThemeMode.SYSTEM
+        var silverWeight = 10
         override suspend fun saveSelection(stateSlug: String, citySlug: String) = Unit
         override suspend fun readSelection() = null to null
         override suspend fun readFavorites() = emptyList<FavoriteCity>()
@@ -77,5 +86,7 @@ class NativeDataTest {
         override suspend fun saveRateDetails(details: RateDetails) = Unit
         override suspend fun readRateDetails(state: String, city: String) = null
         override suspend fun clearCache() = Unit
+        override suspend fun readSilverWeight() = silverWeight
+        override suspend fun saveSilverWeight(grams: Int) { silverWeight = grams }
     }
 }

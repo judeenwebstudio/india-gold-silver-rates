@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -28,6 +29,8 @@ interface PreferencesStore {
     suspend fun saveRateDetails(details: RateDetails)
     suspend fun readRateDetails(state: String, city: String): RateDetails?
     suspend fun clearCache()
+    suspend fun readSilverWeight(): Int
+    suspend fun saveSilverWeight(grams: Int)
 }
 
 class PreferencesRepository(
@@ -40,6 +43,17 @@ class PreferencesRepository(
     private val notificationsKey = booleanPreferencesKey("notifications_enabled")
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val homeCacheKey = stringPreferencesKey("cache_home")
+    private val silverWeightKey = intPreferencesKey("silver_weight_grams")
+
+    override suspend fun readSilverWeight(): Int {
+        val saved = context.rateStackDataStore.data.first()[silverWeightKey] ?: DEFAULT_SILVER_WEIGHT_GRAMS
+        return if (saved in SILVER_WEIGHT_OPTIONS) saved else DEFAULT_SILVER_WEIGHT_GRAMS
+    }
+
+    override suspend fun saveSilverWeight(grams: Int) {
+        require(grams in SILVER_WEIGHT_OPTIONS)
+        context.rateStackDataStore.edit { it[silverWeightKey] = grams }
+    }
 
     override suspend fun saveSelection(stateSlug: String, citySlug: String) {
         context.rateStackDataStore.edit {

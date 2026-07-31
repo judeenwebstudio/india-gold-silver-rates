@@ -60,6 +60,9 @@ test("v1 national serializer returns requested gold and silver fields", () => {
   );
   assert.equal(result.latestSilverRate.pricePerGram, 120);
   assert.equal(result.latestSilverRate.pricePerKilogram, 120_000);
+  assert.equal(result.latestSilverRate.silverPerGram, 120);
+  assert.equal(result.latestSilverRate.silverPer10Gram, 1_200);
+  assert.equal(result.latestSilverRate.silverPerKilogram, 120_000);
   assert.equal(result.lastUpdated, snapshot.lastUpdatedAt);
 });
 

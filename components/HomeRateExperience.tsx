@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { GoldCalculator } from "@/components/GoldCalculator";
 import { LocationSelector } from "@/components/LocationSelector";
 import { RateCard } from "@/components/RateCard";
+import { SilverWeightCalculator } from "@/components/SilverWeightCalculator";
 import type { PublicRateSnapshot, PublicStateOption } from "@/lib/public-rate-types";
 
 function formatTimestamp(value: string) {
@@ -92,6 +93,7 @@ export function HomeRateExperience({ states, initialSnapshot }: { states: Public
       <section id="rates" className="bg-[#fbfaf7] py-14 sm:py-20"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="eyebrow">{snapshot.location.cityName} market snapshot</p><h2 className="section-title mt-2">Indicative city rates</h2></div><p className="max-w-lg text-sm leading-6 text-stone-500 sm:text-right">National base rate plus the configured city adjustment. Making charges and GST are not included.</p></div><div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{snapshot.rates.map((rate, index) => <RateCard key={rate.id} rate={rate} featured={index === 0} />)}</div></div></section>
 
       <section id="calculator" className="bg-white py-14 sm:py-20"><div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-16 lg:px-8"><div><p className="eyebrow">Plan your purchase</p><h2 className="section-title mt-2">Gold price calculator</h2><p className="mt-4 max-w-xl text-base leading-7 text-stone-600">Estimate the metal value using the currently selected indicative city rate. Making charges and GST are intentionally excluded.</p></div><GoldCalculator rates={snapshot.rates} /></div></section>
+      <section className="bg-[#fbfaf7] py-14 sm:py-20"><div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:gap-16 lg:px-8"><div><p className="eyebrow">Flexible silver weights</p><h2 className="section-title mt-2">Silver value calculator</h2><p className="mt-4 max-w-xl text-base leading-7 text-stone-600">Choose from 1 gram to 1 kilogram using the already loaded city rate. Your selection is remembered on this device.</p></div><SilverWeightCalculator snapshot={snapshot}/></div></section>
     </>
   );
 }

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/launcher_background" />
+    <item android:drawable="@color/splash_background" />
     <item
-        android:width="202dp"
-        android:height="99dp"
+        android:width="192dp"
+        android:height="192dp"
         android:gravity="center">
         <bitmap
             android:gravity="fill"
-            android:src="@drawable/ratestack_logo" />
+            android:src="@drawable/splash_icon" />
     </item>
 </layer-list>

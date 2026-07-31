@@ -85,7 +85,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -575,70 +577,31 @@ fun RateStackApp(
 
 @Composable
 private fun SplashScreen() {
-    val scale = remember { Animatable(0.85f) }
+    val scale = remember { Animatable(1.04f) }
     val alpha = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        launch { scale.animateTo(1.0f, animationSpec = tween(500)) }
-        launch { alpha.animateTo(1.0f, animationSpec = tween(500)) }
+        launch { scale.animateTo(1.0f, animationSpec = tween(650)) }
+        launch { alpha.animateTo(1.0f, animationSpec = tween(400)) }
     }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
+        color = Color(0xFF050B12),
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+            Image(
+                painter = painterResource(R.drawable.splash_cinematic),
+                contentDescription = "RateStack",
                 modifier = Modifier
+                    .fillMaxSize()
                     .scale(scale.value)
                     .alpha(alpha.value),
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(110.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Image(
-                            painter = painterResource(R.drawable.ratestack_logo),
-                            contentDescription = "RateStack Logo",
-                            modifier = Modifier.size(80.dp),
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(
-                    text = "RateStack",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp,
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-
-                Text(
-                    text = "Live Gold & Silver Prices",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Medium,
-                    ),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.5.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+                contentScale = ContentScale.Crop,
+            )
         }
     }
 }

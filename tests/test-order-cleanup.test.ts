@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { evaluateTestOrderCleanup, isDeleteConfirmation, parseIndiaCleanupCutoff, type TestOrderCleanupCandidate } from "../lib/test-order-cleanup";
+import { evaluateTestOrderCleanup, MAX_TEST_ORDER_CLEANUP, type TestOrderCleanupCandidate } from "../lib/test-order-cleanup";
 
-const cutoff = new Date("2026-07-31T06:30:00.000Z");
 const candidate = (overrides: Partial<TestOrderCleanupCandidate> = {}): TestOrderCleanupCandidate => ({
   id: "cm1234567890123456789012", orderNumber: "SHOP-TEST-1", customerEmail: "test@example.com",
   createdAt: new Date("2026-07-30T00:00:00.000Z"), paymentStatus: "PENDING", orderStatus: "PAYMENT_PENDING",
@@ -15,31 +14,30 @@ const candidate = (overrides: Partial<TestOrderCleanupCandidate> = {}): TestOrde
   ...overrides,
 });
 
-test("unpaid pending test order before cutoff is eligible", () => {
-  assert.equal(evaluateTestOrderCleanup(candidate(), cutoff).eligible, true);
+test("eligible pending order is accepted", () => {
+  assert.equal(evaluateTestOrderCleanup(candidate()).eligible, true);
+});
+
+test("multiple eligible pending orders are accepted",()=>{
+  assert.deepEqual([candidate(),candidate({id:"cm2234567890123456789012",orderNumber:"SHOP-TEST-2"})].map(evaluateTestOrderCleanup).map(result=>result.eligible),[true,true]);
 });
 
 test("paid or successful gateway order is blocked", () => {
-  const result = evaluateTestOrderCleanup(candidate({ paymentStatus: "SUCCESS", paidAt: new Date() }), cutoff);
+  const result = evaluateTestOrderCleanup(candidate({ paymentStatus: "SUCCESS", paidAt: new Date() }));
   assert.equal(result.eligible, false); assert.match(result.reasons.join(" "), /Payment status|gateway payment marker/);
 });
 
 test("any payment verification record is blocked", () => {
-  assert.equal(evaluateTestOrderCleanup(candidate({ paymentVerification: { result: "VERIFIED" } }), cutoff).eligible, false);
+  assert.equal(evaluateTestOrderCleanup(candidate({ paymentVerification: { result: "VERIFIED" } })).eligible, false);
 });
 
 test("shipped or fulfilled order is blocked", () => {
-  const result = evaluateTestOrderCleanup(candidate({ orderStatus: "SHIPPED", shipmentStatus: "SHIPPED", trackingNumber: "AWB1" }), cutoff);
+  const result = evaluateTestOrderCleanup(candidate({ orderStatus: "SHIPPED", shipmentStatus: "SHIPPED", trackingNumber: "AWB1" }));
   assert.equal(result.eligible, false); assert.match(result.reasons.join(" "), /Order status|Shipment status|tracking/);
 });
 
 test("refund order is blocked", () => {
-  assert.equal(evaluateTestOrderCleanup(candidate({ _count: { ...candidate()._count, refunds: 1 } }), cutoff).eligible, false);
-});
-
-test("new orders and non-allowlisted customer orders are blocked", () => {
-  assert.equal(evaluateTestOrderCleanup(candidate({ createdAt: cutoff }), cutoff).eligible, false);
-  assert.equal(evaluateTestOrderCleanup(candidate(), cutoff, new Set(["another@example.com"])).eligible, false);
+  assert.equal(evaluateTestOrderCleanup(candidate({ _count: { ...candidate()._count, refunds: 1 } })).eligible, false);
 });
 
 test("cleanup action is super-admin only and inherits authentication and CSRF", async () => {
@@ -53,8 +51,7 @@ test("cleanup action is super-admin only and inherits authentication and CSRF", 
   assert.match(permissions, /cleanup:\["SUPER_ADMIN"\]/);
   assert.match(guard, /ADMIN_UNAUTHORIZED/); assert.match(guard, /CSRF_REJECTED/);
   assert.doesNotMatch(action, /export const initialCleanupState/);
-  assert.match(action, /export async function previewTestOrderCleanupAction/);
-  assert.match(action, /export async function deleteTestOrderCleanupAction/);
+  assert.match(action, /export async function deleteSelectedPendingOrdersAction/);
 });
 
 test("cleanup fails closed and transaction rollback protects the batch", async () => {
@@ -68,7 +65,7 @@ test("cleanup fails closed and transaction rollback protects the batch", async (
 test("successful transaction records an immutable admin audit", async () => {
   const action = await readFile(new URL("../app/admin/(workspace)/orders/cleanup-actions.ts", import.meta.url), "utf8");
   assert.match(action, /tx\.adminAuditLog\.create/);
-  assert.match(action, /TEST_ORDERS_DELETED/);
+  assert.match(action, /PENDING_ORDERS_PERMANENTLY_DELETED/);
   assert.match(action, /orderIds: ids/);
 });
 
@@ -87,20 +84,16 @@ test("orders page keeps existing controls and a valid client/server boundary", a
   assert.match(shipping, /createShiprocketAction/); assert.match(shipping, /assignAwbAction/); assert.match(shipping, /schedulePickupAction/);
 });
 
-test("India datetime-local parsing is exact and rejects invalid cutoffs",()=>{
-  assert.equal(parseIndiaCleanupCutoff("2026-07-31T13:30",new Date("2026-08-01T00:00:00Z")).toISOString(),"2026-07-31T08:00:00.000Z");
-  assert.throws(()=>parseIndiaCleanupCutoff("31/07/2026",new Date("2026-08-01T00:00:00Z")),/INVALID_CUTOFF/);
-});
-
-test("DELETE confirmation is exact",()=>{
-  assert.equal(isDeleteConfirmation("DELETE"),true);assert.equal(isDeleteConfirmation("delete"),false);assert.equal(isDeleteConfirmation(" DELETE "),false);
-});
-
-test("production form submits controlled IDs and dry-run approval",async()=>{
+test("production form submits controlled explicit IDs through one delete action",async()=>{
   const client=await readFile(new URL("../components/admin/TestOrderCleanupPanel.tsx",import.meta.url),"utf8");
   const action=await readFile(new URL("../app/admin/(workspace)/orders/cleanup-actions.ts",import.meta.url),"utf8");
   assert.match(client,/selected\.map\(id=><input[^>]+name="cleanupOrderIds"/);
-  assert.match(client,/name="cleanupApprovalToken" value=\{preview\.approvalToken/);
-  assert.match(client,/formAction=\{previewAction\}/);assert.match(client,/action=\{deleteAction\}/);
-  assert.match(action,/validApproval/);assert.match(action,/revalidatePath\("\/admin\/orders","page"\)/);
+  assert.match(client,/action=\{action\}/);assert.match(client,/selected\.length===0/);
+  assert.doesNotMatch(client,/cleanupCutoff|cleanupEmails|cleanupConfirmation|Dry-run preview/);
+  assert.match(action,/revalidatePath\("\/admin\/orders","page"\)/);
+});
+
+test("empty selection and maximum 50 are enforced",async()=>{
+  const action=await readFile(new URL("../app/admin/(workspace)/orders/cleanup-actions.ts",import.meta.url),"utf8");
+  assert.equal(MAX_TEST_ORDER_CLEANUP,50);assert.match(action,/NO_ORDERS_SELECTED/);assert.match(action,/ids\.length > MAX_TEST_ORDER_CLEANUP/);
 });

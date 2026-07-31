@@ -43,18 +43,8 @@ export type TestOrderCleanupResult = {
   reasons: string[];
 };
 
-export function parseIndiaCleanupCutoff(value:string,now=new Date()){
-  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))throw new Error("INVALID_CUTOFF");
-  const cutoff=new Date(`${value}:00+05:30`);
-  if(Number.isNaN(cutoff.getTime())||cutoff>now)throw new Error("INVALID_CUTOFF");
-  return cutoff;
-}
-export const isDeleteConfirmation=(value:FormDataEntryValue|null)=>value==="DELETE";
-
 export function evaluateTestOrderCleanup(
   order: TestOrderCleanupCandidate,
-  cutoff: Date,
-  allowedEmails: Set<string> | null = null,
 ): TestOrderCleanupResult {
   const reasons: string[] = [];
   if (!unpaidStatuses.has(order.paymentStatus.toUpperCase())) reasons.push(`Payment status is ${order.paymentStatus}, not pending/unpaid.`);
@@ -68,8 +58,6 @@ export function evaluateTestOrderCleanup(
   if (order.pickupAt || order.pickupTokenNumber || order.pickupScheduledAt) reasons.push("Pickup data exists.");
   if (order.deliveredAt || order._count.statusHistory > 0 || order._count.trackingEvents > 0) reasons.push("Fulfilment, delivery, or tracking history exists.");
   if (order._count.shiprocketOperations > 0 || order._count.logisticsWebhookEvents > 0) reasons.push("Shiprocket operations or webhook events exist.");
-  if (order.createdAt >= cutoff) reasons.push("Order was created at or after the real-test cutoff.");
-  if (allowedEmails && !allowedEmails.has(order.customerEmail?.trim().toLowerCase() || "")) reasons.push("Customer email is not in the supplied test-email allowlist.");
   return { id: order.id, orderNumber: order.orderNumber, eligible: reasons.length === 0, reasons };
 }
 

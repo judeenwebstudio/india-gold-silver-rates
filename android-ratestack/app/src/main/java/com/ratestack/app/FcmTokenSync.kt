@@ -7,21 +7,41 @@ import com.ratestack.app.data.ApiProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 internal object FcmTokenSync {
+    private val syncInProgress = AtomicBoolean(false)
+    @Volatile private var lastRegisteredKey: String? = null
+
     private fun authToken(context: Context) = context
         .getSharedPreferences("ratestack_scheme_prefs", Context.MODE_PRIVATE)
         .getString("scheme_user_token", null)
 
     fun refresh(context: Context) {
         if (!BuildConfig.FIREBASE_CONFIGURED) return
-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token -> register(context, token) }
+        if (!syncInProgress.compareAndSet(false, true)) return
+        FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token -> registerClaimed(context, token) }
+            .addOnFailureListener { syncInProgress.set(false) }
     }
 
     fun register(context: Context, fcmToken: String) {
-        val auth = authToken(context) ?: return
+        if (!BuildConfig.FIREBASE_CONFIGURED || !syncInProgress.compareAndSet(false, true)) return
+        registerClaimed(context, fcmToken)
+    }
+
+    private fun registerClaimed(context: Context, fcmToken: String) {
+        val auth = authToken(context) ?: run {
+            syncInProgress.set(false)
+            return
+        }
+        val registrationKey = "${auth.hashCode()}:${fcmToken.hashCode()}"
+        if (registrationKey == lastRegisteredKey) {
+            syncInProgress.set(false)
+            return
+        }
         CoroutineScope(Dispatchers.IO).launch {
-            runCatching {
+            val registered = runCatching {
                 ApiProvider.service.registerPushDevice(
                     "Bearer $auth",
                     mapOf(
@@ -31,7 +51,9 @@ internal object FcmTokenSync {
                         "appVersion" to BuildConfig.VERSION_NAME,
                     ),
                 )
-            }
+            }.getOrNull()?.let { it.isSuccessful && it.body()?.success == true } == true
+            if (registered) lastRegisteredKey = registrationKey
+            syncInProgress.set(false)
         }
     }
 
@@ -45,6 +67,7 @@ internal object FcmTokenSync {
             val token = task.result
             if (token.isNullOrBlank()) onComplete() else CoroutineScope(Dispatchers.IO).launch {
                 runCatching { ApiProvider.service.revokePushDevice("Bearer $auth", mapOf("token" to token)) }
+                lastRegisteredKey = null
                 onComplete()
             }
         }

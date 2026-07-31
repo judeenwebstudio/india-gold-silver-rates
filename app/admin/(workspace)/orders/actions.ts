@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { allowedNextStatuses, publicStatusMessage, requireOrderAdmin, shipmentToOrderStatus, transitionOrder } from "@/lib/admin-orders";
 import { verifyRazorpaySignature } from "@/lib/schemes/razorpay";
 import { checkPhonePePaymentStatus } from "@/lib/schemes/phonepe";
+import { enqueueOrderEvent } from "@/lib/notifications/outbox";
 import type { ShopOrderStatus, ShopShipmentStatus } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 import { cancelShiprocketShipment } from "@/lib/shiprocket/service";
@@ -79,7 +80,7 @@ export async function verifyPaymentAction(formData:FormData){
         await tx.shipmentTrackingEvent.create({data:{orderId,status:"PAYMENT_VERIFIED",publicMessage:publicStatusMessage("PAYMENT_VERIFIED"),source:"PAYMENT_GATEWAY",adminUserId:admin.id}});
       }
       await tx.adminAuditLog.create({data:{adminUserId:admin.id,action:"PAYMENT_VERIFICATION_ATTEMPT",targetEntity:"ShopOrder",targetId:orderId,detailsJson:{gateway:order.gateway,verified,message},ipAddress:admin.ipAddress}});
-    });done(orderId,message,!verified);
+    });if(verified)await enqueueOrderEvent(orderId,"PAYMENT_VERIFIED");done(orderId,message,!verified);
   }catch(error){done(orderId,failure(error),true);}
 }
 

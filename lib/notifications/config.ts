@@ -20,5 +20,5 @@ export function getEmailConfig(){
 
 export function integrationHealth(){
   const firebase=getFirebaseConfig(),email=getEmailConfig();
-  return {firebase:{enabled:firebase.enabled,valid:firebase.valid,missing:firebase.missing},email:{enabled:email.enabled,valid:email.valid,provider:email.provider}};
+  return {firebase:{enabled:firebase.enabled,valid:firebase.valid,missing:firebase.missing,projectIdConfigured:Boolean(firebase.projectId),clientEmailConfigured:Boolean(firebase.clientEmail),privateKeyConfigured:Boolean(firebase.privateKey),androidPackageName:firebase.androidPackageName||"Not configured"},email:{enabled:email.enabled,valid:email.valid,provider:email.provider}};
 }

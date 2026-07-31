@@ -172,6 +172,7 @@ class SchemeViewModel(
                     val authData = res.body()?.data
                     if (authData?.token != null) {
                         repository.saveUserToken(authData.token)
+                        repository.syncPushToken()
                         repository.saveUserDetails(authData.user?.fullName ?: "Customer", authData.user?.phone ?: normalizedPhone)
                         _userToken.value = authData.token
                         _userName.value = authData.user?.fullName ?: "Customer"
@@ -201,6 +202,7 @@ class SchemeViewModel(
                 val authData = res.body()?.data
                 if (res.isSuccessful && res.body()?.success == true && authData?.token != null) {
                     repository.saveUserToken(authData.token)
+                    repository.syncPushToken()
                     repository.saveUserDetails(authData.user?.fullName ?: "Customer", authData.user?.phone.orEmpty())
                     _userToken.value = authData.token
                     _userName.value = authData.user?.fullName ?: "Customer"
@@ -274,6 +276,7 @@ class SchemeViewModel(
                     val authData = res.body()?.data
                     if (authData?.token != null) {
                         repository.saveUserToken(authData.token)
+                        repository.syncPushToken()
                         repository.saveUserDetails(authData.user?.fullName ?: fullName, authData.user?.phone ?: normalizedPhone)
                         _userToken.value = authData.token
                         _userName.value = authData.user?.fullName ?: fullName

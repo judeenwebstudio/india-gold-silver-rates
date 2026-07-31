@@ -36,4 +36,22 @@ class NotificationLinkRouterTest {
             assertEquals(NotificationLinkTarget.HOME, router.resolve(url))
         }
     }
+
+    @Test
+    fun routesOrderAndTrackingNotifications() {
+        assertEquals("/shop/orders?orderId=order_123", router.routeData("ORDER", "order_123", "false", null))
+        assertEquals("/shop/orders?orderId=order_123&tracking=true", router.routeData("TRACKING", "order_123", "true", null))
+    }
+
+    @Test
+    fun routesMetalAlerts() {
+        assertEquals("/gold-rate", router.routeData("RATE", null, null, "GOLD"))
+        assertEquals("/silver-rate", router.routeData("RATE", null, null, "SILVER"))
+    }
+
+    @Test
+    fun invalidOrMissingNotificationDataFallsBackSafely() {
+        assertEquals("/shop/orders", router.routeData("ORDER", "../admin", "false", null))
+        assertEquals("/shop/orders", router.routeData("UNKNOWN", null, null, null))
+    }
 }

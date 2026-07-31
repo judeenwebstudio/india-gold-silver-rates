@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.gson.Gson
+import com.ratestack.app.FcmTokenSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -26,6 +27,10 @@ class SchemeRepository(
 
     fun clearUserToken() {
         prefs.edit { remove("scheme_user_token") }
+    }
+
+    fun syncPushToken() {
+        FcmTokenSync.refresh(context)
     }
 
     fun revokePushToken(onComplete: () -> Unit) {

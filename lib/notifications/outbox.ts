@@ -29,5 +29,6 @@ const orderCopy:Record<string,[string,string]>={
 export async function enqueueOrderEvent(orderId:string,eventType:string){
   const order=await prisma.shopOrder.findUnique({where:{id:orderId},select:{id:true,userId:true,orderNumber:true}});
   const copy=orderCopy[eventType];if(!order||!copy)return [];
-  return enqueueNotification({customerId:order.userId,shopOrderId:order.id,eventType,title:copy[0],body:copy[1].replace("{orderId}",order.orderNumber),payload:{deepLink:`/shop/orders/${order.id}`,orderId:order.id},deduplicationKey:`order:${order.id}:${eventType}`});
+  const tracking=["SHIPPED","OUT_FOR_DELIVERY","DELIVERED","SHIPMENT_DELAYED","DELIVERY_EXCEPTION"].includes(eventType);
+  return enqueueNotification({customerId:order.userId,shopOrderId:order.id,eventType,title:copy[0],body:copy[1].replace("{orderId}",order.orderNumber),payload:{deepLink:"/shop/orders",destination:tracking?"TRACKING":"ORDER",orderId:order.id,tracking:String(tracking),channel:tracking?"delivery":"orders"},deduplicationKey:`order:${order.id}:${eventType}`});
 }

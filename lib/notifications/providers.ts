@@ -11,7 +11,7 @@ export async function sendPush(token:string,title:string,body:string,data:Record
   const config=getFirebaseConfig();if(!config.enabled)return {disabled:true,messageId:null};
   if(!config.valid)throw new PermanentNotificationError(`Firebase configuration incomplete: ${config.missing.join(", ")}`);
   if(!getApps().length)initializeApp({credential:cert({projectId:config.projectId,clientEmail:config.clientEmail,privateKey:config.privateKey})});
-  try{return {disabled:false,messageId:await getMessaging().send({token,notification:{title,body},data,android:{notification:{channelId:data.channel||"orders",clickAction:"OPEN_RATESTACK"}}})}}
+  try{return {disabled:false,messageId:await getMessaging().send({token,notification:{title,body},data,android:{notification:{channelId:data.channel||"orders"}}})}}
   catch(error){const code=String((error as {code?:string}).code||"");if(/registration-token-not-registered|invalid-registration-token/.test(code))throw new PermanentNotificationError(code);throw error}
 }
 export async function sendEmail(outbox:{eventType:string;title:string;body:string;shopOrderId:string|null}){

@@ -4,9 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { allowedNextStatuses } from "@/lib/admin-order-transitions";
 import { getShiprocketConfig, requirePackageConfig, ShiprocketError } from "./config";
 import { shiprocketRequest } from "./client";
-import { mapShiprocketStatus, shouldApplyTracking } from "./tracking";
+import { mapShiprocketStatus, shouldApplyTracking, statusRank } from "./tracking";
 import type { Prisma } from "@/generated/prisma/client";
-import { enqueueNotification } from "@/lib/notifications/outbox";
+import { enqueueNotification, enqueueOrderEvent } from "@/lib/notifications/outbox";
 
 type Admin={id:string;ipAddress:string|null};
 const hash=(value:unknown)=>createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -66,9 +66,9 @@ async function addTrackingEvent(orderId:string,status:string,message:string,raw?
   await prisma.shipmentTrackingEvent.create({data:{orderId,status,publicMessage:message,internalNote:raw?`Provider status: ${raw.slice(0,160)}`:null,source:"SHIPROCKET"}});
 }
 export async function applyTrackingUpdate(orderId:string,rawStatus:string,options:{statusCode?:number;eventAt?:Date;webhook?:boolean}={}){
-  const order=await prisma.shopOrder.findUniqueOrThrow({where:{id:orderId}}),mapped=mapShiprocketStatus(rawStatus);if(!shouldApplyTracking(order.shipmentStatus,mapped.shipmentStatus))return {applied:false,mapped};
+  const order=await prisma.shopOrder.findUniqueOrThrow({where:{id:orderId}}),mapped=mapShiprocketStatus(rawStatus),firstShipped=/PICKED[\s_-]*UP|SHIPPED|HANDED[\s_-]*TO[\s_-]*COURIER/i.test(rawStatus)&&statusRank(order.shipmentStatus)<statusRank("SHIPPED");if(!shouldApplyTracking(order.shipmentStatus,mapped.shipmentStatus))return {applied:false,mapped};
   const orderStatus=mapped.orderStatus&&allowedNextStatuses(order.orderStatus).includes(mapped.orderStatus)?mapped.orderStatus:undefined,now=new Date();
-  await prisma.$transaction(async tx=>{await tx.shopOrder.update({where:{id:orderId},data:{shipmentStatus:mapped.shipmentStatus,orderStatus,shiprocketStatusCode:options.statusCode,shiprocketStatusText:rawStatus.slice(0,200),shiprocketRawStatus:rawStatus.slice(0,500),shiprocketIntegrationStatus:mapped.integrationStatus,shiprocketLastSyncedAt:now,shiprocketLastWebhookAt:options.webhook?now:undefined,deliveredAt:mapped.shipmentStatus==="DELIVERED"?(options.eventAt||now):undefined,shiprocketFailureReason:null}});if(orderStatus)await tx.orderStatusHistory.create({data:{orderId,status:orderStatus,publicMessage:mapped.publicMessage,source:"SHIPROCKET"}})});await addTrackingEvent(orderId,mapped.shipmentStatus,mapped.publicMessage,rawStatus);await notify(orderId,mapped.shipmentStatus,mapped.publicMessage);return {applied:true,mapped};
+  await prisma.$transaction(async tx=>{await tx.shopOrder.update({where:{id:orderId},data:{shipmentStatus:mapped.shipmentStatus,orderStatus,shiprocketStatusCode:options.statusCode,shiprocketStatusText:rawStatus.slice(0,200),shiprocketRawStatus:rawStatus.slice(0,500),shiprocketIntegrationStatus:mapped.integrationStatus,shiprocketLastSyncedAt:now,shiprocketLastWebhookAt:options.webhook?now:undefined,deliveredAt:mapped.shipmentStatus==="DELIVERED"?(options.eventAt||now):undefined,shiprocketFailureReason:null}});if(orderStatus)await tx.orderStatusHistory.create({data:{orderId,status:orderStatus,publicMessage:mapped.publicMessage,source:"SHIPROCKET"}})});await addTrackingEvent(orderId,mapped.shipmentStatus,mapped.publicMessage,rawStatus);if(firstShipped)await enqueueOrderEvent(orderId,"SHIPPED");else await notify(orderId,mapped.shipmentStatus,mapped.publicMessage);return {applied:true,mapped};
 }
 export async function refreshTracking(orderId:string){
   const order=await prisma.shopOrder.findUniqueOrThrow({where:{id:orderId}});if(!order.awbCode)throw new ShiprocketError("TRACKING_FAILED","Tracking begins after AWB assignment.");

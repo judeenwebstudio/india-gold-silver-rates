@@ -18,9 +18,13 @@ class RateStackMessagingService : FirebaseMessagingService() {
         val body = message.notification?.body
             ?: message.data["body"]
             ?: getString(R.string.notification_default_body)
-        val url = message.data[NotificationHelper.DATA_KEY_URL]
-            ?: message.data[NotificationHelper.DATA_KEY_LINK]
-            ?: message.data[NotificationHelper.DATA_KEY_DEEP_LINK]
+        val router = NotificationLinkRouter(UrlPolicy(BuildConfig.TRUSTED_HOST))
+        val url = router.routeData(
+            message.data[NotificationHelper.DATA_KEY_DESTINATION],
+            message.data[NotificationHelper.DATA_KEY_ORDER_ID],
+            message.data[NotificationHelper.DATA_KEY_TRACKING],
+            message.data[NotificationHelper.DATA_KEY_METAL],
+        )
         val channel = NotificationHelper.safeChannel(message.data["channel"])
 
         NotificationHelper.showNotification(

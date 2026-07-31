@@ -13,11 +13,14 @@ type Dashboard = { customer:{fullName:string;phone:string|null;email:string|null
 const blank:Address={fullName:"",mobile:"",addressLine1:"",addressLine2:"",landmark:"",city:"",district:"",state:"",pincode:"",country:"India",addressType:"HOME"};
 const card="rounded-3xl border border-amber-300/15 bg-white/[0.055] p-5 shadow-[0_18px_60px_rgba(0,0,0,.28)] backdrop-blur-xl sm:p-6";
 const readToken=()=>localStorage.getItem("scheme_user_token")||localStorage.getItem("ratestack_user_token")||"";
+const readRequestedOrderId=()=>new URLSearchParams(window.location.search).get("orderId")||"";
+const subscribeToLocation=()=>()=>{};
 const subscribeToAuth=(onChange:()=>void)=>{window.addEventListener("auth:change",onChange);window.addEventListener("storage",onChange);return()=>{window.removeEventListener("auth:change",onChange);window.removeEventListener("storage",onChange);};};
 
 export function CustomerDashboard(){
   const [data,setData]=useState<Dashboard|null>(null); const [login,setLogin]=useState(false); const [error,setError]=useState(""); const [address,setAddress]=useState<Address|null>(null);
   const token=useSyncExternalStore(subscribeToAuth,readToken,()=>"");
+  const requestedOrderId=useSyncExternalStore(subscribeToLocation,readRequestedOrderId,()=>"");
   const load=useCallback(()=>{if(!token)return;fetch("/api/v1/me/dashboard",{headers:{Authorization:`Bearer ${token}`},cache:"no-store"}).then(r=>r.json()).then(b=>{if(!b.success)throw new Error(b.error?.message);setData(b.data)}).catch(e=>setError(e.message||"Dashboard unavailable."));},[token]);
   useEffect(()=>{void load();},[load]);
   async function saveAddress(){if(!address)return;const method=address.id?"PUT":"POST";const url=address.id?`/api/v1/me/addresses/${address.id}`:"/api/v1/me/addresses";const r=await fetch(url,{method,headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify(address)});const b=await r.json();if(!r.ok){setError(b.error?.message);return;}setAddress(null);load();}
@@ -26,7 +29,9 @@ export function CustomerDashboard(){
   async function refreshTracking(order:Order){setError("");const r=await fetch(`/api/v1/me/orders/${order.id}/tracking`,{method:"POST",headers:{Authorization:`Bearer ${token}`}});const body=await r.json();if(!r.ok){setError(body.error?.message||"Tracking is temporarily unavailable.");return;}load();}
   function logout(){["scheme_user_token","ratestack_user_token","scheme_user_name","scheme_user_phone"].forEach(key=>localStorage.removeItem(key));window.dispatchEvent(new CustomEvent("auth:change"));window.location.href="/";}
   if(!data)return <main className="mx-auto min-h-[70vh] max-w-7xl px-4 py-20 text-center"><p>{error||(!token?"Sign in to open your Dashboard.":"Loading your Dashboard…")}</p>{!token&&!login&&<button onClick={()=>setLogin(true)} className="mt-5 rounded-xl bg-amber-400 px-5 py-3 font-black text-stone-950">Login to Dashboard</button>}{login&&<AuthModal initialMode="login" redirectTo="/shop/orders" onClose={()=>setLogin(false)} onSuccess={()=>{setLogin(false);load();}}/>}</main>;
-  const recent=data.orders.slice(0,3); const tracked=data.orders.find(order=>order.shipment.trackingNumber)||data.orders[0];
+  const requested=data.orders.find(order=>order.id===requestedOrderId);
+  const recent=requested?[requested,...data.orders.filter(order=>order.id!==requested.id).slice(0,2)]:data.orders.slice(0,3);
+  const tracked=requested||data.orders.find(order=>order.shipment.trackingNumber)||data.orders[0];
   return <main className="relative overflow-hidden"><div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(217,160,49,.18),transparent_32%),radial-gradient(circle_at_90%_25%,rgba(255,255,255,.06),transparent_25%)]"/><div className="relative mx-auto max-w-7xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
     <section className={`${card} overflow-hidden bg-gradient-to-br from-amber-300/15 via-white/[.06] to-transparent`}><div className="flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-black uppercase tracking-[.24em] text-amber-300">My Dashboard</p><h1 className="mt-3 font-display text-4xl font-bold sm:text-5xl">Welcome, {data.customer.fullName}</h1><p className="mt-2 text-stone-400">Your orders, deliveries, addresses and account—beautifully organised in one place.</p></div><button onClick={logout} className="rounded-xl border border-red-300/30 px-5 py-3 font-bold text-red-200 hover:bg-red-400/10">Logout</button></div></section>
     <section aria-labelledby="orders-summary-title"><h2 id="orders-summary-title" className="mb-4 font-display text-2xl font-bold">Orders Summary</h2><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[["Total Orders",data.summary.totalOrders],["Paid Orders",data.summary.paidOrders],["Live Shipments",data.summary.activeShipments],["Total Spent",`₹${data.summary.totalSpent.toLocaleString("en-IN")}`]].map(([label,value])=><article key={label} className={card}><p className="text-xs font-black uppercase tracking-wider text-stone-500">{label}</p><p className="mt-3 text-3xl font-black text-amber-300">{value}</p></article>)}</div></section>

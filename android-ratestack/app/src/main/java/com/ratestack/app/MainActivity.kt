@@ -135,9 +135,19 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     }
 
     private fun resolveIncomingUrl(intent: Intent?): String? {
-        val raw = intent?.dataString ?: intent?.getStringExtra(NotificationHelper.EXTRA_NOTIFICATION_URL)
+        val router = NotificationLinkRouter(UrlPolicy(BuildConfig.TRUSTED_HOST))
+        val destination = intent?.getStringExtra(NotificationHelper.DATA_KEY_DESTINATION)
+        val orderId = intent?.getStringExtra(NotificationHelper.DATA_KEY_ORDER_ID)
+        val tracking = intent?.getStringExtra(NotificationHelper.DATA_KEY_TRACKING)
+        val metal = intent?.getStringExtra(NotificationHelper.DATA_KEY_METAL)
+        val dataRoute = if (destination != null || orderId != null || tracking != null || metal != null) {
+            router.routeData(destination, orderId, tracking, metal)
+        } else null
+        val raw = intent?.dataString
+            ?: intent?.getStringExtra(NotificationHelper.EXTRA_NOTIFICATION_URL)
+            ?: dataRoute
         if (raw.isNullOrBlank()) return null
-        return when (NotificationLinkRouter(UrlPolicy(BuildConfig.TRUSTED_HOST)).resolve(raw)) {
+        return when (router.resolve(raw)) {
             NotificationLinkTarget.INTERNAL -> raw
             NotificationLinkTarget.EXTERNAL_HTTPS -> {
                 openExternalUri(raw.toUri())

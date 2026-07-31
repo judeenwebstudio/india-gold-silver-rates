@@ -41,6 +41,16 @@ export type ScrapedRateResult = {
   fetchedAt: string;
   preferredSession: ScraperSession;
   quotes: ScrapedRateQuote[];
+  city?: ScraperCityTarget;
+};
+
+export type ScraperCityTarget = {
+  cityId: string;
+  state: string;
+  city: string;
+  citySlug: string;
+  providerCityName: string;
+  providerSlug: string;
 };
 
 export type ScraperSourceAttempt = {

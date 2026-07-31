@@ -1,7 +1,7 @@
 import { load } from "cheerio";
 import { createHash } from "node:crypto";
 import { ScraperRejectedError } from "@/lib/scrapers/errors";
-import type { ScrapedRateQuote, ScrapedRateResult } from "@/lib/scrapers/types";
+import type { ScrapedRateQuote, ScrapedRateResult, ScraperCityTarget } from "@/lib/scrapers/types";
 
 const MONTHS: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
@@ -54,12 +54,14 @@ function quote(code: ScrapedRateQuote["code"], label: string, metalType: "GOLD" 
 export function parseGoodReturnsRates(
   goldHtml: string,
   silverHtml: string,
-  context: { provider: string; sourceUrl: string; fetchedAt: string },
+  context: { provider: string; sourceUrl: string; fetchedAt: string; city: ScraperCityTarget },
 ): ScrapedRateResult & { rawResponseHash: string } {
   const gold = pageText(goldHtml);
   const silver = pageText(silverHtml);
-  if (!/Gold Rate in Trichy/i.test(gold) || !/Silver Rate in Trichy/i.test(silver)) {
-    throw new ScraperRejectedError("GoodReturns did not return the exact Trichy city pages.");
+  const escapedCity = context.city.providerCityName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!new RegExp(`Gold Rate in ${escapedCity}\\b`, "i").test(gold) ||
+      !new RegExp(`Silver Rate in ${escapedCity}\\b`, "i").test(silver)) {
+    throw new ScraperRejectedError(`GoodReturns did not return the requested ${context.city.providerCityName} city pages.`);
   }
   const goldDate = parseDate(goldHtml);
   const silverDate = parseDate(silverHtml);
@@ -82,6 +84,7 @@ export function parseGoodReturnsRates(
     recordedAt: new Date(`${goldDate}T10:00:00+05:30`).toISOString(),
     fetchedAt: context.fetchedAt,
     preferredSession: "AM",
+    city: context.city,
     rawResponseHash: createHash("sha256").update(goldHtml).update(silverHtml).digest("hex"),
     quotes: [
       quote("GOLD_999", "Gold 24K", "GOLD", "999", "K24", gold24),

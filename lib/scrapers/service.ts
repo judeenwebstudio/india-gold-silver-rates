@@ -43,6 +43,8 @@ import type {
   ScraperSourceAttempt,
   RateScraperProvider,
 } from "@/lib/scrapers/types";
+import { duplicateGoodReturnsMappings, resolveGoodReturnsCity } from "@/lib/scrapers/providers/goodreturns-city";
+import { GoodReturnsRateProvider } from "@/lib/scrapers/providers/goodreturns";
 
 export type ScraperMode =
   | "MANUAL_TEST"
@@ -67,6 +69,18 @@ export type ScraperExecutionResult = {
   attemptCount?: number;
   locked?: boolean;
   cronSlot?: CronSlot;
+  mappingReport?: GoodReturnsMappingReport;
+};
+
+export type GoodReturnsMappingReport = {
+  totalActiveCities: number;
+  successfullyMapped: number;
+  unsupported: number;
+  failed: number;
+  duplicateMappings: number;
+  unsupportedCities: Array<{ cityId: string; city: string; state: string; providerSlug: string; reason: string }>;
+  failedCities: Array<{ cityId: string; city: string; state: string; providerSlug: string; reason: string }>;
+  duplicates: ReturnType<typeof duplicateGoodReturnsMappings>;
 };
 
 type SelectedMappedRate = {
@@ -192,23 +206,16 @@ async function validateChangeThreshold(
   const selectedRates = selectedMappedRates(result);
   const violations: Array<Record<string, unknown>> = [];
   const stale: string[] = [];
-  const sourceCity = config.name === "GOODRETURNS"
-    ? await prisma.city.findFirst({
-        where: { slug: "tiruchirappalli", state: { code: "TN" } },
-        select: { id: true },
-      })
-    : null;
-  if (config.name === "GOODRETURNS" && !sourceCity) {
-    throw new ScraperRejectedError(
-      "The configured Tiruchirappalli city record is unavailable.",
-    );
+  const sourceCityId = config.name === "GOODRETURNS" ? result.city?.cityId : null;
+  if (config.name === "GOODRETURNS" && !sourceCityId) {
+    throw new ScraperRejectedError("The requested GoodReturns city context is unavailable.");
   }
 
   await Promise.all(
     selectedRates.map(async ({ quote, selected, purity }) => {
       const baseline = await prisma.metalRate.findFirst({
         where: {
-          cityId: sourceCity?.id ?? null,
+          cityId: sourceCityId ?? null,
           isActive: true,
           metalType: toMetalType(quote.metalType),
           purity: purity as MetalPurity,
@@ -410,11 +417,9 @@ async function writeSynchronizedRates(
     try {
       const synchronized = await prisma.$transaction(
         async (transaction) => {
-          const sourceCity = provider === RateProvider.GOODRETURNS
-            ? await transaction.city.findFirst({ where: { slug: "tiruchirappalli", state: { code: "TN" } }, select: { id: true } })
-            : null;
-          if (provider === RateProvider.GOODRETURNS && !sourceCity) {
-            throw new ScraperRejectedError("The configured Tiruchirappalli city record is unavailable.");
+          const sourceCityId = provider === RateProvider.GOODRETURNS ? parsed.city?.cityId : null;
+          if (provider === RateProvider.GOODRETURNS && !sourceCityId) {
+            throw new ScraperRejectedError("The requested GoodReturns city context is unavailable.");
           }
           const summary: ScraperDatabaseSummary = {
             created: 0,
@@ -429,7 +434,7 @@ async function writeSynchronizedRates(
             const metalType = toMetalType(quote.metalType);
             const existing = await transaction.metalRate.findFirst({
               where: {
-                cityId: sourceCity?.id ?? null,
+                cityId: sourceCityId ?? null,
                 isActive: true,
                 metalType,
                 purity: purity as MetalPurity,
@@ -519,7 +524,7 @@ async function writeSynchronizedRates(
                   purity: purity as MetalPurity,
                   pricePerGram: selected.pricePerGram,
                   pricePerKilogram,
-                  cityId: sourceCity?.id ?? null,
+                  cityId: sourceCityId ?? null,
                   source: config.name,
                   recordedAt,
                   ...provenance,
@@ -676,6 +681,123 @@ async function recordUnsuccessfulAttempt(
   });
 }
 
+function isUnsupportedGoodReturnsCity(error: unknown) {
+  if (error instanceof ScraperError && error.details?.status === 404) return true;
+  return error instanceof ScraperRejectedError && /requested .+ city pages/i.test(error.message);
+}
+
+function emptyDatabaseSummary(): ScraperDatabaseSummary {
+  return { created: 0, updated: 0, unchanged: 0, historyEntries: 0, metadataUpdated: 0 };
+}
+
+function addDatabaseSummary(target: ScraperDatabaseSummary, source: ScraperDatabaseSummary) {
+  target.created += source.created;
+  target.updated += source.updated;
+  target.unchanged += source.unchanged;
+  target.historyEntries += source.historyEntries;
+  target.metadataUpdated += source.metadataUpdated;
+}
+
+async function synchronizeAllGoodReturnsCities(
+  config: ScraperProviderConfig,
+  mode: ScraperMode,
+  attemptedAt: string,
+  startedAtMs: number,
+  cronSlot?: CronSlot,
+) {
+  const activeCities = await prisma.city.findMany({
+    where: { isActive: true, deletedAt: null, state: { isActive: true } },
+    select: { id: true, name: true, slug: true, state: { select: { name: true } } },
+    orderBy: [{ state: { name: "asc" } }, { name: "asc" }],
+  });
+  const targets = activeCities.map(resolveGoodReturnsCity);
+  const duplicates = duplicateGoodReturnsMappings(targets);
+  const duplicateCityIds = new Set(duplicates.flatMap(({ cities }) => cities.map(({ cityId }) => cityId)));
+  const report: GoodReturnsMappingReport = {
+    totalActiveCities: targets.length,
+    successfullyMapped: 0,
+    unsupported: 0,
+    failed: 0,
+    duplicateMappings: duplicates.length,
+    unsupportedCities: [],
+    failedCities: [],
+    duplicates,
+  };
+  const database = emptyDatabaseSummary();
+  const parsedResults: ScrapedRateResult[] = [];
+  let cursor = 0;
+  const concurrency = Math.max(1, Math.min(8, Number(process.env.GOODRETURNS_CONCURRENCY ?? "4") || 4));
+
+  const worker = async () => {
+    while (cursor < targets.length) {
+      const target = targets[cursor++];
+      if (duplicateCityIds.has(target.cityId)) {
+        report.unsupported += 1;
+        report.unsupportedCities.push({ ...target, reason: "Duplicate provider slug; manual mapping required." });
+        continue;
+      }
+      const provider = new GoodReturnsRateProvider(config, target);
+      try {
+        const parsed = await provider.scrape();
+        await validateChangeThreshold(provider.config, parsed);
+        parsedResults.push(parsed);
+        report.successfullyMapped += 1;
+        if (mode !== "MANUAL_TEST") {
+          const synchronized = await writeSynchronizedRates(
+            provider.config, parsed, attemptedAt, mode, 1, startedAtMs, cronSlot, [{
+              provider: provider.name,
+              sourceUrl: provider.sourceUrl,
+              status: "SUCCESS",
+              sourceDate: parsed.sourceDate,
+              sourceRecordedAt: parsed.recordedAt,
+              preferredSession: parsed.preferredSession,
+              attemptedAt: new Date().toISOString(),
+            }],
+          );
+          addDatabaseSummary(database, synchronized.summary);
+        }
+      } catch (error) {
+        const item = {
+          cityId: target.cityId,
+          city: target.city,
+          state: target.state,
+          providerSlug: target.providerSlug,
+          reason: error instanceof Error ? error.message : "Unknown provider error",
+        };
+        if (isUnsupportedGoodReturnsCity(error)) {
+          report.unsupported += 1;
+          report.unsupportedCities.push(item);
+        } else {
+          report.failed += 1;
+          report.failedCities.push(item);
+        }
+        console.warn("[rate-sync] GoodReturns city skipped", item);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, worker));
+
+  const log = await prisma.rateUpdateLog.create({
+    data: {
+      source: "GOODRETURNS",
+      sourceUrl: process.env.GOODRETURNS_BASE_URL?.trim() || "https://www.goodreturns.in",
+      status: report.failed > 0 && report.successfullyMapped === 0
+        ? RateUpdateStatus.FAILED
+        : database.created + database.updated > 0
+          ? RateUpdateStatus.SUCCESS
+          : RateUpdateStatus.NO_CHANGE,
+      executionType: mode as RateSyncExecutionType,
+      message: `GoodReturns city mapping completed for ${report.totalActiveCities} active cities: ${report.successfullyMapped} mapped, ${report.unsupported} unsupported, ${report.failed} failed.`,
+      changedRates: database.created + database.updated,
+      durationMs: Date.now() - startedAtMs,
+      rawData: { mappingReport: report, database } as Prisma.InputJsonObject,
+    },
+    select: { id: true },
+  });
+  console.info("[rate-sync] GoodReturns city mapping report", report);
+  return { report, database, parsed: parsedResults[0], logId: log.id };
+}
+
 export async function executeScraper(
   mode: ScraperMode,
   options: { cronSlot?: CronSlot } = {},
@@ -696,7 +818,34 @@ export async function executeScraper(
     }
 
     const providerOrder = logResolvedProviderOrder(`executeScraper:${mode}`);
-    const providers = createRateScraperProviders(scraperConfig, providerOrder.enabled);
+    if (providerOrder.enabled.includes("GOODRETURNS")) {
+      const lease = await acquireRateSyncLease();
+      if (!lease) throw new RateSyncLockUnavailableError("Another rate synchronization is already running. This attempt was safely skipped.");
+      try {
+        const citySync = await synchronizeAllGoodReturnsCities(
+          scraperConfig, mode, attemptedAt, startedAtMs, cronSlot,
+        );
+        if (citySync.report.successfullyMapped > 0) {
+          return {
+            ok: true,
+            outcome: citySync.database.created + citySync.database.updated > 0 ? "SUCCESS" : "NO_CHANGE",
+            message: `Processed ${citySync.report.totalActiveCities} active cities; ${citySync.report.successfullyMapped} GoodReturns mappings succeeded.`,
+            logId: citySync.logId,
+            parsed: citySync.parsed,
+            database: citySync.database,
+            attemptCount: 1,
+            cronSlot,
+            mappingReport: citySync.report,
+          };
+        }
+      } finally {
+        await releaseRateSyncLease(lease);
+      }
+    }
+    const providers = createRateScraperProviders(
+      scraperConfig,
+      providerOrder.enabled.filter((provider) => provider !== "GOODRETURNS"),
+    );
 
     if (mode === "MANUAL_TEST") {
       const prepared = await scrapeWithFallback(providers, scraperConfig.maxChangePercent);

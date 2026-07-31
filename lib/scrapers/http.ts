@@ -291,7 +291,11 @@ export async function fetchPublicHtml(
   }
 
   if (!response.ok) {
-    throw new ScraperFetchError(`The source returned HTTP ${response.status}.`);
+    throw new ScraperFetchError(`The source returned HTTP ${response.status}.`, {
+      status: response.status,
+      redirectChain,
+      finalUrl,
+    });
   }
 
   if (new URL(finalUrl).protocol !== "https:") {

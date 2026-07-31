@@ -24,6 +24,10 @@ const result = (provider: string): ScrapedRateResult => ({
 const provider = (name: string, scrape: () => Promise<ScrapedRateResult>): RateScraperProvider => ({
   name, sourceUrl: config(name).url, config: config(name), scrape,
 });
+const city = {
+  cityId: "city-1", state: "Karnataka", city: "Bengaluru", citySlug: "bengaluru",
+  providerCityName: "Bangalore", providerSlug: "bangalore",
+};
 
 test("valid GoodReturns prevents an unnecessary IBJA request", async () => {
   let ibjaCalls = 0;
@@ -47,7 +51,7 @@ test("runtime reads and resolves the three provider environment variables", () =
   assert.deepEqual(resolved.enabled, ["GOODRETURNS", "IBJA"]);
   assert.equal(resolved.disabled[0]?.provider, "BANKBAZAAR");
   assert.deepEqual(
-    createRateScraperProviders(config("IBJA"), resolved.enabled).map((item) => item.name),
+    createRateScraperProviders(config("IBJA"), resolved.enabled, city).map((item) => item.name),
     ["GOODRETURNS", "IBJA"],
   );
 });
@@ -60,7 +64,7 @@ test("configured provider order is respected instead of hardcoded", () => {
   });
   assert.deepEqual(resolved.enabled, ["IBJA", "GOODRETURNS"]);
   assert.deepEqual(
-    createRateScraperProviders(config("IBJA"), resolved.enabled).map((item) => item.name),
+    createRateScraperProviders(config("IBJA"), resolved.enabled, city).map((item) => item.name),
     ["IBJA", "GOODRETURNS"],
   );
 });

@@ -84,6 +84,10 @@ export function getResolvedProviderOrder(
   const bankBazaarAuthorised = enabledFlag(env.BANKBAZAAR_AUTHORISED);
   const disabled: ResolvedProviderOrder["disabled"] = [];
   const enabled = requested.filter((provider) => {
+    if (provider === "GOODRETURNS" && env.GOODRETURNS_ENABLED?.trim().toLowerCase() === "false") {
+      disabled.push({ provider, reason: "GoodReturns is disabled." });
+      return false;
+    }
     if (provider !== "BANKBAZAAR") return true;
     if (!bankBazaarEnabled || !bankBazaarAuthorised) {
       disabled.push({

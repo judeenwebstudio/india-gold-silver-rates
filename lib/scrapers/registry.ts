@@ -4,6 +4,7 @@ import { GoodReturnsRateProvider } from "@/lib/scrapers/providers/goodreturns";
 import type { ConfiguredRateProvider } from "@/lib/scrapers/config";
 import type {
   RateScraperProvider,
+  ScraperCityTarget,
   ScraperProviderConfig,
 } from "@/lib/scrapers/types";
 
@@ -28,9 +29,10 @@ export function createRateScraperProvider(config: ScraperProviderConfig) {
 export function createRateScraperProviders(
   config: ScraperProviderConfig,
   providerOrder: ConfiguredRateProvider[] = ["GOODRETURNS", "IBJA"],
+  city?: ScraperCityTarget,
 ) {
   return providerOrder.flatMap((provider): RateScraperProvider[] => {
-    if (provider === "GOODRETURNS") return [new GoodReturnsRateProvider(config)];
+    if (provider === "GOODRETURNS") return city ? [new GoodReturnsRateProvider(config, city)] : [];
     if (provider === "IBJA") {
       return [createRateScraperProvider({ ...config, name: "IBJA" })];
     }

@@ -9,17 +9,18 @@ export type ShopPrice = {
   totalPaise: bigint;
 };
 
-export const SILVER_COIN_WEIGHT_GRAMS = 10;
+export const SILVER_COIN_WEIGHTS_GRAMS = [1, 2, 4, 8, 10, 20, 50, 100, 250, 500, 1000] as const;
+export const DEFAULT_SILVER_COIN_WEIGHT_GRAMS = 10;
 
 export function customerShopWeights(metalType: 'GOLD' | 'SILVER', configuredWeights: number[]) {
-  return metalType === 'SILVER' ? [SILVER_COIN_WEIGHT_GRAMS] : configuredWeights;
+  return metalType === 'SILVER' ? [...SILVER_COIN_WEIGHTS_GRAMS] : configuredWeights;
 }
 
 export function validateShopWeight(metalType: 'GOLD' | 'SILVER', configuredWeights: number[], weightGrams: number) {
-  if (metalType === 'SILVER' && weightGrams !== SILVER_COIN_WEIGHT_GRAMS) {
-    return { code: 'INVALID_SILVER_WEIGHT', message: 'Silver Coin is available only in 10g.' };
+  if (metalType === 'SILVER' && !SILVER_COIN_WEIGHTS_GRAMS.includes(weightGrams as (typeof SILVER_COIN_WEIGHTS_GRAMS)[number])) {
+    return { code: 'INVALID_SILVER_WEIGHT', message: 'Selected Silver Coin weight is unavailable.' };
   }
-  if (!configuredWeights.includes(weightGrams)) {
+  if (metalType !== 'SILVER' && !configuredWeights.includes(weightGrams)) {
     return { code: 'INVALID_WEIGHT', message: 'Selected weight is unavailable.' };
   }
   return null;

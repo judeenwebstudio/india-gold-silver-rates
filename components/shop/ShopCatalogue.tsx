@@ -3,9 +3,6 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { AuthModal } from "@/components/AuthModal";
-import { LocationSelector } from "@/components/LocationSelector";
-import { SilverWeightCalculator } from "@/components/SilverWeightCalculator";
-import type { PublicRateSnapshot, PublicStateOption } from "@/lib/public-rate-types";
 
 type Price = { metalValue: number; serviceCharge: number; gst: number; shipping: number; total: number };
 type Product = {
@@ -27,26 +24,24 @@ function ProductImage({ product }: { product: Product }) {
   </div></div>;
 }
 
-export function ShopCatalogue({ embedded = false, states, initialSnapshot }: { embedded?: boolean; states?: PublicStateOption[]; initialSnapshot?: PublicRateSnapshot }) {
+function defaultWeight(product: Product) {
+  return product.metalType === "SILVER" && product.weights.includes(10) ? 10 : product.weights[0];
+}
+
+export function ShopCatalogue({ embedded = false }: { embedded?: boolean }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [location, setLocation] = useState("Loading shop location…");
   const [selections, setSelections] = useState<Record<string, { weight: number; quantity: number }>>({});
   const [authOpen, setAuthOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [rateSnapshot,setRateSnapshot]=useState(initialSnapshot);
-  const [rateStateId,setRateStateId]=useState(initialSnapshot?.location.stateId??states?.[0]?.id??"");
-  const [rateCitySlug,setRateCitySlug]=useState(initialSnapshot?.location.citySlug??"");
-  const [rateLoading,setRateLoading]=useState(false);
-
-  async function selectRateCity(slug:string,nextStateId=rateStateId){if(!slug)return;setRateStateId(nextStateId);setRateCitySlug(slug);setRateLoading(true);try{const response=await fetch(`/api/rates/city/${encodeURIComponent(slug)}`,{cache:"no-store"});const data=await response.json() as PublicRateSnapshot|{error?:string};if(!response.ok||!("rates" in data))throw new Error("error" in data?data.error:"City rates could not be loaded.");setRateSnapshot(data)}catch(reason){setError(reason instanceof Error?reason.message:"City rates could not be loaded.")}finally{setRateLoading(false)}}
 
   useEffect(() => {
     fetch("/api/v1/shop", { cache: "no-store" }).then((response) => response.json()).then((body) => {
       if (!body.success) throw new Error(body.error?.message);
       setProducts(body.data.products);
       setLocation(body.data.location);
-      setSelections(Object.fromEntries(body.data.products.map((product: Product) => [product.id, { weight: product.weights[0], quantity: 1 }])));
+      setSelections(Object.fromEntries(body.data.products.map((product: Product) => [product.id, { weight: defaultWeight(product), quantity: 1 }])));
     }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Shop is temporarily unavailable."));
   }, []);
 
@@ -69,7 +64,7 @@ export function ShopCatalogue({ embedded = false, states, initialSnapshot }: { e
       </section>
       {error && <p role="alert" className="mb-6 rounded-xl bg-red-50 p-4 font-semibold text-red-800">{error}</p>}
       <div className="grid gap-8 md:grid-cols-2">{products.map((product) => {
-        const selection = selections[product.id] || { weight: product.weights[0], quantity: 1 };
+        const selection = selections[product.id] || { weight: defaultWeight(product), quantity: 1 };
         const unit = product.prices[String(selection.weight)];
         const price = unit ? { metalValue: unit.metalValue * selection.quantity, serviceCharge: unit.serviceCharge * selection.quantity, gst: unit.gst * selection.quantity, shipping: unit.shipping * selection.quantity, total: unit.total * selection.quantity } : null;
         return <article key={product.id} className="shop-product-card overflow-hidden rounded-3xl border border-stone-200/80 bg-white shadow-[0_14px_40px_rgba(41,34,24,0.10)]">
@@ -90,7 +85,6 @@ export function ShopCatalogue({ embedded = false, states, initialSnapshot }: { e
           </div>
         </article>;
       })}</div>
-      {states&&rateSnapshot&&<section className="mt-10 space-y-5 rounded-3xl border border-slate-200 bg-white p-5 sm:p-7"><div><p className="text-xs font-black uppercase tracking-[.16em] text-amber-700">City silver rate display</p><h2 className="mt-1 text-2xl font-black">Calculate silver from 1g to 1kg</h2><p className="mt-2 text-sm text-stone-600">This informational city-rate calculator is separate from the available coin product denominations.</p></div><LocationSelector states={states} selectedStateId={rateStateId} selectedCitySlug={rateCitySlug} loading={rateLoading} onStateChange={next=>{const city=states.find(state=>state.id===next)?.cities[0];setRateStateId(next);if(city)void selectRateCity(city.slug,next)}} onCityChange={slug=>void selectRateCity(slug)}/><SilverWeightCalculator snapshot={rateSnapshot}/></section>}
     </div>
     {authOpen && <AuthModal initialMode="login" redirectTo="/shop" onClose={() => setAuthOpen(false)} onSuccess={() => setAuthOpen(false)} />}
   </section>;

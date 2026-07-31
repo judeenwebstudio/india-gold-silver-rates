@@ -1,14 +1,7 @@
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ShopCatalogue } from "@/components/shop/ShopCatalogue";
-import { getCityDisplayRates, getPublicLocations } from "@/lib/city-rate-service";
 
-export const dynamic = "force-dynamic";
-
-export default async function ShopPage() {
-  const states=await getPublicLocations();
-  const city=states.flatMap(state=>state.cities).find(item=>item.slug==="chennai")??states[0]?.cities[0];
-  if(!city)throw new Error("No active city is configured for the Shop rate display.");
-  const snapshot=await getCityDisplayRates(city.slug);
-  return <div className="min-h-screen bg-[#fbfaf7]"><Header/><main className="mx-auto max-w-6xl px-4 py-12"><ShopCatalogue states={states} initialSnapshot={snapshot}/></main><Footer/></div>;
+export default function ShopPage() {
+  return <div className="min-h-screen bg-[#fbfaf7]"><Header/><main className="mx-auto max-w-6xl px-4 py-12"><ShopCatalogue /></main><Footer/></div>;
 }

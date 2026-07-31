@@ -50,8 +50,8 @@ fun ShopLandingScreen(
         Text("Direct coin purchase using the live Trichy rate for every customer.", color = Color.Gray)
         if (loading) CircularProgressIndicator()
         val visibleProducts = products.ifEmpty { listOf(
-            ShopProductDto("shop-gold-22k", "Gold 22K Coin", "22K", "Hallmarked 22K gold coin.", "/products/gold-22k-coin.webp", listOf(1.0,2.0,4.0,8.0,10.0,20.0,50.0), 5.0, 3.0, true),
-            ShopProductDto("shop-silver-999", "Silver Coin", "999", "Fine silver coin.", "/products/silver-coin.webp", listOf(10.0), 5.0, 3.0, true),
+            ShopProductDto("shop-gold-22k", "Gold 22K Coin", "GOLD", "22K", "Hallmarked 22K gold coin.", "/products/gold-22k-coin.webp", listOf(1.0,2.0,4.0,8.0,10.0,20.0,50.0), 5.0, 3.0, true),
+            ShopProductDto("shop-silver-999", "Silver Coin", "SILVER", "999", "Fine silver coin.", "/products/silver-coin.webp", listOf(1.0,2.0,4.0,8.0,10.0,20.0,50.0,100.0,250.0,500.0,1000.0), 5.0, 3.0, true),
         ) }
         visibleProducts.forEach { product ->
             val isGold = product.name?.contains("Gold") == true

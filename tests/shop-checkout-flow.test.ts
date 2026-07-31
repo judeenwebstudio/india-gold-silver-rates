@@ -11,6 +11,8 @@ const android = read("android-ratestack/app/src/main/java/com/ratestack/app/ui/s
 
 test("Buy Now opens checkout instead of loading a gateway", () => {
   assert.match(catalogue, /\/shop\/checkout\?productId=/);
+  assert.match(catalogue, /weight=\$\{selection\.weight\}/);
+  assert.match(catalogue, /quantity=\$\{selection\.quantity\}/);
   assert.doesNotMatch(catalogue, /checkout\.razorpay\.com|\/api\/v1\/shop\/checkout/);
 });
 
@@ -24,6 +26,12 @@ test("server recalculates totals and ignores client amounts", () => {
   assert.match(api, /calculateShopPrice/);
   assert.doesNotMatch(api, /clientAmount|totalAmount:\s*parsed\.data/);
   assert.match(api, /totalAmountPaise: price\.totalPaise/);
+  assert.match(api, /weightGrams: parsed\.data\.weightGrams/);
+  assert.match(checkout, /weightGrams: weight/);
+});
+
+test("Shop page has no separate silver calculator section",()=>{
+  assert.doesNotMatch(catalogue,/SilverWeightCalculator|Calculate silver from 1g to 1kg|City silver rate display/);
 });
 
 test("pending order and idempotent retry precede gateway initiation", () => {

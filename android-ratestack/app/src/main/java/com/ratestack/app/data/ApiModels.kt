@@ -474,6 +474,7 @@ data class ShopResponseDto(
 data class ShopProductDto(
     val productId: String?,
     val name: String?,
+    val metalType: String?,
     val purity: String?,
     val description: String?,
     val imageUrl: String?,

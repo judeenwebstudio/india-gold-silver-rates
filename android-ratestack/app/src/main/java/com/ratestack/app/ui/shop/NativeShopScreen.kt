@@ -2,6 +2,7 @@ package com.ratestack.app.ui.shop
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -45,7 +46,11 @@ fun NativeShopScreen(
     LaunchedEffect(Unit) {
         runCatching { ApiProvider.service.getShop() }.onSuccess { response ->
             products = response.body()?.data?.products.orEmpty().filter { it.enabled != false }
-            products.forEach { p -> p.productId?.let { selections[it] = (p.availableWeights?.firstOrNull() ?: 10.0) to 1 } }
+            products.forEach { p -> p.productId?.let { id ->
+                val weights = p.availableWeights.orEmpty()
+                val initial = if (p.metalType.equals("SILVER", true) && 10.0 in weights) 10.0 else weights.firstOrNull() ?: 10.0
+                selections[id] = initial to 1
+            } }
         }.onFailure { errorMessage = "Unable to load Shop products." }
         loading = false
     }
@@ -102,7 +107,8 @@ fun NativeShopScreen(
         products.forEach { product ->
             val id = product.productId.orEmpty()
             val weights = product.availableWeights.orEmpty()
-            val selected = selections[id] ?: ((weights.firstOrNull() ?: 10.0) to 1)
+            val initialWeight = if (product.metalType.equals("SILVER", true) && 10.0 in weights) 10.0 else weights.firstOrNull() ?: 10.0
+            val selected = selections[id] ?: (initialWeight to 1)
             val key = if (selected.first % 1.0 == 0.0) selected.first.toInt().toString() else selected.first.toString()
             ShopCard(product, weights, selected.first, selected.second, product.prices?.get(key), busy == id,
                 { selections[id] = it to selected.second }, { selections[id] = selected.first to it.coerceIn(1, 10) },
@@ -245,12 +251,12 @@ private fun ShopCard(product: ShopProductDto, weights: List<Double>, weight: Dou
                 Text("Purity: ${product.purity ?: "Verified"}", fontWeight = FontWeight.Bold)
                 Text("In stock", color = Color(0xFF15803D), fontWeight = FontWeight.Bold)
             }
-            Text("Weight: ${weight.toInt()}g", fontWeight = FontWeight.Bold)
+            Text("Weight: ${shopWeightLabel(weight)}", fontWeight = FontWeight.Bold)
             Text("Live Trichy rate: ${money(product.ratePerGram ?: 0.0)} / g", fontWeight = FontWeight.Bold)
             Text("Source: ${friendlyRateSource(product.rateSource)}")
             Text("${product.rateSourceType?.replace('_', ' ') ?: "Market reference rate"} - ${formatRateDate(product.rateDate)}")
             Text("Available weights", fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { weights.forEach { option -> if (option == weight) Button({ onWeight(option) }) { Text("${option.toInt()}g") } else OutlinedButton({ onWeight(option) }) { Text("${option.toInt()}g") } } }
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { weights.forEach { option -> if (option == weight) Button({ onWeight(option) }) { Text(shopWeightLabel(option)) } else OutlinedButton({ onWeight(option) }) { Text(shopWeightLabel(option)) } } }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Quantity", fontWeight = FontWeight.Bold); OutlinedButton({ onQuantity(quantity - 1) }, enabled = quantity > 1) { Text("−") }; Text("$quantity", fontWeight = FontWeight.Black); OutlinedButton({ onQuantity(quantity + 1) }, enabled = quantity < 10) { Text("+") }
             }
@@ -287,3 +293,4 @@ internal fun formatRateDate(value: String?): String {
 }
 @Composable private fun PriceRow(label: String, value: String, color: Color = Color.White) { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(label, color = Color.White); Text(value, color = color, fontWeight = FontWeight.Bold) } }
 private fun money(value: Double) = NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(value)
+private fun shopWeightLabel(value: Double) = if (value == 1000.0) "1kg" else "${value.toInt()}g"

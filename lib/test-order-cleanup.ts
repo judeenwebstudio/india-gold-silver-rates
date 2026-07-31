@@ -1,7 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 
 export const MAX_TEST_ORDER_CLEANUP = 50;
-const unpaidStatuses = new Set(["CREATED", "PENDING", "UNPAID"]);
+const deletablePaymentStatuses = new Set(["CREATED", "PENDING", "UNPAID", "FAILED"]);
 
 export type TestOrderCleanupCandidate = {
   id: string;
@@ -47,10 +47,14 @@ export function evaluateTestOrderCleanup(
   order: TestOrderCleanupCandidate,
 ): TestOrderCleanupResult {
   const reasons: string[] = [];
-  if (!unpaidStatuses.has(order.paymentStatus.toUpperCase())) reasons.push(`Payment status is ${order.paymentStatus}, not pending/unpaid.`);
+  const verificationResult = order.paymentVerification?.result;
+  const failedVerification = verificationResult === "FAILED";
+  if (!deletablePaymentStatuses.has(order.paymentStatus.toUpperCase())) reasons.push(`Payment status is ${order.paymentStatus}, not deletable.`);
   if (order.orderStatus !== "PAYMENT_PENDING") reasons.push(`Order status is ${order.orderStatus}, not PAYMENT_PENDING.`);
-  if (order.paidAt || order.gatewayPaymentId || order.gatewaySignature) reasons.push("A completed or signed gateway payment marker exists.");
-  if (order.paymentVerification) reasons.push(`A payment verification record exists (${order.paymentVerification.result}).`);
+  if (order.paidAt) reasons.push("A captured payment timestamp exists.");
+  if (verificationResult === "VERIFIED") reasons.push("A verified payment record exists.");
+  if (verificationResult === "MANUAL_REVIEW") reasons.push("Payment verification requires manual review.");
+  if ((order.gatewayPaymentId || order.gatewaySignature) && !failedVerification) reasons.push("Unresolved gateway payment evidence exists.");
   if (order._count.refunds > 0) reasons.push("A refund record exists.");
   if (order.invoiceNumber) reasons.push("An invoice has been finalized.");
   if (order.shipmentStatus !== "NOT_CREATED") reasons.push(`Shipment status is ${order.shipmentStatus}.`);

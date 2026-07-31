@@ -18,6 +18,11 @@ test("eligible pending order is accepted", () => {
   assert.equal(evaluateTestOrderCleanup(candidate()).eligible, true);
 });
 
+test("FAILED payment status and FAILED verification remain deletable", () => {
+  const result = evaluateTestOrderCleanup(candidate({ paymentStatus: "FAILED", paymentVerification: { result: "FAILED" }, gatewayPaymentId: "pay_failed" }));
+  assert.equal(result.eligible, true);
+});
+
 test("multiple eligible pending orders are accepted",()=>{
   assert.deepEqual([candidate(),candidate({id:"cm2234567890123456789012",orderNumber:"SHOP-TEST-2"})].map(evaluateTestOrderCleanup).map(result=>result.eligible),[true,true]);
 });
@@ -27,7 +32,7 @@ test("paid or successful gateway order is blocked", () => {
   assert.equal(result.eligible, false); assert.match(result.reasons.join(" "), /Payment status|gateway payment marker/);
 });
 
-test("any payment verification record is blocked", () => {
+test("verified payment record is blocked", () => {
   assert.equal(evaluateTestOrderCleanup(candidate({ paymentVerification: { result: "VERIFIED" } })).eligible, false);
 });
 
@@ -87,8 +92,11 @@ test("orders page keeps existing controls and a valid client/server boundary", a
 test("production form submits controlled explicit IDs through one delete action",async()=>{
   const client=await readFile(new URL("../components/admin/TestOrderCleanupPanel.tsx",import.meta.url),"utf8");
   const action=await readFile(new URL("../app/admin/(workspace)/orders/cleanup-actions.ts",import.meta.url),"utf8");
-  assert.match(client,/selected\.map\(id=><input[^>]+name="cleanupOrderIds"/);
-  assert.match(client,/action=\{action\}/);assert.match(client,/selected\.length===0/);
+  assert.match(client,/visibleSelected\.map\(id=><input[^>]+name="cleanupOrderIds"/);
+  assert.match(client,/visibleIds\.has\(id\)/);
+  assert.match(client,/selection\.state === state \? selection\.ids : \[\]/);
+  assert.match(client,/setSelection\(\{state,ids\}\)/);
+  assert.match(client,/action=\{action\}/);assert.match(client,/visibleSelected\.length===0/);
   assert.doesNotMatch(client,/cleanupCutoff|cleanupEmails|cleanupConfirmation|Dry-run preview/);
   assert.match(action,/revalidatePath\("\/admin\/orders","page"\)/);
 });

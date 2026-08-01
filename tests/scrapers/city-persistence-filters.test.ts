@@ -10,3 +10,10 @@ test("rate persistence comparison is scoped by provider, city, purity and sessio
   assert.match(source, /CITY_COMPARE_MISMATCH/);
   assert.doesNotMatch(source, /matched the stored national rates/);
 });
+
+test("GoodReturns city persistence is processed sequentially", () => {
+  const source = fs.readFileSync(path.join(process.cwd(), "lib/scrapers/service.ts"), "utf8");
+  assert.match(source, /for \(const target of supportedTargets\) \{/);
+  assert.doesNotMatch(source, /GOODRETURNS_CONCURRENCY/);
+  assert.doesNotMatch(source, /Promise\.all\(Array\.from\([^\n]+worker/);
+});

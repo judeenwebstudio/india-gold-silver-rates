@@ -845,12 +845,8 @@ async function synchronizeAllGoodReturnsCities(
   }
   const database = emptyDatabaseSummary();
   const parsedResults: ScrapedRateResult[] = [];
-  let cursor = 0;
-  const concurrency = Math.max(1, Math.min(8, Number(process.env.GOODRETURNS_CONCURRENCY ?? "4") || 4));
 
-  const worker = async () => {
-    while (cursor < supportedTargets.length) {
-      const target = supportedTargets[cursor++];
+  for (const target of supportedTargets) {
       if (duplicateCityIds.has(target.cityId)) {
         report.unsupported += 1;
         report.unsupportedCities.push({ ...target, reason: "Duplicate provider slug; manual mapping required." });
@@ -954,9 +950,7 @@ async function synchronizeAllGoodReturnsCities(
           errorCode: row.status,
         });
       }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(concurrency, supportedTargets.length) }, worker));
+  }
   report.first100Mismatches = report.incorrectMappings.filter(({ status }) => status === "CITY_MISMATCH").slice(0, 100);
   report.csv = mappingCsv([
     ...report.correctMappings,

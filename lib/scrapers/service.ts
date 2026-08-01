@@ -361,7 +361,7 @@ export async function scrapeWithFallback(
         rates: parsedRateSummary(parsed),
       });
       failureStage = "STRUCTURAL_VALIDATION";
-      assertValidScrapedResult(parsed);
+      assertValidScrapedResult(parsed, Date.now(), attemptedAt);
       parsedValidated = true;
 
       if (validPrimary) {

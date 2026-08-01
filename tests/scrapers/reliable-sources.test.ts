@@ -125,3 +125,26 @@ test("future timestamps and abnormal cross-source variance are rejected", () => 
     ScraperRejectedError,
   );
 });
+
+test("GoodReturns current IST date is accepted before its nominal publication time", () => {
+  const result = {
+    ...fallbackResult(),
+    sourceDate: "2026-07-31",
+    sourceTime: "10:00 IST",
+    recordedAt: "2026-07-31T04:30:00.000Z",
+    fetchedAt: "2026-07-30T23:45:00.000Z",
+  };
+  assert.doesNotThrow(() => assertValidScrapedResult(result, Date.parse("2026-07-30T23:45:00.000Z")));
+  assert.doesNotThrow(() => assertValidScrapedResult(result, Date.parse("2026-07-31T05:00:00.000Z")));
+});
+
+test("a genuinely future IST calendar date remains rejected", () => {
+  const result = {
+    ...fallbackResult(), sourceDate: "2026-08-01", sourceTime: "10:00 IST",
+    recordedAt: "2026-08-01T04:30:00.000Z", fetchedAt: "2026-07-31T03:00:00.000Z",
+  };
+  assert.throws(
+    () => assertValidScrapedResult(result, Date.parse("2026-07-31T03:00:00.000Z")),
+    /future/i,
+  );
+});

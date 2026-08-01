@@ -3,6 +3,22 @@ import type { ScrapedRateResult } from "@/lib/scrapers/types";
 
 export const MAX_SOURCE_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 
+function istDateTime(value: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).format(value);
+}
+
+function istCalendarDate(value: Date) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 export function selectedSourceValue(result: ScrapedRateResult, mappedPurity: string) {
   const quote = result.quotes.find((candidate) => candidate.mappedPurity === mappedPurity);
   if (!quote) return null;
@@ -12,14 +28,41 @@ export function selectedSourceValue(result: ScrapedRateResult, mappedPurity: str
 export function assertValidScrapedResult(
   result: ScrapedRateResult,
   nowMs = Date.now(),
+  attemptedAt = new Date(nowMs).toISOString(),
 ) {
   const recordedAt = new Date(result.recordedAt);
   if (Number.isNaN(recordedAt.getTime())) {
     throw new ScraperRejectedError("The source timestamp is invalid.");
   }
-  if (recordedAt.getTime() > nowMs + MAX_SOURCE_FUTURE_SKEW_MS) {
+  const now = new Date(nowMs);
+  const differenceMinutes = (recordedAt.getTime() - nowMs) / 60_000;
+  const sameIstCalendarDate = result.sourceDate === istCalendarDate(now);
+  const beyondThreshold = recordedAt.getTime() > nowMs + MAX_SOURCE_FUTURE_SKEW_MS;
+  const validationDecision = beyondThreshold && !sameIstCalendarDate
+    ? "REJECTED_FUTURE"
+    : beyondThreshold ? "ACCEPTED_CURRENT_IST_DATE" : "ACCEPTED";
+  const diagnostics = {
+    sourceDate: result.sourceDate,
+    sourceTime: result.sourceTime,
+    recordedAt: result.recordedAt,
+    fetchedAt: result.fetchedAt,
+    attemptedAt,
+    currentServerTimeUtc: now.toISOString(),
+    currentServerTimeAsiaKolkata: istDateTime(now),
+    computedSourceTimestamp: recordedAt.toISOString(),
+    currentUtc: now.toISOString(),
+    currentIst: istDateTime(now),
+    computedSourceUtc: recordedAt.toISOString(),
+    computedSourceIst: istDateTime(recordedAt),
+    differenceMinutes: Number(differenceMinutes.toFixed(3)),
+    validationThresholdMinutes: MAX_SOURCE_FUTURE_SKEW_MS / 60_000,
+    sameIstCalendarDate,
+    validationDecision,
+  };
+  console.info("[rate-sync] source timestamp validation", diagnostics);
+  if (validationDecision === "REJECTED_FUTURE") {
     throw new ScraperRejectedError("The source timestamp is in the future.", {
-      recordedAt: result.recordedAt,
+      ...diagnostics,
     });
   }
 

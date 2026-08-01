@@ -118,7 +118,7 @@ export function Header() {
                   <button
                     type="button"
                     onClick={() => setAccountDropdownOpen((prev) => !prev)}
-                    className={`flex items-center gap-1.5 rounded-xl border border-amber-500/70 px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none ${scrolled ? "bg-white/70 text-stone-900 hover:bg-amber-50" : "bg-black/20 text-white hover:bg-amber-400/10"}`}
+                    className={`cursor-pointer flex items-center gap-1.5 rounded-xl border border-amber-500/70 px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none ${scrolled ? "bg-white/70 text-stone-900 hover:bg-amber-50" : "bg-black/20 text-white hover:bg-amber-400/10"}`}
                   >
                     <span>My Account</span>
                     <span className="text-[0.6rem] text-amber-800">▼</span>
@@ -129,14 +129,14 @@ export function Header() {
                       <Link
                         href="/shop/orders"
                         onClick={() => setAccountDropdownOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-amber-50 hover:text-amber-900 transition-colors"
+                        className="cursor-pointer flex items-center gap-2 px-4 py-2 hover:bg-amber-50 hover:text-amber-900 transition-colors"
                       >
                         📊 My Dashboard
                       </Link>
                       <div className="border-t border-stone-100 my-1"></div>
                       <button
                         onClick={handleLogout}
-                        className="w-full text-left flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 transition-colors font-bold"
+                        className="cursor-pointer w-full text-left flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 transition-colors font-bold"
                       >
                         🚪 Logout
                       </button>
@@ -149,14 +149,14 @@ export function Header() {
                 <button
                   type="button"
                   onClick={() => handleOpenAuth("login")}
-                  className={`rounded-xl border border-amber-500/80 px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none ${scrolled ? "bg-white/70 text-stone-900 hover:bg-amber-50" : "bg-black/20 text-white hover:bg-amber-400/10"}`}
+                  className={`cursor-pointer rounded-xl border border-amber-500/80 px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all duration-200 hover:-translate-y-0.5 motion-reduce:transform-none motion-reduce:transition-none ${scrolled ? "bg-white/70 text-stone-900 hover:bg-amber-50" : "bg-black/20 text-white hover:bg-amber-400/10"}`}
                 >
                   Login
                 </button>
                 <button
                   type="button"
                   onClick={() => handleOpenAuth("register")}
-                  className="hidden rounded-xl bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 px-3.5 py-1.5 text-xs font-black text-stone-950 shadow-[0_6px_18px_rgba(217,151,34,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_9px_22px_rgba(217,151,34,0.38)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-300 motion-reduce:transform-none motion-reduce:transition-none md:inline-flex"
+                  className="cursor-pointer hidden rounded-xl bg-gradient-to-br from-amber-300 via-amber-400 to-amber-600 px-3.5 py-1.5 text-xs font-black text-stone-950 shadow-[0_6px_18px_rgba(217,151,34,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_9px_22px_rgba(217,151,34,0.38)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-300 motion-reduce:transform-none motion-reduce:transition-none md:inline-flex"
                 >
                   Register
                 </button>

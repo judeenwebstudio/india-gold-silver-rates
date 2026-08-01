@@ -54,12 +54,18 @@ fun findEnvProperty(key: String): String? {
 
 val googleServerClientId = providers.gradleProperty("GOOGLE_SERVER_CLIENT_ID")
     .orElse(providers.environmentVariable("GOOGLE_SERVER_CLIENT_ID"))
-    .orElse(providers.gradleProperty("GOOGLE_ANDROID_CLIENT_ID"))
-    .orElse(providers.environmentVariable("GOOGLE_ANDROID_CLIENT_ID"))
     .orElse(providers.provider { findEnvProperty("GOOGLE_SERVER_CLIENT_ID") ?: findEnvProperty("GOOGLE_CLIENT_ID") ?: "" })
     .get()
 
-logger.lifecycle("RateStack Build: GOOGLE_SERVER_CLIENT_ID resolved length=${googleServerClientId.length}, prefix=${googleServerClientId.take(12)}...")
+val googleClientToken = googleServerClientId.substringAfter("-", "").substringBefore(".apps.googleusercontent.com")
+require(
+    googleServerClientId.matches(Regex("^[0-9]+-[a-z0-9-]+\\.apps\\.googleusercontent\\.com$")) &&
+        googleClientToken.length >= 20 &&
+        !googleClientToken.equals("ratestack", ignoreCase = true)
+) {
+    "GOOGLE_SERVER_CLIENT_ID must be the real Web OAuth client ID, not an Android client ID or placeholder."
+}
+logger.lifecycle("RateStack Build: GOOGLE_SERVER_CLIENT_ID resolved length=${googleServerClientId.length}, prefix=${googleServerClientId.take(15)}...")
 val buildCommit = providers.environmentVariable("RATESTACK_BUILD_COMMIT").orElse("unknown").get()
 val configuredVersionCode = providers.gradleProperty("RATESTACK_VERSION_CODE")
     .orElse("2")

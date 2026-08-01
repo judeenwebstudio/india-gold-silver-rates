@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { comparePassword, normalizeEmailAddress, normalizePhoneNumber, signSchemeToken } from '@/lib/schemes/user-auth';
 import { z } from 'zod';
+import { CustomerLoginMethod } from '@/generated/prisma/client';
+import { recordSuccessfulCustomerLogin } from '@/lib/customer-activity';
 
 const loginSchema = z.object({
   identifier: z.string().optional(),
@@ -63,6 +65,7 @@ export async function POST(request: Request) {
       );
     }
     await prisma.schemeUser.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    await recordSuccessfulCustomerLogin(user.id, isEmail ? CustomerLoginMethod.EMAIL_PASSWORD : CustomerLoginMethod.MOBILE_PASSWORD, request);
     const token = signSchemeToken(user.id, user.phone, user.fullName, user.email || undefined);
 
     return NextResponse.json({

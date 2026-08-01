@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectGoogleAccount, exchangeGoogleAuthorizationCode, GOOGLE_SESSION_COOKIE, safeAuthRedirect, signInOrCreateGoogleUser, verifyGoogleIdToken } from '@/lib/google-auth';
+import { CustomerLoginMethod } from '@/generated/prisma/client';
+import { recordSuccessfulCustomerLogin } from '@/lib/customer-activity';
 
 const oauthCookies = ['google_oauth_state', 'google_oauth_nonce', 'google_oauth_verifier', 'google_oauth_next', 'google_oauth_mode', 'google_oauth_link_user'];
 function clearOAuthCookies(response: NextResponse) { for (const name of oauthCookies) response.cookies.delete(name); }
@@ -27,6 +29,7 @@ export async function GET(request: NextRequest) {
     const linkUserId = request.cookies.get('google_oauth_link_user')?.value;
     if (mode === 'connect' && linkUserId) await connectGoogleAccount(linkUserId, identity);
     const result = await signInOrCreateGoogleUser(identity);
+    if (mode !== 'connect') await recordSuccessfulCustomerLogin(result.user.id, CustomerLoginMethod.GOOGLE, request);
     const completion = new URL('/auth/google/complete', request.nextUrl.origin);
     completion.searchParams.set('next', next);
     const response = NextResponse.redirect(completion);

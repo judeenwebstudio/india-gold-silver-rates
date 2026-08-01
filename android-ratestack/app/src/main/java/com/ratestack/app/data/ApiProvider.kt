@@ -16,6 +16,14 @@ object ApiProvider {
             .baseUrl(BuildConfig.WEBSITE_URL.trimEnd('/') + "/")
             .client(
                 OkHttpClient.Builder()
+                    .addInterceptor { chain ->
+                        chain.proceed(
+                            chain.request().newBuilder()
+                                .header("X-RateStack-Platform", "ANDROID")
+                                .header("X-RateStack-App-Version", BuildConfig.VERSION_NAME)
+                                .build(),
+                        )
+                    }
                     .connectTimeout(10, TimeUnit.SECONDS)
                     .readTimeout(15, TimeUnit.SECONDS)
                     .writeTimeout(15, TimeUnit.SECONDS)

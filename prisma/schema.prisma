@@ -165,6 +165,19 @@ enum AuthProvider {
   MOBILE
 }
 
+enum CustomerActivityPlatform {
+  WEB
+  ANDROID
+}
+
+enum CustomerLoginMethod {
+  MOBILE_PASSWORD
+  EMAIL_PASSWORD
+  GOOGLE
+  OTP
+  SESSION_RESTORE
+}
+
 enum RateUpdateStatus {
   SUCCESS
   FAILED
@@ -521,6 +534,7 @@ model SchemeUser {
   shopOrders         ShopOrder[]
   deliveryAddresses DeliveryAddress[]
   authAccounts       AuthAccount[]
+  platformActivities CustomerPlatformActivity[]
   gstProfiles        CustomerGSTProfile[]
   pushDeviceTokens   PushDeviceToken[]
   notificationPreferences CustomerNotificationPreference?
@@ -546,6 +560,26 @@ model AuthAccount {
   @@unique([provider, providerAccountId])
   @@index([userId, provider])
   @@index([providerEmail])
+}
+
+model CustomerPlatformActivity {
+  id           String                   @id @default(cuid())
+  customerId   String
+  customer     SchemeUser               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  platform     CustomerActivityPlatform
+  loginMethod  CustomerLoginMethod
+  deviceIdHash String?
+  appVersion   String?
+  userAgent    String?
+  ipHash       String?
+  loggedInAt   DateTime                 @default(now())
+  lastSeenAt   DateTime                 @default(now())
+  createdAt    DateTime                 @default(now())
+
+  @@index([customerId, platform, lastSeenAt])
+  @@index([platform, lastSeenAt])
+  @@index([loginMethod, lastSeenAt])
+  @@index([lastSeenAt])
 }
 
 model ShopProduct {

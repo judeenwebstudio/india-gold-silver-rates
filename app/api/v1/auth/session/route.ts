@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateSchemeUserFromRequest, signSchemeToken } from '@/lib/schemes/user-auth';
+import { touchCustomerSession } from '@/lib/customer-activity';
 
 export async function GET(request: Request) {
   const auth = await authenticateSchemeUserFromRequest(request);
@@ -9,6 +10,7 @@ export async function GET(request: Request) {
   if (!user?.isActive || user.accountStatus !== 'ACTIVE') {
     return NextResponse.json({ success: false, error: { message: 'Authentication required.' } }, { status: 401 });
   }
+  await touchCustomerSession(user.id, request);
   const token = signSchemeToken(user.id, user.phone, user.fullName, user.email || undefined);
   const response = NextResponse.json({ success: true, data: {
     token,

@@ -40,6 +40,7 @@ const navGroups: NavGroup[] = [
       { label: "Payments", href: "/admin/payments", marker: "PY", available: true },
       { label: "Invoices", href: "/admin/invoices", marker: "IN", available: true },
       { label: "Customers", href: "/admin/customers", marker: "CU", available: true },
+      { label: "Customer Usage", href: "/admin/customers/usage", marker: "US", available: true },
       { label: "Shop Reports", href: "/admin/shop/reports", marker: "RP", available: true },
       { label: "Reports & Analytics", href: "/admin/reports", marker: "RA", available: true },
       { label: "Notifications", href: "/admin/notifications", marker: "NT", available: true },

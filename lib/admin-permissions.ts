@@ -1,6 +1,6 @@
 import "server-only";
 import type { AdminRole } from "@/generated/prisma/enums";
-export type AdminPermission="REPORTS_VIEW"|"REPORTS_EXPORT"|"PROFIT_VIEW"|"GST_VIEW"|"COURIER_REPORT_VIEW"|"NOTIFICATION_VIEW"|"NOTIFICATION_SEND"|"EMAIL_RESEND";
+export type AdminPermission="REPORTS_VIEW"|"REPORTS_EXPORT"|"PROFIT_VIEW"|"GST_VIEW"|"COURIER_REPORT_VIEW"|"NOTIFICATION_VIEW"|"NOTIFICATION_SEND"|"EMAIL_RESEND"|"CUSTOMER_USAGE_VIEW"|"CUSTOMER_USAGE_EXPORT"|"CUSTOMER_DATA_FULL";
 export type OrderAdminPermission="view"|"status"|"payment"|"refund"|"shipment"|"note"|"export"|"shiprocket"|"cleanup";
 const grants:Record<AdminPermission,AdminRole[]>={
   REPORTS_VIEW:["SUPER_ADMIN","ORDER_MANAGER","FINANCE","FULFILLMENT","VIEWER"],
@@ -11,6 +11,9 @@ const grants:Record<AdminPermission,AdminRole[]>={
   NOTIFICATION_VIEW:["SUPER_ADMIN","ORDER_MANAGER","SUPPORT"],
   NOTIFICATION_SEND:["SUPER_ADMIN","ORDER_MANAGER"],
   EMAIL_RESEND:["SUPER_ADMIN","ORDER_MANAGER","SUPPORT"],
+  CUSTOMER_USAGE_VIEW:["SUPER_ADMIN"],
+  CUSTOMER_USAGE_EXPORT:["SUPER_ADMIN"],
+  CUSTOMER_DATA_FULL:["SUPER_ADMIN"],
 };
 const orderGrants:Record<OrderAdminPermission,AdminRole[]>={
   view:["SUPER_ADMIN","ORDER_MANAGER","FINANCE","FULFILLMENT","SUPPORT","VIEWER"],

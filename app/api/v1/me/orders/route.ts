@@ -17,6 +17,13 @@ export async function GET(request: Request) {
     total: Number(order.totalAmountPaise) / 100,
     gateway: order.gateway, transactionId: order.gatewayPaymentId,
     paymentStatus: order.paymentStatus, orderStatus: order.orderStatus,
+    shipmentStatus: order.shipmentStatus,
+    courierPartner: order.courierName || order.courierPartner || null,
+    trackingNumber: order.awbCode || order.trackingNumber || null,
+    awbCode: order.awbCode || order.trackingNumber || null,
+    expectedDeliveryAt: order.expectedDeliveryAt || order.estimatedDeliveryAt || null,
+    deliveredAt: order.deliveredAt || null,
     invoiceNumber: order.invoiceNumber, createdAt: order.createdAt,
   })) });
 }
+

@@ -33,6 +33,7 @@ fun MyOrdersScreen(
     onGoogleLogin: () -> Unit,
     onLogout: () -> Unit,
     onShop: () -> Unit,
+    onTrackOrder: (String) -> Unit = {},
 ) {
     var dashboard by remember { mutableStateOf<CustomerDashboardDto?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -110,47 +111,11 @@ fun MyOrdersScreen(
                 order = order,
                 onInvoice = { openInvoice(order) },
                 onBuyAgain = onShop,
+                onTrackOrder = { onTrackOrder(order.id.orEmpty()) },
                 onSupport = { context.startActivity(Intent(Intent.ACTION_VIEW, "${BuildConfig.WEBSITE_URL.trimEnd('/')}/contact-us".toUri())) },
             )
         }
-        item {
-            val tracked = data?.orders?.firstOrNull { !it.shipment?.trackingNumber.isNullOrBlank() } ?: data?.orders?.firstOrNull()
-            DashboardSection("Live Order Tracking") {
-                Text(tracked?.orderNumber ?: "No active shipment", fontWeight = FontWeight.Black)
-                Text("Status: ${displayStatus(tracked?.shipment?.status) ?: "Tracking begins after dispatch"}")
-                Text("Expected Delivery: ${tracked?.shipment?.expectedDelivery ?: "To be confirmed"}")
-                tracked?.shipment?.timeline.orEmpty().forEach { event ->
-                    Text("• ${event.label.orEmpty()}${event.at?.let { " — $it" }.orEmpty()}")
-                }
-            }
-        }
-        item {
-            val shipment = data?.orders?.firstOrNull { !it.shipment?.trackingNumber.isNullOrBlank() }?.shipment
-            DashboardSection("Delivery & Tracking") {
-                if (shipment == null) {
-                    Text("Tracking details will appear after your order is dispatched.")
-                }
-                shipment?.courierPartner?.takeIf { it.isNotBlank() }?.let { Text("Courier Partner: $it") }
-                shipment?.trackingNumber?.takeIf { it.isNotBlank() }?.let { Text("Tracking Number: $it") }
-                shipment?.status?.takeIf { it.isNotBlank() }?.let { Text("Shipment Status: ${displayStatus(it)}") }
-                shipment?.pickupStatus?.takeIf { it.isNotBlank() }?.let { Text("Pickup Status: ${displayStatus(it)}") }
-                shipment?.expectedDelivery?.takeIf { it.isNotBlank() }?.let { Text("Expected Delivery: $it") }
-                shipment?.deliveredAt?.takeIf { it.isNotBlank() }?.let { Text("Delivered: $it") }
-                shipment?.lastUpdated?.takeIf { it.isNotBlank() }?.let { Text("Last Updated: $it") }
-                shipment?.message?.let { Text(it, color = Color(0xFF78716C)) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton({
-                        val orderId = data?.orders?.firstOrNull { it.shipment?.trackingNumber == shipment?.trackingNumber }?.id
-                        if (!orderId.isNullOrBlank()) scope.launch {
-                            runCatching { ApiProvider.service.refreshOrderTracking("Bearer $token", orderId) }
-                                .onSuccess { refresh() }
-                                .onFailure { error = "Tracking is temporarily unavailable." }
-                        }
-                    }, enabled = !shipment?.trackingNumber.isNullOrBlank()) { Text("Refresh Tracking") }
-                    Button({ context.startActivity(Intent(Intent.ACTION_VIEW, shipment?.trackingUrl.orEmpty().toUri())) }, enabled = !shipment?.trackingUrl.isNullOrBlank()) { Text("Track Shipment") }
-                }
-            }
-        }
+
         item {
             DashboardSection("Saved Addresses") {
                 Button({ editing = ShopAddressDto(fullName=data?.customer?.fullName.orEmpty(), mobile=data?.customer?.phone.orEmpty(), addressLine1="", city="", district="", state="", pincode="") }) { Text("Add Address") }
@@ -239,8 +204,10 @@ private fun OrderCard(
     order: DashboardOrderDto,
     onInvoice: () -> Unit,
     onBuyAgain: () -> Unit,
+    onTrackOrder: () -> Unit,
     onSupport: () -> Unit,
 ) {
+    val badge = getTrackBadge(order.shipment?.status, order.orderStatus)
     DashboardSection(order.productName.orEmpty()) {
         order.imageUrl?.let { raw ->
             AsyncImage(
@@ -261,13 +228,36 @@ private fun OrderCard(
             Text("Delivery Address: ${address.addressLine1}, ${address.city}, ${address.state} – ${address.pincode}")
         }
         Text("Invoice: ${order.invoiceNumber ?: "Pending"}")
-        if (order.invoiceNumber != null) OutlinedButton(onInvoice) { Text("Invoice") }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onBuyAgain) { Text("Buy Again") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (order.invoiceNumber != null) OutlinedButton(onInvoice) { Text("Invoice") }
+            OutlinedButton(onBuyAgain) { Text("Buy Again") }
+            Button(
+                onClick = onTrackOrder,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE2AD3D), contentColor = Color(0xFF141210))
+            ) {
+                Text("📍 Track ${badge.icon} ${badge.label}", fontWeight = FontWeight.Black)
+            }
             OutlinedButton(onSupport) { Text("Need Help") }
         }
     }
 }
+
+private fun getTrackBadge(shipmentStatus: String?, orderStatus: String?): TrackBadge {
+    val s = (shipmentStatus ?: orderStatus ?: "ORDER_PLACED").uppercase(Locale.ENGLISH)
+    return when {
+        s == "DELIVERED" -> TrackBadge("✅", "Delivered")
+        s == "CANCELLED" -> TrackBadge("🔴", "Cancelled")
+        s == "RETURNED" || s.contains("RTO") -> TrackBadge("🔁", "Returned")
+        s == "OUT_FOR_DELIVERY" -> TrackBadge("🔵", "Out for Delivery")
+        s == "IN_TRANSIT" || s == "SHIPPED" -> TrackBadge("🟢", "In Transit")
+        s == "PICKUP_SCHEDULED" || s == "PICKED_UP" -> TrackBadge("🟣", "Picked Up")
+        s == "PACKED" || s == "READY_TO_SHIP" -> TrackBadge("🟡", "Packed")
+        s == "PROCESSING" -> TrackBadge("🟠", "Processing")
+        else -> TrackBadge("⚪", "Order Placed")
+    }
+}
+private data class TrackBadge(val icon: String, val label: String)
+
 @Composable private fun AddressDialog(initial:ShopAddressDto,onClose:()->Unit,onSave:(ShopAddressDto)->Unit){var value by remember(initial){mutableStateOf(initial)};AlertDialog(onDismissRequest=onClose,title={Text("Saved Address")},text={Column(Modifier.heightIn(max=500.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){AddressField("Full Name",value.fullName){value=value.copy(fullName=it)};AddressField("Mobile",value.mobile){value=value.copy(mobile=it)};AddressField("Address Line 1",value.addressLine1){value=value.copy(addressLine1=it)};AddressField("City",value.city){value=value.copy(city=it)};AddressField("District",value.district){value=value.copy(district=it)};AddressField("State",value.state){value=value.copy(state=it)};AddressField("PIN Code",value.pincode){value=value.copy(pincode=it)}}},confirmButton={Button({onSave(value)}){Text("Save")}},dismissButton={TextButton(onClose){Text("Cancel")}})}
 @Composable private fun AddressField(label:String,value:String,onChange:(String)->Unit){OutlinedTextField(value,onChange,label={Text(label)},singleLine=true)}
 private fun money(value:Double)=NumberFormat.getCurrencyInstance(Locale("en","IN")).format(value)

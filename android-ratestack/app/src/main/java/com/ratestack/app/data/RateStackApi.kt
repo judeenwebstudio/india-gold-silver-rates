@@ -69,11 +69,18 @@ interface RateStackApi {
     @retrofit2.http.PATCH("api/v1/me/gst-profile")
     suspend fun toggleGstProfile(@retrofit2.http.Header("Authorization") authHeader:String,@retrofit2.http.Body request:Map<String,Boolean>):Response<ApiEnvelope<CustomerGstProfileDto>>
 
+    @GET("api/v1/me/orders/{orderId}/tracking")
+    suspend fun getOrderTracking(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Path("orderId") orderId: String,
+    ): Response<ApiEnvelope<OrderTrackingResponseDto>>
+
     @POST("api/v1/me/orders/{orderId}/tracking")
     suspend fun refreshOrderTracking(
         @retrofit2.http.Header("Authorization") authHeader: String,
         @Path("orderId") orderId: String,
-    ): Response<ApiEnvelope<Map<String, Any>>>
+    ): Response<ApiEnvelope<OrderTrackingResponseDto>>
+
 
     @GET("api/v1/me/orders/{orderId}/invoice")
     suspend fun downloadShopInvoice(

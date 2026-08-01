@@ -592,3 +592,80 @@ data class NotificationPreferencesDto(
     val goldRateAlerts: Boolean = false,
     val silverRateAlerts: Boolean = false,
 )
+
+data class OrderTrackingResponseDto(
+    val order: TrackingOrderInfoDto?,
+    val deliveryAddress: TrackingDeliveryAddressDto?,
+    val summary: TrackingProductSummaryDto?,
+    val events: List<TrackingEventDto>?,
+    val statusHistory: List<TrackingStatusHistoryDto>?,
+)
+
+data class TrackingOrderInfoDto(
+    val id: String?,
+    val orderNumber: String?,
+    val invoiceNumber: String?,
+    val createdAt: String?,
+    val paymentStatus: String?,
+    val orderStatus: String?,
+    val shipmentStatus: String?,
+    val courierPartner: String?,
+    val courierName: String?,
+    val courierId: String?,
+    val trackingNumber: String?,
+    val awbCode: String?,
+    val shipmentId: String?,
+    val expectedDeliveryAt: String?,
+    val pickupAt: String?,
+    val deliveredAt: String?,
+    val publicTrackingUrl: String?,
+    val lastSyncedAt: String?,
+    val isTerminal: Boolean = false,
+)
+
+data class TrackingDeliveryAddressDto(
+    val customerName: String?,
+    val customerPhone: String?,
+    val customerEmail: String?,
+    val addressLine1: String?,
+    val addressLine2: String?,
+    val landmark: String?,
+    val deliveryCity: String?,
+    val deliveryDistrict: String?,
+    val deliveryState: String?,
+    val deliveryPincode: String?,
+    val deliveryCountry: String?,
+)
+
+data class TrackingProductSummaryDto(
+    val productId: String?,
+    val productName: String?,
+    val metalType: String?,
+    val purity: String?,
+    val weightGrams: Double?,
+    val quantity: Int?,
+    val ratePerGram: Double?,
+    val metalValue: Double?,
+    val serviceCharge: Double?,
+    val gst: Double?,
+    val shipping: Double?,
+    val total: Double?,
+    val imageUrl: String?,
+)
+
+data class TrackingEventDto(
+    val id: String?,
+    val status: String?,
+    val message: String?,
+    val location: String?,
+    val source: String?,
+    val createdAt: String?,
+)
+
+data class TrackingStatusHistoryDto(
+    val id: String?,
+    val status: String?,
+    val message: String?,
+    val createdAt: String?,
+)
+

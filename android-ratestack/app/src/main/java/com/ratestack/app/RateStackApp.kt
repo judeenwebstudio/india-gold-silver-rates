@@ -145,8 +145,10 @@ private object Routes {
     const val RATES = "rates/{state}/{city}"
     const val FAVORITES = "favorites"
     const val MY_ORDERS = "my_orders"
+    const val ORDER_TRACKING = "order_tracking/{orderId}"
     const val SETTINGS = "settings"
 }
+
 
 @Composable
 fun RateStackApp(
@@ -564,8 +566,19 @@ fun RateStackApp(
                         onGoogleLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) },
                         onLogout = { schemeViewModel.logout() },
                         onShop = { navController.navigate(Routes.SCHEMES) },
+                        onTrackOrder = { orderId -> navController.navigate("order_tracking/$orderId") },
                     )
                 }
+                composable(Routes.ORDER_TRACKING) { backStackEntry ->
+                    val orderId = backStackEntry.arguments?.getString("orderId").orEmpty()
+                    val userToken by schemeViewModel.userToken.collectAsState()
+                    com.ratestack.app.ui.shop.OrderTrackingScreen(
+                        orderId = orderId,
+                        token = userToken,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+
                 composable(Routes.SETTINGS) {
                     val userToken by schemeViewModel.userToken.collectAsState()
                     val userName by schemeViewModel.userName.collectAsState()

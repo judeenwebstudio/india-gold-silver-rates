@@ -61,11 +61,11 @@ fun MyOrdersScreen(
                 withContext(Dispatchers.IO) {
                     val directory = File(context.cacheDir, "invoices").apply { mkdirs() }
                     val rawName = order.invoiceNumber ?: order.orderNumber ?: "invoice"
-                    File(directory, "${rawName.replace(Regex("[^A-Za-z0-9._-]"), "_")}.html").apply { writeBytes(body.bytes()) }
+                    File(directory, "${rawName.replace(Regex("[^A-Za-z0-9._-]"), "_")}.pdf").apply { writeBytes(body.bytes()) }
                 }
             }.onSuccess { file ->
                 val uri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.fileprovider", file)
-                val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "text/html").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 context.startActivity(Intent.createChooser(intent, "Open RateStack invoice"))
             }.onFailure { error = "Unable to download this invoice." }
         }

@@ -28,6 +28,7 @@ const navGroups: NavGroup[] = [
       { label: "Gold Rates", href: "/admin/gold-rates", marker: "AU", available: true },
       { label: "Silver Rates", href: "/admin/silver-rates", marker: "AG", available: true },
       { label: "Rate Sources", href: "/admin/rate-sources", marker: "RS", available: true },
+      { label: "GoodReturns Cities", href: "/admin/goodreturns-cities", marker: "GC", available: true },
       { label: "Rate History", href: "/admin/rate-history", marker: "HI", available: false },
     ],
   },

@@ -212,9 +212,11 @@ class SchemeViewModel(
         viewModelScope.launch {
             _authActionState.value = LoadState.Loading
             try {
+                android.util.Log.d("RateStackGoogleAuth", "Stage 5 Diagnostic: Sending ID token to backend /api/v1/auth/google (len=${idToken.length}, prefix=${idToken.take(15)}...)")
                 val res = ApiProvider.service.googleSignIn(mapOf("idToken" to idToken))
                 val authData = res.body()?.data
                 if (res.isSuccessful && res.body()?.success == true && authData?.token != null) {
+                    android.util.Log.d("RateStackGoogleAuth", "Stage 6 Diagnostic: Backend verification SUCCESS! User ID=${authData.user?.id}")
                     repository.saveUserToken(authData.token)
                     repository.syncPushToken()
                     repository.saveUserDetails(authData.user?.fullName ?: "Customer", authData.user?.phone.orEmpty())
@@ -226,12 +228,13 @@ class SchemeViewModel(
                     loadCustomerProfile()
                     onSuccess()
                 } else {
-                    _authActionState.value = LoadState.Error(
-                        res.body()?.error?.message ?: "Google sign-in could not be completed. Please try again.",
-                    )
+                    val serverMsg = res.body()?.error?.message ?: extractSafeErrorMessage(res, "Backend rejected Google token.")
+                    android.util.Log.w("RateStackGoogleAuth", "Stage 6 Diagnostic: Backend rejected ID token. HTTP Status=${res.code()} Error Message='$serverMsg'")
+                    _authActionState.value = LoadState.Error("Backend rejected ID token: $serverMsg")
                 }
-            } catch (_: Exception) {
-                _authActionState.value = LoadState.Error("Google sign-in could not be completed. Please try again.")
+            } catch (e: Exception) {
+                android.util.Log.e("RateStackGoogleAuth", "Stage 6 Diagnostic: Exception verifying token with server: ${e.javaClass.simpleName}: ${e.message}")
+                _authActionState.value = LoadState.Error(extractExceptionMessage(e, "Network error during Google authentication."))
             }
         }
     }

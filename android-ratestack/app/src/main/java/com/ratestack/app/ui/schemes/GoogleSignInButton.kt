@@ -18,7 +18,12 @@ import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.GetCredentialProviderConfigurationException
 import androidx.credentials.exceptions.NoCredentialException
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.ratestack.app.BuildConfig
@@ -34,6 +39,7 @@ fun GoogleSignInButton(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selecting by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Divider(modifier = Modifier.weight(1f), color = Color(0xFF57534E))
@@ -44,32 +50,59 @@ fun GoogleSignInButton(
         OutlinedButton(
             onClick = {
                 if (selecting || isLoading) return@OutlinedButton
-                if (BuildConfig.GOOGLE_SERVER_CLIENT_ID.isBlank()) {
-                    Log.w("RateStackGoogleAuth", "Google sign-in unavailable: server OAuth client ID configured=false")
-                    onError("Google sign-in is currently unavailable.")
+
+                // 1. Google Play Services Availability Check
+                val playServicesStatus = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
+                if (playServicesStatus != ConnectionResult.SUCCESS) {
+                    Log.w("RateStackGoogleAuth", "Stage 1 Diagnostic: Google Play Services unavailable. Status code=$playServicesStatus")
+                    onError("Google Play Services is not available on this device.")
                     return@OutlinedButton
                 }
+
+                // 2. Server Client ID Check
+                val serverClientId = BuildConfig.GOOGLE_SERVER_CLIENT_ID
+                if (serverClientId.isBlank()) {
+                    Log.w("RateStackGoogleAuth", "Stage 2 Diagnostic: Missing Server Client ID (GOOGLE_SERVER_CLIENT_ID is blank)")
+                    onError("Missing Server Client ID: GOOGLE_SERVER_CLIENT_ID is not configured in Android app.")
+                    return@OutlinedButton
+                }
+                Log.d("RateStackGoogleAuth", "Stage 2 Diagnostic: Client ID loaded (prefix=${serverClientId.take(12)}...)")
+
                 selecting = true
                 scope.launch {
                     try {
+                        Log.d("RateStackGoogleAuth", "Stage 3 Diagnostic: Launching CredentialManager request with serverClientId")
                         val option = GetGoogleIdOption.Builder()
-                            .setServerClientId(BuildConfig.GOOGLE_SERVER_CLIENT_ID)
+                            .setServerClientId(serverClientId)
                             .setFilterByAuthorizedAccounts(false)
                             .setAutoSelectEnabled(false)
                             .build()
                         val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
                         val credential = CredentialManager.create(context).getCredential(context, request).credential
+
                         if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                            onIdToken(GoogleIdTokenCredential.createFrom(credential.data).idToken)
+                            val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
+                            Log.d("RateStackGoogleAuth", "Stage 4 Diagnostic: ID token received successfully (length=${googleIdToken.length}, prefix=${googleIdToken.take(15)}...)")
+                            onIdToken(googleIdToken)
                         } else {
-                            onError("Google sign-in could not be completed. Please try again.")
+                            Log.w("RateStackGoogleAuth", "Stage 4 Diagnostic: Unexpected credential type received: ${credential::class.java.name}")
+                            onError("Google sign-in returned an unsupported credential type.")
                         }
-                    } catch (exception: NoCredentialException) {
-                        Log.w("RateStackGoogleAuth", "Credential selection failed: ${exception::class.java.simpleName}")
-                        onError("No eligible Google account was found on this device.")
-                    } catch (exception: Exception) {
-                        Log.e("RateStackGoogleAuth", "Google sign-in failed: ${exception::class.java.simpleName}")
-                        onError("Google sign-in could not be completed. Please try again.")
+                    } catch (e: GetCredentialCancellationException) {
+                        Log.i("RateStackGoogleAuth", "Stage 3 Diagnostic: Google sign-in was cancelled by user")
+                        onError("Google sign-in was cancelled.")
+                    } catch (e: NoCredentialException) {
+                        Log.w("RateStackGoogleAuth", "Stage 3 Diagnostic: NoCredentialException - OAuth configuration mismatch or no account")
+                        onError("OAuth configuration mismatch or no Google account found on device.")
+                    } catch (e: GetCredentialProviderConfigurationException) {
+                        Log.e("RateStackGoogleAuth", "Stage 3 Diagnostic: Provider configuration error: ${e.message}")
+                        onError("Firebase / Google Provider configuration invalid.")
+                    } catch (e: GetCredentialException) {
+                        Log.e("RateStackGoogleAuth", "Stage 3 Diagnostic: GetCredentialException [${e.type}]: ${e.message}")
+                        onError("Google sign-in failed: ${e.type ?: e.message}")
+                    } catch (e: Exception) {
+                        Log.e("RateStackGoogleAuth", "Stage 3 Diagnostic: Unexpected Exception: ${e::class.java.name}: ${e.message}")
+                        onError("Google sign-in error: ${e::class.java.simpleName}")
                     } finally {
                         selecting = false
                     }

@@ -23,11 +23,35 @@ val trustedHost = providers.gradleProperty("RATESTACK_TRUSTED_HOST")
 val privacyPolicyUrl = providers.gradleProperty("RATESTACK_PRIVACY_POLICY_URL")
     .orElse("https://ratestack.in/privacy-policy")
     .get()
+fun findEnvProperty(key: String): String? {
+    val envFiles = listOf(
+        file("../.env"),
+        file(".env"),
+        rootProject.file("../.env"),
+        rootProject.file(".env")
+    )
+    for (f in envFiles) {
+        if (f.isFile) {
+            f.readLines().forEach { line ->
+                val trimmed = line.trim()
+                if (!trimmed.startsWith("#") && trimmed.contains("=")) {
+                    val parts = trimmed.split("=", limit = 2)
+                    if (parts[0].trim() == key) {
+                        val v = parts[1].trim().removeSurrounding("\"").removeSurrounding("'")
+                        if (v.isNotBlank()) return v
+                    }
+                }
+            }
+        }
+    }
+    return null
+}
+
 val googleServerClientId = providers.gradleProperty("GOOGLE_SERVER_CLIENT_ID")
     .orElse(providers.environmentVariable("GOOGLE_SERVER_CLIENT_ID"))
     .orElse(providers.gradleProperty("GOOGLE_ANDROID_CLIENT_ID"))
     .orElse(providers.environmentVariable("GOOGLE_ANDROID_CLIENT_ID"))
-    .orElse("")
+    .orElse(providers.provider { findEnvProperty("GOOGLE_CLIENT_ID") ?: findEnvProperty("GOOGLE_SERVER_CLIENT_ID") ?: "" })
     .get()
 val buildCommit = providers.environmentVariable("RATESTACK_BUILD_COMMIT").orElse("unknown").get()
 val configuredVersionCode = providers.gradleProperty("RATESTACK_VERSION_CODE")

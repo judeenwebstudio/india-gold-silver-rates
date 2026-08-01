@@ -22,7 +22,9 @@ export async function POST(request: Request) {
       httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 30 * 24 * 60 * 60,
     });
     return response;
-  } catch {
-    return NextResponse.json({ success: false, error: { message: 'Google sign-in could not be completed. Please try again.' } }, { status: 401 });
+  } catch (error: any) {
+    const code = error instanceof GoogleAuthError ? error.code : 'AUTH_FAILED';
+    const message = error instanceof GoogleAuthError ? error.message : 'Google sign-in could not be completed. Please try again.';
+    return NextResponse.json({ success: false, error: { code, message } }, { status: 401 });
   }
 }

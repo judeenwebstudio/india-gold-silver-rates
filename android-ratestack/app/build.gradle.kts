@@ -25,9 +25,14 @@ val privacyPolicyUrl = providers.gradleProperty("RATESTACK_PRIVACY_POLICY_URL")
     .get()
 fun findEnvProperty(key: String): String? {
     val envFiles = listOf(
-        file("../.env"),
+        file("local.properties"),
+        file("../local.properties"),
+        rootProject.file("local.properties"),
+        file(".env.local"),
+        file("../.env.local"),
         file(".env"),
-        rootProject.file("../.env"),
+        file("../.env"),
+        rootProject.file(".env.local"),
         rootProject.file(".env")
     )
     for (f in envFiles) {
@@ -51,8 +56,10 @@ val googleServerClientId = providers.gradleProperty("GOOGLE_SERVER_CLIENT_ID")
     .orElse(providers.environmentVariable("GOOGLE_SERVER_CLIENT_ID"))
     .orElse(providers.gradleProperty("GOOGLE_ANDROID_CLIENT_ID"))
     .orElse(providers.environmentVariable("GOOGLE_ANDROID_CLIENT_ID"))
-    .orElse(providers.provider { findEnvProperty("GOOGLE_CLIENT_ID") ?: findEnvProperty("GOOGLE_SERVER_CLIENT_ID") ?: "" })
+    .orElse(providers.provider { findEnvProperty("GOOGLE_SERVER_CLIENT_ID") ?: findEnvProperty("GOOGLE_CLIENT_ID") ?: "" })
     .get()
+
+logger.lifecycle("RateStack Build: GOOGLE_SERVER_CLIENT_ID resolved length=${googleServerClientId.length}, prefix=${googleServerClientId.take(12)}...")
 val buildCommit = providers.environmentVariable("RATESTACK_BUILD_COMMIT").orElse("unknown").get()
 val configuredVersionCode = providers.gradleProperty("RATESTACK_VERSION_CODE")
     .orElse("2")

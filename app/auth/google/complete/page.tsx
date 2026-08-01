@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { safeCustomerReturnTo } from "@/lib/customer-auth-return";
 
 export default function GoogleCompletePage() {
   const [message, setMessage] = useState("Completing Google sign-in…");
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
-    const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : "/schemes/dashboard";
+    const safeNext = safeCustomerReturnTo(next);
     fetch("/api/v1/auth/session", { cache: "no-store" })
       .then((response) => response.json())
       .then((body) => {

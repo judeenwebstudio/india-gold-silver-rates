@@ -29,9 +29,12 @@ import java.util.UUID
 fun NativeShopScreen(
     token: String?,
     onLogin: () -> Unit,
+    onCheckoutLogin: (String, Double, Int) -> Unit,
     onRegister: () -> Unit,
     onGoogleLogin: () -> Unit,
     onOrders: () -> Unit,
+    pendingCheckout: PendingAuthDestination? = null,
+    onPendingCheckoutRestored: () -> Unit = {},
     modifier: Modifier = Modifier,
     embedded: Boolean = false,
 ) {
@@ -53,6 +56,19 @@ fun NativeShopScreen(
             } }
         }.onFailure { errorMessage = "Unable to load Shop products." }
         loading = false
+    }
+    LaunchedEffect(products, token, pendingCheckout) {
+        val pending = pendingCheckout
+        if (!token.isNullOrBlank() && pending?.validCheckout() == true) {
+            val product = products.firstOrNull { it.productId == pending.productId }
+            val weight = pending.weightGrams
+            val quantity = pending.quantity
+            if (product != null && weight != null && quantity != null && weight in product.availableWeights.orEmpty()) {
+                selections[product.productId.orEmpty()] = weight to quantity
+                checkoutSelection = Triple(product, weight, quantity)
+                onPendingCheckoutRestored()
+            }
+        }
     }
     fun checkout(product: ShopProductDto, request: ShopCheckoutRequestDto) {
         if (token.isNullOrBlank()) { onLogin(); return }
@@ -112,7 +128,7 @@ fun NativeShopScreen(
             val key = if (selected.first % 1.0 == 0.0) selected.first.toInt().toString() else selected.first.toString()
             ShopCard(product, weights, selected.first, selected.second, product.prices?.get(key), busy == id,
                 { selections[id] = it to selected.second }, { selections[id] = selected.first to it.coerceIn(1, 10) },
-                { if (token.isNullOrBlank()) onLogin() else checkoutSelection = Triple(product, selected.first, selected.second) })
+                { if (token.isNullOrBlank()) onCheckoutLogin(id, selected.first, selected.second) else checkoutSelection = Triple(product, selected.first, selected.second) })
         }
     }
     checkoutSelection?.let { selected ->

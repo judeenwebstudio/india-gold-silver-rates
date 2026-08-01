@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { safeCustomerReturnTo } from "@/lib/customer-auth-return";
 
 type AuthModalProps = {
   initialMode?: "login" | "register" | "forgot";
@@ -12,6 +13,7 @@ type AuthModalProps = {
 type Mode = "login" | "register" | "forgot_mobile" | "forgot_email" | "forgot_otp" | "forgot_reset";
 
 export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectTo = "/schemes/dashboard" }: AuthModalProps) {
+  const safeRedirectTo = safeCustomerReturnTo(redirectTo);
   const [mode, setMode] = useState<Mode>(initialMode === "forgot" ? "forgot_mobile" : initialMode);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -220,7 +222,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectT
             localStorage.setItem("scheme_user_phone", resData.data.user.phone);
           }
           onSuccess();
-          window.location.href = redirectTo;
+          window.location.href = safeRedirectTo;
         } else {
           setError(resData.error?.message || "Registration failed. Please try again.");
         }
@@ -262,7 +264,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectT
             localStorage.setItem("scheme_user_phone", resData.data.user.phone);
           }
           onSuccess();
-          window.location.href = redirectTo;
+          window.location.href = safeRedirectTo;
         } else {
           setError(resData.error?.message || "Invalid login details.");
         }
@@ -277,7 +279,7 @@ export function AuthModal({ initialMode = "login", onClose, onSuccess, redirectT
   const handleGoogleSignIn = () => {
     if (googleLoading || loading) return;
     setGoogleLoading(true);
-    window.location.assign(`/api/auth/google?next=${encodeURIComponent(redirectTo)}`);
+    window.location.assign(`/api/auth/google?next=${encodeURIComponent(safeRedirectTo)}`);
   };
 
   return (

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { AuthModal } from "@/components/AuthModal";
 
 declare global { interface Window { Razorpay?: new (options: Record<string, unknown>) => { open(): void } } }
 type Address = { id?: string; fullName: string; mobile: string; addressLine1: string; addressLine2: string; landmark: string; city: string; district: string; state: string; pincode: string; country: "India"; addressType: "HOME" | "OFFICE" | "OTHER"; isDefault?: boolean };
@@ -31,6 +32,7 @@ export function ShopCheckout() {
   const [gst,setGst]=useState<GstDetails>({enabled:false,businessName:"",gstNumber:"",billingAddress:"",sameAsDelivery:false});
   const [error, setError] = useState(""); const [success, setSuccess] = useState<{ orderNumber: string; paymentId: string; amount: number } | null>(null);
   const token = typeof window === "undefined" ? "" : localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token") || "";
+  const authRequired = !token;
   const unit = product?.prices[String(weight)]; const price = unit ? { metalValue: unit.metalValue * quantity, serviceCharge: unit.serviceCharge * quantity, gst: unit.gst * quantity, shipping: unit.shipping * quantity, total: unit.total * quantity } : null;
   const deliveryBillingAddress=`${address.addressLine1}${address.addressLine2?`, ${address.addressLine2}`:""}, ${address.city}, ${address.district}, ${address.state} - ${address.pincode}, India`;
   const effectiveBillingAddress=gst.sameAsDelivery?deliveryBillingAddress:gst.billingAddress;
@@ -38,7 +40,7 @@ export function ShopCheckout() {
   const valid = useMemo(() => customer.fullName.trim().length >= 2 && /^(?:\+91)?[6-9]\d{9}$/.test(customer.mobile.trim()) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email) && address.fullName.trim().length >= 2 && /^(?:\+91)?[6-9]\d{9}$/.test(address.mobile.trim()) && address.addressLine1.trim().length >= 3 && address.city.trim().length >= 2 && address.district.trim().length >= 2 && address.state.trim().length >= 2 && /^[1-9]\d{5}$/.test(address.pincode) && gstValid, [customer, address,gstValid]);
 
   useEffect(() => {
-    if (!token) { window.location.replace("/shop"); return; }
+    if (!token) return;
     Promise.all([
       fetch("/api/v1/shop", { cache: "no-store" }).then(r => r.json()),
       fetch("/api/v1/me/profile", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
@@ -105,6 +107,7 @@ export function ShopCheckout() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Payment failed."); setBusy(false); }
   }
 
+  if (authRequired) return <AuthModal initialMode="login" redirectTo={`/shop/checkout?${params.toString()}`} onClose={() => window.location.assign("/shop")} onSuccess={() => undefined}/>;
   if (success) return <div className="rounded-3xl border bg-white p-8 shadow-xl"><p className="text-sm font-black uppercase text-emerald-700">Payment successful</p><h1 className="mt-2 text-3xl font-black">Thank you for your order</h1><div className="mt-6 space-y-2"><p>RateStack order ID: <b>{success.orderNumber}</b></p><p>Payment ID: <b>{success.paymentId}</b></p><p>{product?.name} · {weight}g × {quantity}</p><p>Amount paid: <b>₹{success.amount.toLocaleString("en-IN")}</b></p><p>Delivery: {address.addressLine1}, {address.city}, {address.state} – {address.pincode}</p><p>Estimated delivery information will be shared after processing.</p></div><Link href="/shop/orders" className="mt-6 inline-block rounded-xl bg-amber-500 px-5 py-3 font-black">View My Orders</Link></div>;
   if (!product || !price) return <p className="py-20 text-center">{error || "Loading secure checkout…"}</p>;
   return <div className="space-y-6"><div><p className="text-sm font-black uppercase text-amber-700">Secure checkout</p><h1 className="text-3xl font-black">{review ? "Review and pay" : "Customer and delivery details"}</h1><p className="text-stone-600">Customer Details · Delivery Address · Order Review · Payment</p></div>{error && <p role="alert" className="rounded-xl bg-red-50 p-4 font-semibold text-red-800">{error}</p>}

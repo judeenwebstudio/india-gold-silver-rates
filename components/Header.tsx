@@ -20,6 +20,7 @@ export function Header() {
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authReturnTo, setAuthReturnTo] = useState("/schemes/dashboard");
   const [userToken, setUserToken] = useState<string | null>(() => typeof window === "undefined" ? null : localStorage.getItem("scheme_user_token") || localStorage.getItem("ratestack_user_token"));
   const [userName, setUserName] = useState<string>(() => typeof window === "undefined" ? "Customer" : localStorage.getItem("scheme_user_name") || "Customer");
 
@@ -62,6 +63,7 @@ export function Header() {
 
   const handleOpenAuth = (mode: "login" | "register") => {
     setAuthMode(mode);
+    setAuthReturnTo(`${window.location.pathname}${window.location.search}${window.location.hash}`);
     setShowAuthModal(true);
   };
 
@@ -231,6 +233,7 @@ export function Header() {
       {showAuthModal && (
         <AuthModal
           initialMode={authMode}
+          redirectTo={authReturnTo}
           onClose={() => setShowAuthModal(false)}
           onSuccess={() => {
             setShowAuthModal(false);

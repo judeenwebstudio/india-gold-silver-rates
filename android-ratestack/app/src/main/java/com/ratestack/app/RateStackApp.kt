@@ -110,6 +110,8 @@ import com.ratestack.app.data.CityOption
 import com.ratestack.app.data.FavoriteCity
 import com.ratestack.app.data.GoldRate
 import com.ratestack.app.data.HomeData
+import com.ratestack.app.data.AuthDestinationType
+import com.ratestack.app.data.PendingAuthDestination
 import com.ratestack.app.data.PreferencesRepository
 import com.ratestack.app.data.PreferencesStore
 import com.ratestack.app.data.RateDetails
@@ -167,6 +169,33 @@ fun RateStackApp(
     val navController = rememberNavController()
     var splashVisible by remember { mutableStateOf(true) }
 
+    fun openCustomerLogin(destination: PendingAuthDestination) {
+        schemeViewModel.requireAuthentication(destination)
+        navController.navigate(Routes.CUSTOMER_LOGIN) { launchSingleTop = true }
+    }
+
+    fun navigateAfterCustomerAuth(authRoute: String = Routes.CUSTOMER_LOGIN) {
+        val pendingJoinPlanId = schemeViewModel.pendingJoinPlanId.value
+        if (!pendingJoinPlanId.isNullOrBlank()) {
+            navController.navigate("scheme_join/${android.net.Uri.encode(pendingJoinPlanId)}") {
+                popUpTo(authRoute) { inclusive = true }
+                launchSingleTop = true
+            }
+            return
+        }
+        val pending = schemeViewModel.pendingAuthDestination.value
+        val route = when (pending?.type) {
+            AuthDestinationType.DASHBOARD -> Routes.MY_ORDERS
+            AuthDestinationType.SHOP, AuthDestinationType.CHECKOUT -> Routes.SCHEMES
+            else -> Routes.SCHEMES
+        }
+        navController.navigate(route) {
+            popUpTo(authRoute) { inclusive = true }
+            launchSingleTop = true
+        }
+        if (pending?.type != AuthDestinationType.CHECKOUT) schemeViewModel.clearPendingAuthDestination()
+    }
+
     val themeMode by viewModel.themeMode.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -212,17 +241,24 @@ fun RateStackApp(
                     val home by viewModel.home.collectAsState()
                     val rates by viewModel.rates.collectAsState()
                     val userToken by schemeViewModel.userToken.collectAsState()
-                    HomeScreen(home, rates, selection, userToken, viewModel, navController)
+                    val pendingAuth by schemeViewModel.pendingAuthDestination.collectAsState()
+                    HomeScreen(home, rates, selection, userToken, viewModel, navController, pendingAuth, ::openCustomerLogin, { destination -> schemeViewModel.requireAuthentication(destination); navController.navigate(Routes.CUSTOMER_REGISTER) }, schemeViewModel::clearPendingAuthDestination)
                 }
 
                 composable(Routes.SCHEMES) {
                     val userToken by schemeViewModel.userToken.collectAsState()
+                    val pendingAuth by schemeViewModel.pendingAuthDestination.collectAsState()
                     com.ratestack.app.ui.shop.NativeShopScreen(
                         token = userToken,
-                        onLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
-                        onRegister = { navController.navigate(Routes.CUSTOMER_REGISTER) },
-                        onGoogleLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                        onLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.SHOP)) },
+                        onCheckoutLogin = { productId, weight, quantity ->
+                            openCustomerLogin(PendingAuthDestination.checkout(productId, weight, quantity))
+                        },
+                        onRegister = { schemeViewModel.requireAuthentication(PendingAuthDestination(AuthDestinationType.SHOP)); navController.navigate(Routes.CUSTOMER_REGISTER) },
+                        onGoogleLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.SHOP)) },
                         onOrders = { navController.navigate(Routes.MY_ORDERS) },
+                        pendingCheckout = pendingAuth,
+                        onPendingCheckoutRestored = { schemeViewModel.clearPendingAuthDestination() },
                     )
                 }
 
@@ -289,31 +325,13 @@ fun RateStackApp(
                         onLoginSubmit = { phone, pass ->
                             schemeViewModel.login(phone, pass) {
                                 schemeViewModel.resetAuthActionState()
-                                val pendingId = schemeViewModel.pendingJoinPlanId.value
-                                if (!pendingId.isNullOrBlank()) {
-                                    navController.navigate("scheme_join/${android.net.Uri.encode(pendingId)}") {
-                                        popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
-                                    }
-                                } else {
-                                    navController.navigate(Routes.SCHEMES) {
-                                        popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
-                                    }
-                                }
+                                navigateAfterCustomerAuth()
                             }
                         },
                         onGoogleIdToken = { idToken ->
                             schemeViewModel.googleSignIn(idToken) {
                                 schemeViewModel.resetAuthActionState()
-                                val pendingId = schemeViewModel.pendingJoinPlanId.value
-                                if (!pendingId.isNullOrBlank()) {
-                                    navController.navigate("scheme_join/${android.net.Uri.encode(pendingId)}") {
-                                        popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
-                                    }
-                                } else {
-                                    navController.navigate(Routes.SCHEMES) {
-                                        popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
-                                    }
-                                }
+                                navigateAfterCustomerAuth()
                             }
                         },
                         onNavigateRegister = {
@@ -340,18 +358,14 @@ fun RateStackApp(
                         onRegisterSubmit = { fullName, phone, pass ->
                             schemeViewModel.register(fullName, phone, pass) {
                                 schemeViewModel.resetAuthActionState()
-                                val destination = if (schemeViewModel.userToken.value.isNullOrBlank()) Routes.CUSTOMER_LOGIN else Routes.SCHEMES
-                                navController.navigate(destination) {
-                                    popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }
-                                }
+                                if (schemeViewModel.userToken.value.isNullOrBlank()) navController.navigate(Routes.CUSTOMER_LOGIN) { popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }; launchSingleTop = true }
+                                else navigateAfterCustomerAuth(Routes.CUSTOMER_REGISTER)
                             }
                         },
                         onGoogleIdToken = { idToken ->
                             schemeViewModel.googleSignIn(idToken) {
                                 schemeViewModel.resetAuthActionState()
-                                navController.navigate(Routes.SCHEMES) {
-                                    popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }
-                                }
+                                navigateAfterCustomerAuth(Routes.CUSTOMER_REGISTER)
                             }
                         },
                         onNavigateLogin = {
@@ -545,9 +559,9 @@ fun RateStackApp(
                     val userToken by schemeViewModel.userToken.collectAsState()
                     com.ratestack.app.ui.shop.MyOrdersScreen(
                         token = userToken,
-                        onLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
-                        onRegister = { navController.navigate(Routes.CUSTOMER_REGISTER) },
-                        onGoogleLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                        onLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) },
+                        onRegister = { schemeViewModel.requireAuthentication(PendingAuthDestination(AuthDestinationType.DASHBOARD)); navController.navigate(Routes.CUSTOMER_REGISTER) },
+                        onGoogleLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) },
                         onLogout = { schemeViewModel.logout() },
                         onShop = { navController.navigate(Routes.SCHEMES) },
                     )
@@ -566,7 +580,7 @@ fun RateStackApp(
                         onRateApp = onRateApp,
                         onProfileClick = { navController.navigate(Routes.MY_ORDERS) },
                         onLogoutClick = { schemeViewModel.logout() },
-                        onLoginClick = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                        onLoginClick = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) },
                         onRegisterClick = { navController.navigate(Routes.CUSTOMER_REGISTER) },
                     )
                 }
@@ -686,6 +700,10 @@ private fun HomeScreen(
     userToken: String?,
     viewModel: RateStackViewModel,
     navController: NavHostController,
+    pendingAuth: PendingAuthDestination?,
+    onRequireAuth: (PendingAuthDestination) -> Unit,
+    onRequireRegistration: (PendingAuthDestination) -> Unit,
+    onPendingAuthRestored: () -> Unit,
 ) {
     val isRefreshing = home is LoadState.Loading || rates is LoadState.Loading
     val refreshState = rememberPullRefreshState(isRefreshing, viewModel::refreshHome)
@@ -807,10 +825,13 @@ private fun HomeScreen(
             item {
                 com.ratestack.app.ui.shop.NativeShopScreen(
                     token = userToken,
-                    onLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
-                    onRegister = { navController.navigate(Routes.CUSTOMER_REGISTER) },
-                    onGoogleLogin = { navController.navigate(Routes.CUSTOMER_LOGIN) },
+                    onLogin = { onRequireAuth(PendingAuthDestination(AuthDestinationType.SHOP)) },
+                    onCheckoutLogin = { productId, weight, quantity -> onRequireAuth(PendingAuthDestination.checkout(productId, weight, quantity)) },
+                    onRegister = { onRequireRegistration(PendingAuthDestination(AuthDestinationType.SHOP)) },
+                    onGoogleLogin = { onRequireAuth(PendingAuthDestination(AuthDestinationType.SHOP)) },
                     onOrders = { navController.navigate(Routes.MY_ORDERS) },
+                    pendingCheckout = pendingAuth,
+                    onPendingCheckoutRestored = onPendingAuthRestored,
                     embedded = true,
                 )
             }

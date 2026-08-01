@@ -7,6 +7,7 @@ import com.ratestack.app.data.ApiProvider
 import com.ratestack.app.data.AuthResponseDto
 import com.ratestack.app.data.CustomerProfileDto
 import com.ratestack.app.data.PaymentOrderResponseDto
+import com.ratestack.app.data.PendingAuthDestination
 import com.ratestack.app.data.RedemptionQuotationDto
 import com.ratestack.app.data.RepositoryResult
 import com.ratestack.app.data.SchemeDashboardDto
@@ -30,6 +31,19 @@ class SchemeViewModel(
 
     private val _userPhone = MutableStateFlow<String?>(repository.getUserPhone())
     val userPhone: StateFlow<String?> = _userPhone.asStateFlow()
+
+    private val _pendingAuthDestination = MutableStateFlow(repository.pendingAuthDestination())
+    val pendingAuthDestination: StateFlow<PendingAuthDestination?> = _pendingAuthDestination.asStateFlow()
+
+    fun requireAuthentication(destination: PendingAuthDestination) {
+        repository.savePendingAuthDestination(destination)
+        _pendingAuthDestination.value = destination
+    }
+
+    fun clearPendingAuthDestination() {
+        repository.clearPendingAuthDestination()
+        _pendingAuthDestination.value = null
+    }
 
     private val _schemePlans = MutableStateFlow<LoadState<SchemeListResponseDto>>(LoadState.Loading)
     val schemePlans: StateFlow<LoadState<SchemeListResponseDto>> = _schemePlans.asStateFlow()
@@ -659,6 +673,7 @@ class SchemeViewModel(
     }
 
     fun logout() {
+        clearPendingAuthDestination()
         repository.revokePushToken {
             repository.clearUserToken()
             repository.clearUserDetails()

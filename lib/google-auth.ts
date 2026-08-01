@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { normalizeEmailAddress, signSchemeToken } from '@/lib/schemes/user-auth';
+import { safeCustomerReturnTo } from '@/lib/customer-auth-return';
 
 export const GOOGLE_SESSION_COOKIE = 'ratestack_scheme_session';
 
@@ -182,6 +183,5 @@ export async function connectGoogleAccount(userId: string, identity: GoogleIdent
 }
 
 export function safeAuthRedirect(value: string | null | undefined): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/schemes/dashboard';
-  return value;
+  return safeCustomerReturnTo(value);
 }

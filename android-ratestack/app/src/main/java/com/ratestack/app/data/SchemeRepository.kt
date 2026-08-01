@@ -17,6 +17,18 @@ class SchemeRepository(
     private val prefs: SharedPreferences = context.getSharedPreferences("ratestack_scheme_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
 
+    fun pendingAuthDestination(): PendingAuthDestination? = prefs.getString("pending_auth_destination", null)?.let { raw ->
+        runCatching { gson.fromJson(raw, PendingAuthDestination::class.java) }.getOrNull()
+    }
+
+    fun savePendingAuthDestination(destination: PendingAuthDestination) {
+        prefs.edit { putString("pending_auth_destination", gson.toJson(destination)) }
+    }
+
+    fun clearPendingAuthDestination() {
+        prefs.edit { remove("pending_auth_destination") }
+    }
+
     fun getUserToken(): String? {
         return prefs.getString("scheme_user_token", null)
     }

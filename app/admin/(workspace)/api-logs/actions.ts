@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import {
   executeGoodReturnsCatalogueSync,
-  executeScraper,
   type GoodReturnsMappingReport,
   type ScraperDatabaseSummary,
 } from "@/lib/scrapers/service";
@@ -36,7 +35,7 @@ async function requireAdministrator(): Promise<ScraperActionState | null> {
 }
 
 function toActionState(
-  result: Awaited<ReturnType<typeof executeScraper>>,
+  result: Awaited<ReturnType<typeof executeGoodReturnsCatalogueSync>>,
 ): ScraperActionState {
   return {
     status: result.ok ? "success" : "error",
@@ -57,7 +56,7 @@ export async function testScraperAction(
   const sessionError = await requireAdministrator();
   if (sessionError) return sessionError;
 
-  const result = await executeScraper("MANUAL_TEST");
+  const result = await executeGoodReturnsCatalogueSync("MANUAL_TEST");
   revalidatePath("/admin/api-logs");
   return toActionState(result);
 }

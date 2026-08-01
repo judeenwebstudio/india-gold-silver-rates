@@ -506,8 +506,12 @@ data class ShopAddressDto(
 data class ShopCheckoutRequestDto(
     val productId: String, val weightGrams: Double, val quantity: Int, val gateway: String,
     val idempotencyKey: String, val customer: ShopCustomerDto, val addressId: String? = null, val newAddress: ShopAddressDto? = null,
-    val gst: GstDetailsDto = GstDetailsDto(false),
+    val gst: GstDetailsDto = GstDetailsDto(false), val couponCode: String? = null,
 )
+data class CouponDto(val code:String?,val name:String?,val message:String?,val description:String?,val bannerColor:String?,val icon:String?)
+data class CouponCartDto(val productId:String,val weightGrams:Double,val quantity:Int)
+data class CouponValidateRequestDto(val couponCode:String,val cart:CouponCartDto)
+data class CouponValidationDto(val eligible:Boolean?,val code:String?,val discountAmount:Double?,val gstAmount:Double?,val totalAmount:Double?,val reason:String?)
 data class GstDetailsDto(val enabled:Boolean,val businessName:String?=null,val gstNumber:String?=null,val billingAddress:String?=null)
 data class CustomerGstProfileDto(val id:String?,val businessName:String?,val gstNumber:String?,val billingAddress:String?,val isActive:Boolean?)
 data class ShopCheckoutDto(
@@ -668,4 +672,3 @@ data class TrackingStatusHistoryDto(
     val message: String?,
     val createdAt: String?,
 )
-

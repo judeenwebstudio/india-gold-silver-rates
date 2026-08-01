@@ -90,6 +90,31 @@ enum ShopRefundStatus {
   FAILED
 }
 
+enum CouponDiscountType {
+  FIXED
+  PERCENTAGE
+}
+
+enum CouponProductScope {
+  ALL_PRODUCTS
+  GOLD_ONLY
+  SILVER_ONLY
+  SELECTED_PRODUCTS
+}
+
+enum CouponCustomerScope {
+  ALL_CUSTOMERS
+  NEW_CUSTOMERS
+  EXISTING_CUSTOMERS
+  SPECIFIC_USERS
+}
+
+enum CouponRedemptionStatus {
+  RESERVED
+  CONSUMED
+  RELEASED
+}
+
 enum ShiprocketIntegrationStatus {
   DISABLED
   NOT_CONFIGURED
@@ -532,6 +557,7 @@ model SchemeUser {
   redemptionRequests RedemptionRequest[]
   auditLogs          AuditLog[]
   shopOrders         ShopOrder[]
+  couponRedemptions  CouponRedemption[]
   deliveryAddresses DeliveryAddress[]
   authAccounts       AuthAccount[]
   platformActivities CustomerPlatformActivity[]
@@ -610,6 +636,54 @@ model ShopProduct {
   @@index([isActive, metalType])
 }
 
+model Coupon {
+  id                       String                @id @default(cuid())
+  code                     String                @unique
+  name                     String
+  description              String?
+  discountType             CouponDiscountType
+  discountValue            Int
+  maximumDiscountPaise     BigInt?
+  minimumPurchasePaise     BigInt
+  maximumTotalUses         Int?
+  perCustomerLimit         Int                  @default(1)
+  productScope             CouponProductScope   @default(ALL_PRODUCTS)
+  customerScope            CouponCustomerScope  @default(ALL_CUSTOMERS)
+  selectedProductIdsJson   Json?
+  specificUserIdsJson      Json?
+  startsAt                 DateTime
+  expiresAt                DateTime
+  isEnabled                Boolean              @default(true)
+  bannerColor              String?              @default("#171717")
+  icon                     String?              @default("🎉")
+  termsAndConditions       String?
+  redemptions              CouponRedemption[]
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+
+  @@index([isEnabled, startsAt, expiresAt])
+  @@index([productScope])
+  @@index([customerScope])
+}
+
+model CouponRedemption {
+  id                  String                 @id @default(cuid())
+  couponId            String
+  coupon              Coupon                 @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  userId              String
+  user                SchemeUser             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  orderId             String                 @unique
+  order               ShopOrder              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status              CouponRedemptionStatus @default(RESERVED)
+  discountAmountPaise BigInt
+  reservedAt          DateTime               @default(now())
+  consumedAt          DateTime?
+  releasedAt          DateTime?
+
+  @@index([couponId, status, reservedAt])
+  @@index([userId, couponId, status])
+}
+
 model ShopOrder {
   id                         String    @id @default(cuid())
   orderNumber                String    @unique
@@ -665,6 +739,11 @@ model ShopOrder {
   publicTrackingUrl          String?
   shipmentId                 String?
   discountAmountPaise        BigInt @default(0)
+  couponCode                  String?
+  couponDiscountType          CouponDiscountType?
+  couponDiscountValue         Int?
+  originalSubtotalPaise       BigInt?
+  finalSubtotalPaise          BigInt?
   cancellationReason         String?
   cancellationPaymentCaptured Boolean?
   cancellationRefundRequired Boolean?
@@ -712,6 +791,7 @@ model ShopOrder {
   shiprocketOperations       ShiprocketOperation[]
   logisticsWebhookEvents     LogisticsWebhookEvent[]
   notificationOutbox         NotificationOutbox[]
+  couponRedemption           CouponRedemption?
 
   @@index([userId, createdAt])
   @@index([gatewayOrderId])
@@ -728,6 +808,7 @@ model ShopOrder {
   @@index([paymentStatus, paidAt])
   @@index([metalType, createdAt])
   @@index([courierName, shipmentStatus])
+  @@index([couponCode, paymentStatus])
 }
 
 model CustomerGSTProfile {

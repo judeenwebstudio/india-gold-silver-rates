@@ -149,6 +149,7 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
     var review by remember { mutableStateOf(false) }; var error by remember { mutableStateOf<String?>(null) }
     var gateway by remember { mutableStateOf("RAZORPAY") }; var saveFuture by remember { mutableStateOf(true) }; var makeDefault by remember { mutableStateOf(false) }
     var gstEnabled by remember { mutableStateOf(false) };var gstBusiness by remember { mutableStateOf("") };var gstNumber by remember { mutableStateOf("") };var gstAddress by remember { mutableStateOf("") };var gstSameAsDelivery by remember { mutableStateOf(false) }
+    var couponCode by remember { mutableStateOf("") }; var appliedCoupon by remember { mutableStateOf<CouponValidationDto?>(null) }; var couponBusy by remember { mutableStateOf(false) }
     val checkoutScope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         runCatching {
@@ -166,6 +167,12 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
     val deliveryBillingAddress="${address.addressLine1}${if(address.addressLine2.isNotBlank())", ${address.addressLine2}" else ""}, ${address.city}, ${address.district}, ${address.state} - ${address.pincode}, India"
     val effectiveGstAddress=if(gstSameAsDelivery)deliveryBillingAddress else gstAddress
     val gstValid=!gstEnabled||(gstBusiness.trim().isNotEmpty()&&gstBusiness.length<=150&&effectiveGstAddress.trim().isNotEmpty()&&effectiveGstAddress.length<=500&&Regex("^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$").matches(gstNumber))
+    val weightKey=if(weight%1.0==0.0)weight.toInt().toString() else weight.toString()
+    val unitPrice=product.prices?.get(weightKey)
+    val subtotal=((unitPrice?.metalValue?:0.0)+(unitPrice?.serviceCharge?:0.0))*quantity
+    val shipping=(unitPrice?.shipping?:0.0)*quantity
+    val baseGst=(unitPrice?.gst?:0.0)*quantity
+    val baseTotal=(unitPrice?.total?:0.0)*quantity
     val valid = name.trim().length >= 2 && Regex("^(?:\\+91)?[6-9]\\d{9}$").matches(mobile.trim()) &&
         android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() && address.fullName.trim().length >= 2 &&
         Regex("^(?:\\+91)?[6-9]\\d{9}$").matches(address.mobile.trim()) && address.addressLine1.trim().length >= 3 &&
@@ -233,6 +240,12 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
                 Text("$name • $mobile • $email"); Text("${address.addressLine1}, ${address.city}, ${address.district}, ${address.state} – ${address.pincode}, India")
                 Text("Payment method: $gateway", fontWeight = FontWeight.Bold)
                 if(gstEnabled){Text("GST Invoice",fontWeight=FontWeight.Black);Text(gstBusiness);Text(gstNumber);Text(effectiveGstAddress)}
+                Divider()
+                PriceRow("Subtotal", money(subtotal)); PriceRow("Shipping", if(shipping==0.0)"FREE" else money(shipping))
+                Text("Coupon",fontWeight=FontWeight.Bold)
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(couponCode,{couponCode=it.uppercase(Locale.ENGLISH);appliedCoupon=null},Modifier.weight(1f),label={Text("Coupon Code")},singleLine=true,enabled=appliedCoupon==null);if(appliedCoupon==null)Button({checkoutScope.launch{couponBusy=true;error=null;val response=runCatching{ApiProvider.service.validateCoupon("Bearer $token",CouponValidateRequestDto(couponCode,CouponCartDto(product.productId.orEmpty(),weight,quantity)))}.getOrNull();val body=response?.body();if(response?.isSuccessful==true&&body?.data?.eligible==true){appliedCoupon=body.data;couponCode=body.data.code.orEmpty()}else error=body?.error?.message?:body?.data?.reason?:"Invalid coupon";couponBusy=false}},enabled=couponCode.isNotBlank()&&!couponBusy){Text(if(couponBusy)"Applying…" else "Apply")}else TextButton({appliedCoupon=null;couponCode=""}){Text("Remove")}}
+                appliedCoupon?.let{Text("Coupon Applied · ${it.code}  -${money(it.discountAmount?:0.0)}",color=Color(0xFF15803D),fontWeight=FontWeight.Bold)}
+                PriceRow("GST (3%)",money(appliedCoupon?.gstAmount?:baseGst)); Divider(); PriceRow("Grand Total",money(appliedCoupon?.totalAmount?:baseTotal))
                 Text("Gateway opens only after you confirm below.", style = MaterialTheme.typography.bodySmall)
             }
         } },
@@ -244,7 +257,7 @@ private fun ShopCheckoutDialog(token: String, product: ShopProductDto, weight: D
                     val result = ApiProvider.service.createDeliveryAddress("Bearer $token", address.copy(isDefault = makeDefault || saved.isEmpty()))
                     selected = result.body()?.data ?: run { error = result.body()?.error?.message ?: "Unable to save address."; return@launch }
                 }
-                onConfirm(ShopCheckoutRequestDto(product.productId.orEmpty(), weight, quantity, gateway, UUID.randomUUID().toString(), ShopCustomerDto(name.trim(), mobile.trim(), email.trim()), addressId = selected.id, newAddress = if (selected.id == null) selected else null,gst=if(gstEnabled)GstDetailsDto(true,gstBusiness.trim(),gstNumber,effectiveGstAddress.trim())else GstDetailsDto(false)))
+                onConfirm(ShopCheckoutRequestDto(product.productId.orEmpty(), weight, quantity, gateway, UUID.randomUUID().toString(), ShopCustomerDto(name.trim(), mobile.trim(), email.trim()), addressId = selected.id, newAddress = if (selected.id == null) selected else null,gst=if(gstEnabled)GstDetailsDto(true,gstBusiness.trim(),gstNumber,effectiveGstAddress.trim())else GstDetailsDto(false),couponCode=appliedCoupon?.code))
             }
         }, enabled = review || valid) { Text(if (review) "Confirm & Pay" else "Review Order") } },
         dismissButton = { TextButton(if (review) ({ review = false }) else onDismiss) { Text(if (review) "Edit Details" else "Cancel") } },

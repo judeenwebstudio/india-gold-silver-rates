@@ -144,6 +144,13 @@ input {
   to { transform: translateX(200%); }
 }
 
+@keyframes coupon-banner-scroll {
+  to { transform: translateX(-50%); }
+}
+
+.coupon-banner-track { animation: coupon-banner-scroll 28s linear infinite; }
+.coupon-banner:hover .coupon-banner-track { animation-play-state: paused; }
+
 @media (hover: hover) and (pointer: fine) {
   .shop-product-card:hover {
     transform: translateY(-4px);
@@ -179,4 +186,6 @@ input {
     animation: none;
     transform: translateX(50%);
   }
+
+  .coupon-banner-track { animation: none; }
 }

@@ -4,6 +4,7 @@ import { authenticateSchemeUserFromRequest } from '@/lib/schemes/user-auth';
 import { verifyRazorpaySignature } from '@/lib/schemes/razorpay';
 import { z } from 'zod';
 import { enqueueOrderEvent } from '@/lib/notifications/outbox';
+import { consumeCouponForOrder } from '@/lib/coupons';
 
 const schema = z.object({ shopOrderId: z.string(), gatewayPaymentId: z.string(), gatewaySignature: z.string() });
 export async function POST(request: Request) {
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
     gatewayFeePaise,otherCostPaise:product?.otherCostPaise,
     costSnapshotComplete:Boolean(product&&product.productCostPaise!=null&&product.metalAcquisitionCostPaise!=null&&product.packagingCostPaise!=null&&product.shippingCostPaise!=null&&gatewayFeePaise!=null&&product.otherCostPaise!=null),
   } });
+  await consumeCouponForOrder(order.id);
   await enqueueOrderEvent(order.id,"PAYMENT_VERIFIED");
   return NextResponse.json({ success: true, data: { orderNumber: order.orderNumber, invoiceNumber } });
 }

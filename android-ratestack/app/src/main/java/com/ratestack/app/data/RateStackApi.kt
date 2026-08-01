@@ -35,6 +35,15 @@ interface RateStackApi {
     @GET("api/v1/shop")
     suspend fun getShop(): Response<ApiEnvelope<ShopResponseDto>>
 
+    @GET("api/v1/coupons/active")
+    suspend fun getActiveCoupons(): Response<ApiEnvelope<List<CouponDto>>>
+
+    @POST("api/v1/coupons/validate")
+    suspend fun validateCoupon(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Body request: CouponValidateRequestDto,
+    ): Response<ApiEnvelope<CouponValidationDto>>
+
     @POST("api/v1/shop/checkout")
     suspend fun createShopCheckout(
         @retrofit2.http.Header("Authorization") authHeader: String,

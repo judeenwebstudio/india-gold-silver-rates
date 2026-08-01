@@ -79,7 +79,7 @@ export async function getInvoicePdf(orderId: string, customerId?: string) {
     },
     summary: {
       metalPaise: order.metalValuePaise, servicePaise: order.serviceChargePaise, gstPaise: order.gstPaise,
-      shippingPaise: order.shippingAmountPaise, discountPaise: order.discountAmountPaise, totalPaise: order.totalAmountPaise,
+      shippingPaise: order.shippingAmountPaise, discountPaise: order.discountAmountPaise, totalPaise: order.totalAmountPaise, couponCode: order.couponCode,
     },
     company: {
       name: merchant?.legalSellerName || "RateStack Jewellery & Coins India Pvt Ltd",

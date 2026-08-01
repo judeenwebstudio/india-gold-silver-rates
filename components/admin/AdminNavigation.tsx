@@ -36,6 +36,7 @@ const navGroups: NavGroup[] = [
     title: "Shop Management",
     items: [
       { label: "Products", href: "/admin/products", marker: "PR", available: true },
+      { label: "Coupons", href: "/admin/coupons", marker: "CP", available: true },
       { label: "Product Costs", href: "/admin/products/costs", marker: "PC", available: true },
       { label: "Orders", href: "/admin/orders", marker: "OR", available: true },
       { label: "Payments", href: "/admin/payments", marker: "PY", available: true },

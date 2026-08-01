@@ -1,4 +1,5 @@
 import { Footer } from "@/components/Footer";
+import { CouponBanner } from "@/components/CouponBanner";
 import { Header } from "@/components/Header";
 import { HistoricalChart } from "@/components/HistoricalChart";
 import { HomeRateExperience } from "@/components/HomeRateExperience";
@@ -27,6 +28,7 @@ export default async function Home() {
   return (
     <>
       <Header />
+      <CouponBanner />
       <main>
         <HomeRateExperience
           states={locations}

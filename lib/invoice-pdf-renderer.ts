@@ -10,7 +10,7 @@ export type InvoicePdfData = {
   customer: { name: string; mobile: string; email: string };
   shippingAddress: string;
   product: { image?: Buffer | null; name: string; metal: string; purity: string; weight: string; quantity: number; ratePaise: bigint; amountPaise: bigint };
-  summary: { metalPaise: bigint; servicePaise: bigint; gstPaise: bigint; shippingPaise: bigint; discountPaise: bigint; totalPaise: bigint };
+  summary: { metalPaise: bigint; servicePaise: bigint; gstPaise: bigint; shippingPaise: bigint; discountPaise: bigint; totalPaise: bigint; couponCode?: string | null };
   company: { name: string; gstin: string; address: string; website: string; supportEmail: string };
   trackingUrl: string;
   gstBilling?: { businessName: string; gstin: string; address: string } | null;
@@ -100,7 +100,7 @@ export async function renderInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
   summaryRow(doc, "Making / Service Charges", money(data.summary.servicePaise), sx, summaryY + 20, sw);
   summaryRow(doc, "GST", money(data.summary.gstPaise), sx, summaryY + 38, sw);
   summaryRow(doc, "Shipping", data.summary.shippingPaise === 0n ? "FREE" : money(data.summary.shippingPaise), sx, summaryY + 56, sw);
-  summaryRow(doc, "Discount", money(data.summary.discountPaise), sx, summaryY + 74, sw);
+  summaryRow(doc, data.summary.couponCode ? `Coupon Discount (${data.summary.couponCode})` : "Discount", money(data.summary.discountPaise), sx, summaryY + 74, sw);
   doc.moveTo(sx, summaryY + 94).lineTo(sx + sw, summaryY + 94).strokeColor(GOLD).stroke();
   summaryRow(doc, "GRAND TOTAL", money(data.summary.totalPaise), sx, summaryY + 102, sw, true);
 

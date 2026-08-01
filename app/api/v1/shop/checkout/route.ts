@@ -7,6 +7,7 @@ import { createPhonePeOrder } from '@/lib/schemes/phonepe';
 import { calculateShopPrice, getTrichyShopRates, validateShopWeight } from '@/lib/shop';
 import { z } from 'zod';
 import { optionalGstSchema } from '@/lib/gst';
+import { CouponError, couponAdjustedPrice, validateCoupon } from '@/lib/coupons';
 
 const schema = z.object({
   productId: z.string().min(1), weightGrams: z.number().positive(), quantity: z.number().int().min(1).max(10),
@@ -26,6 +27,7 @@ const schema = z.object({
     pincode: z.string().regex(/^[1-9]\d{5}$/, 'Enter a valid six-digit Indian PIN code.'), country: z.literal('India'), addressType: z.enum(['HOME', 'OFFICE', 'OTHER']),
   }).optional(),
   gst: optionalGstSchema.optional().default({ enabled: false }),
+  couponCode: z.string().trim().max(40).optional(),
 }).refine((value) => Boolean(value.addressId) !== Boolean(value.newAddress), { message: 'Select one valid delivery address.' });
 
 export async function POST(request: Request) {
@@ -52,6 +54,9 @@ export async function POST(request: Request) {
   const rawRateDate = product.metalType === 'GOLD' ? rates.goldRateDate : rates.silverRateDate;
   const parsedRateDate = rawRateDate ? new Date(rawRateDate) : null;
   const price = calculateShopPrice(rate, parsed.data.weightGrams, parsed.data.quantity, product.serviceChargeBasisPoints, product.gstBasisPoints);
+  let coupon = null;
+  if(parsed.data.couponCode){try{coupon=await validateCoupon(parsed.data.couponCode,authUser.userId,{productId:product.id,metalType:product.metalType,subtotalPaise:price.metalValuePaise+price.serviceChargePaise})}catch(error){const e=error instanceof CouponError?error:new CouponError('COUPON_VALIDATION_FAILED','Coupon validation failed');return NextResponse.json({success:false,error:{code:e.code,message:e.message}},{status:400})}}
+  const adjusted=coupon?couponAdjustedPrice(price.metalValuePaise,price.serviceChargePaise,price.shippingAmountPaise,product.gstBasisPoints,coupon.discountAmountPaise):null;
   const orderNumber = existing?.orderNumber || `SHOP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
   const order = existing || await prisma.shopOrder.create({
     data: {
@@ -59,8 +64,10 @@ export async function POST(request: Request) {
       metalType: product.metalType, purity: product.purity, weightGrams: parsed.data.weightGrams, quantity: parsed.data.quantity,
       trichyRatePerGramPaise: rate, rateSource, rateDate: parsedRateDate && !Number.isNaN(parsedRateDate.getTime()) ? parsedRateDate : null,
       metalValuePaise: price.metalValuePaise, serviceChargeBasisPoints: product.serviceChargeBasisPoints,
-      serviceChargePaise: price.serviceChargePaise, gstBasisPoints: product.gstBasisPoints, gstPaise: price.gstPaise,
-      shippingAmountPaise: price.shippingAmountPaise, totalAmountPaise: price.totalPaise,
+      serviceChargePaise: price.serviceChargePaise, gstBasisPoints: product.gstBasisPoints,
+      shippingAmountPaise: price.shippingAmountPaise, gstPaise:adjusted?.gstPaise??price.gstPaise,totalAmountPaise:adjusted?.totalPaise??price.totalPaise,
+      discountAmountPaise:coupon?.discountAmountPaise??0n,couponCode:coupon?.code,couponDiscountType:coupon?.discountType,couponDiscountValue:coupon?.discountValue,
+      originalSubtotalPaise:coupon?.originalSubtotalPaise??(price.metalValuePaise+price.serviceChargePaise),finalSubtotalPaise:coupon?.finalSubtotalPaise??(price.metalValuePaise+price.serviceChargePaise),
       customerName: parsed.data.customer.fullName, customerPhone: parsed.data.customer.mobile, customerEmail: parsed.data.customer.email,
       addressLine1: selectedAddress.addressLine1, addressLine2: selectedAddress.addressLine2 || null,
       landmark: selectedAddress.landmark || null, deliveryCity: selectedAddress.city,
@@ -73,6 +80,7 @@ export async function POST(request: Request) {
       gstBillingAddress: parsed.data.gst.enabled ? parsed.data.gst.billingAddress : null,
     },
   });
+  if(coupon&&!existing)await prisma.couponRedemption.create({data:{couponId:coupon.couponId,userId:authUser.userId,orderId:order.id,discountAmountPaise:coupon.discountAmountPaise}});
   if(parsed.data.gst.enabled){
     const current=await prisma.customerGSTProfile.findFirst({where:{customerId:authUser.userId,isDefault:true}});
     const profileData={businessName:parsed.data.gst.businessName,gstNumber:parsed.data.gst.gstNumber,billingAddress:parsed.data.gst.billingAddress,isActive:true,isDefault:true};
@@ -96,14 +104,14 @@ export async function POST(request: Request) {
     redirectUrl = phonepe.redirectUrl;
     }
   } catch (error) {
-    await prisma.shopOrder.update({ where: { id: order.id }, data: { failureMessage: error instanceof Error ? error.message.slice(0, 250) : 'Gateway initiation failed' } });
+    await prisma.$transaction([prisma.shopOrder.update({ where: { id: order.id }, data: { failureMessage: error instanceof Error ? error.message.slice(0, 250) : 'Gateway initiation failed' } }),prisma.couponRedemption.updateMany({where:{orderId:order.id,status:'RESERVED'},data:{status:'RELEASED',releasedAt:new Date()}})]);
     return NextResponse.json({ success: false, error: { code: 'PAYMENT_INITIATION_FAILED', message: 'Order saved. Payment could not be started; please retry.' }, data: { shopOrderId: order.id, orderNumber } }, { status: 502 });
   }
   const updated = await prisma.shopOrder.update({ where: { id: order.id }, data: { gatewayOrderId } });
   return shopOrderResponse(updated, redirectUrl);
 }
 
-function shopOrderResponse(order: { id: string; orderNumber: string; gateway: string; gatewayOrderId: string | null; metalValuePaise: bigint; serviceChargePaise: bigint; gstPaise: bigint; shippingAmountPaise: bigint; totalAmountPaise: bigint; currency: string }, redirectUrl?: string) {
+function shopOrderResponse(order: { id: string; orderNumber: string; gateway: string; gatewayOrderId: string | null; metalValuePaise: bigint; serviceChargePaise: bigint; gstPaise: bigint; shippingAmountPaise: bigint; discountAmountPaise:bigint;couponCode:string|null; totalAmountPaise: bigint; currency: string }, redirectUrl?: string) {
   return NextResponse.json({ success: true, data: {
     shopOrderId: order.id, orderNumber: order.orderNumber, gateway: order.gateway, gatewayOrderId: order.gatewayOrderId, redirectUrl,
     keyId: order.gateway === 'RAZORPAY' ? process.env.RAZORPAY_KEY_ID : undefined,
@@ -113,6 +121,7 @@ function shopOrderResponse(order: { id: string; orderNumber: string; gateway: st
       serviceChargeAmount: Number(order.serviceChargePaise) / 100,
       gstAmount: Number(order.gstPaise) / 100,
       shippingAmount: Number(order.shippingAmountPaise) / 100,
+      couponCode:order.couponCode,discountAmount:Number(order.discountAmountPaise)/100,
       totalAmount: Number(order.totalAmountPaise) / 100,
     },
   } });

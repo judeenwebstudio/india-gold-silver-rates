@@ -1,4 +1,10 @@
-import { prisma } from '@/lib/prisma';
+import {
+  MetalPurity,
+  MetalType,
+  RateHistoryAction,
+  RateProvider,
+} from "@/generated/prisma/client";
+import { prisma } from "@/lib/prisma";
 
 export type HistoryMetal = 'gold24k' | 'gold22k' | 'silver';
 export type HistoryUnit = 'gram' | 'kilogram';
@@ -27,6 +33,13 @@ export type PublicHistoryRecord = {
 };
 
 const purityByMetal = { gold24k: 'K24', gold22k: 'K22', silver: 'P999' } as const;
+
+export function historySelection(metal: HistoryMetal) {
+  return {
+    purity: purityByMetal[metal] as MetalPurity,
+    metalType: metal === "silver" ? MetalType.SILVER : MetalType.GOLD,
+  };
+}
 
 export function sourceSession(timestamp: string): 'AM' | 'PM' {
   return new Date(timestamp).getUTCHours() >= 12 ? 'PM' : 'AM';
@@ -70,46 +83,76 @@ export async function getStoredRateHistory(options: {
 }) {
   const city = await prisma.city.findFirst({
     where: { slug: options.citySlug, isActive: true, deletedAt: null },
+    select: { id: true, name: true },
+  });
+  if (!city) throw new Error("City not found.");
+
+  const rangeEnd = new Date();
+  const rangeStart = new Date(rangeEnd);
+  rangeStart.setUTCHours(0, 0, 0, 0);
+  rangeStart.setUTCDate(rangeStart.getUTCDate() - (options.days - 1));
+  const { purity, metalType } = historySelection(options.metal);
+  const history = await prisma.rateHistory.findMany({
+    where: {
+      metalType,
+      action: { in: [RateHistoryAction.CREATE, RateHistoryAction.UPDATE] },
+      source: { startsWith: "SCRAPER:GOODRETURNS:" },
+      createdAt: { gte: rangeStart },
+      metalRate: {
+        cityId: city.id,
+        metalType,
+        purity,
+        provider: RateProvider.GOODRETURNS,
+        OR: [
+          { sourceSession: { in: ["AM", "PM"] } },
+          { sourceSession: null, source: "GOODRETURNS" },
+        ],
+        recordedAt: { gte: rangeStart },
+        isActive: true,
+        deletedAt: null,
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 500,
     select: {
-      id: true, name: true,
-      gold24KAdjustment: true, gold22KAdjustment: true, silver999Adjustment: true,
+      newData: true,
+      source: true,
+      createdAt: true,
+      metalRate: { select: { sourceSession: true } },
     },
   });
-  if (!city) throw new Error('City not found.');
-  const history = await prisma.rateHistory.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 500,
-    select: { newData: true, source: true, createdAt: true },
-  });
-  const purity = purityByMetal[options.metal];
-  const adjustment = options.metal === 'gold24k'
-    ? Number(city.gold24KAdjustment)
-    : options.metal === 'gold22k'
-      ? Number(city.gold22KAdjustment)
-      : Number(city.silver999Adjustment);
-  const multiplier = options.metal === 'silver' && options.unit === 'kilogram' ? 1000 : 1;
+
   const candidates: PublicHistoryRecord[] = [];
   for (const entry of history) {
     if (!entry.newData || Array.isArray(entry.newData)) continue;
     const data = entry.newData as StoredRateData;
-    if (data.purity !== purity || data.cityId != null || !data.recordedAt) continue;
-    const base = options.metal === 'silver' && options.unit === 'kilogram'
+    if (
+      data.purity !== purity ||
+      data.cityId !== city.id ||
+      data.source !== "GOODRETURNS" ||
+      !data.recordedAt
+    ) continue;
+    const published = new Date(data.recordedAt);
+    if (!Number.isFinite(published.getTime()) || published < rangeStart || published > rangeEnd) continue;
+    const base = options.metal === "silver" && options.unit === "kilogram"
       ? Number(data.pricePerKilogram ?? Number(data.pricePerGram) * 1000)
       : Number(data.pricePerGram);
     if (!Number.isFinite(base) || base <= 0) continue;
-    const publishedAt = new Date(data.recordedAt).toISOString();
-    const isOfficial = data.source === 'IBJA' && entry.source.startsWith('SCRAPER:IBJA:');
+    const publishedAt = published.toISOString();
+    const session = entry.metalRate.sourceSession === "AM" || entry.metalRate.sourceSession === "PM"
+      ? entry.metalRate.sourceSession
+      : sourceSession(publishedAt);
     candidates.push({
       date: publishedAt.slice(0, 10),
       rateDate: publishedAt.slice(0, 10),
-      rate: Math.round((base + adjustment * multiplier) * 100) / 100,
+      rate: Math.round(base * 100) / 100,
       sourcePublishedAt: publishedAt,
       city: city.name,
-      sourceName: data.source || 'Configured source',
+      sourceName: "GoodReturns",
       sourceReference: entry.source,
-      sourceSession: sourceSession(publishedAt),
-      isOfficial,
-      rateType: 'INDICATIVE',
+      sourceSession: session,
+      isOfficial: true,
+      rateType: "ORIGINAL",
       recordedAt: entry.createdAt.toISOString(),
     });
   }
@@ -118,8 +161,9 @@ export async function getStoredRateHistory(options: {
     city: city.name,
     metal: options.metal,
     unit: options.unit,
-    currency: 'INR',
-    rateType: 'INDICATIVE' as const,
+    currency: "INR",
+    providerName: "GoodReturns",
+    rateType: "ORIGINAL" as const,
     records,
     summary: historySummary(records),
     availableDays: records.length,

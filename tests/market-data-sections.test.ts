@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { historySummary, selectDailyHistory, type PublicHistoryRecord } from "../lib/rate-history";
+import fs from "node:fs";
+import path from "node:path";
+import { MetalPurity, MetalType } from "../generated/prisma/client";
+import { historySelection, historySummary, selectDailyHistory, type PublicHistoryRecord } from "../lib/rate-history";
 import { sortCityRecords, type CityComparisonRecord } from "../lib/city-rate-comparison";
 
 const history = (date: string, rate: number, session: "AM" | "PM", official = true): PublicHistoryRecord => ({
@@ -22,6 +25,39 @@ test("history summary uses the first and last real observations", () => {
   assert.deepEqual(historySummary([history("2026-07-22", 100, "PM"), history("2026-07-24", 125, "PM")]), {
     current: 125, previous: 100, change: 25, changePercent: 25, high: 125, low: 100,
   });
+});
+
+test("city history maps K22, K24 and Silver to their exact stored rate identities", () => {
+  assert.deepEqual(historySelection("gold22k"), { metalType: MetalType.GOLD, purity: MetalPurity.K22 });
+  assert.deepEqual(historySelection("gold24k"), { metalType: MetalType.GOLD, purity: MetalPurity.K24 });
+  assert.deepEqual(historySelection("silver"), { metalType: MetalType.SILVER, purity: MetalPurity.P999 });
+});
+
+test("one-day and no-history states preserve only available observations", () => {
+  const oneDay = selectDailyHistory([history("2026-08-01", 13220, "AM")], 7);
+  assert.equal(oneDay.length, 1);
+  assert.equal(historySummary(oneDay)?.previous, null);
+  assert.deepEqual(selectDailyHistory([], 7), []);
+  assert.equal(historySummary([]), null);
+});
+
+test("city history query filters GoodReturns provider, sessions, status and city", () => {
+  const source = fs.readFileSync(path.join(process.cwd(), "lib/rate-history.ts"), "utf8");
+  assert.match(source, /cityId: city\.id/);
+  assert.match(source, /provider: RateProvider\.GOODRETURNS/);
+  assert.match(source, /sourceSession: \{ in: \["AM", "PM"\] \}/);
+  assert.match(source, /isActive: true/);
+  assert.match(source, /deletedAt: null/);
+  assert.match(source, /recordedAt: \{ gte: rangeStart \}/);
+  assert.doesNotMatch(source, /data\.cityId != null/);
+  assert.doesNotMatch(source, /SCRAPER:IBJA:/);
+});
+
+test("history UI explains one-day and no-history collection states", () => {
+  const source = fs.readFileSync(path.join(process.cwd(), "components/HistoricalChart.tsx"), "utf8");
+  assert.match(source, /History will build as daily rates are collected/);
+  assert.match(source, /prices from stored \{data\?\.providerName/);
+  assert.doesNotMatch(source, /derived from stored IBJA publications/);
 });
 
 const city = (name: string, value: number | null): CityComparisonRecord => ({

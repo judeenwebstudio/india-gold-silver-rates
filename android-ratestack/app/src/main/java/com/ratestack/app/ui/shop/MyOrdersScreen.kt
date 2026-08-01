@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -112,23 +113,41 @@ fun MyOrdersScreen(
                 onInvoice = { openInvoice(order) },
                 onBuyAgain = onShop,
                 onTrackOrder = { onTrackOrder(order.id.orEmpty()) },
-                onSupport = { context.startActivity(Intent(Intent.ACTION_VIEW, "${BuildConfig.WEBSITE_URL.trimEnd('/')}/contact-us".toUri())) },
+                onSupport = {
+                    val helpIntent = Intent(Intent.ACTION_SENDTO).apply {
+                        setData("mailto:info@ratestack.in".toUri())
+                        putExtra(Intent.EXTRA_SUBJECT, "RateStack Order Help: #${order.orderNumber} (${order.id})")
+                        putExtra(Intent.EXTRA_TEXT, "Hello RateStack Support Team,\n\nI need assistance with my order:\nOrder Number: #${order.orderNumber}\nOrder ID: ${order.id}\nProduct: ${order.productName}\nPayment Status: ${order.paymentStatus}\n\nCustomer: ${data?.customer?.fullName}\nPhone: ${data?.customer?.phone}\n\nDetails:\n")
+                    }
+                    context.startActivity(Intent.createChooser(helpIntent, "Contact RateStack Support"))
+                },
             )
         }
 
         item {
-            DashboardSection("Saved Addresses") {
-                Button({ editing = ShopAddressDto(fullName=data?.customer?.fullName.orEmpty(), mobile=data?.customer?.phone.orEmpty(), addressLine1="", city="", district="", state="", pincode="") }) { Text("Add Address") }
-                data?.addresses.orEmpty().forEach { address ->
-                    Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("${address.fullName} • ${address.mobile}", fontWeight = FontWeight.Black)
-                            Text("${address.addressLine1}, ${address.city}, ${address.state} – ${address.pincode}")
-                            Text("${address.addressType}${if(address.isDefault==true)" • Default Address" else ""}")
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton({ editing = address }) { Text("Edit") }
-                                TextButton({ if (data?.addresses.orEmpty().size > 1) scope.launch { ApiProvider.service.deleteDeliveryAddress("Bearer $token", address.id.orEmpty()); refresh() } }) { Text("Delete") }
-                                if(address.isDefault!=true) TextButton({ scope.launch { ApiProvider.service.setDefaultDeliveryAddress("Bearer $token", address.id.orEmpty()); refresh() } }) { Text("Set Default") }
+            DashboardSection(
+                title = "Saved Addresses",
+                action = {
+                    Button({ editing = ShopAddressDto(fullName=data?.customer?.fullName.orEmpty(), mobile=data?.customer?.phone.orEmpty(), addressLine1="", city="", district="", state="", pincode="") }) {
+                        Text("+ Add Address", fontWeight = FontWeight.Bold)
+                    }
+                }
+            ) {
+                val addresses = data?.addresses.orEmpty()
+                if (addresses.isEmpty()) {
+                    Text("No saved addresses yet.", color = Color.Gray)
+                } else {
+                    addresses.forEach { address ->
+                        Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("${address.fullName} • ${address.mobile}", fontWeight = FontWeight.Black)
+                                Text("${address.addressLine1}, ${address.city}, ${address.state} – ${address.pincode}")
+                                Text("${address.addressType}${if(address.isDefault==true)" • Default Address" else ""}")
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    TextButton({ editing = address }) { Text("Edit") }
+                                    TextButton({ if (addresses.size > 1) scope.launch { ApiProvider.service.deleteDeliveryAddress("Bearer $token", address.id.orEmpty()); refresh() } }, enabled = addresses.size > 1) { Text("Delete") }
+                                    if(address.isDefault!=true) TextButton({ scope.launch { ApiProvider.service.setDefaultDeliveryAddress("Bearer $token", address.id.orEmpty()); refresh() } }) { Text("Set Default") }
+                                }
                             }
                         }
                     }
@@ -198,7 +217,7 @@ private fun NotificationSettings(token:String){
     }
 }
 @Composable private fun Metric(label:String,value:String,modifier:Modifier=Modifier){Card(modifier){Column(Modifier.padding(12.dp)){Text(label,style=MaterialTheme.typography.labelSmall);Text(value,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=Color(0xFFB7791F))}}}
-@Composable private fun DashboardSection(title:String,content:@Composable ColumnScope.()->Unit){Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,Color(0x66B7791F))){Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){Text(title,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=MaterialTheme.colorScheme.primary);content()}}}
+@Composable private fun DashboardSection(title:String, action:(@Composable ()->Unit)?=null, content:@Composable ColumnScope.()->Unit){Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,Color(0x66B7791F))){Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){Text(title,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=MaterialTheme.colorScheme.primary);action?.invoke()};content()}}}
 @Composable
 private fun OrderCard(
     order: DashboardOrderDto,

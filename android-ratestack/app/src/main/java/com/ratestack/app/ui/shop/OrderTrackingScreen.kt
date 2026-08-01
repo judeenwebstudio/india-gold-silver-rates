@@ -310,12 +310,12 @@ fun OrderTrackingScreen(
                             s.imageUrl?.let { raw ->
                                 AsyncImage(
                                     model = if (raw.startsWith("http")) raw else BuildConfig.WEBSITE_URL.trimEnd('/') + raw,
-                                    contentDescription = s.productName,
+                                    contentDescription = s.productName.orEmpty(),
                                     modifier = Modifier.fillMaxWidth().height(120.dp),
                                     contentScale = ContentScale.Fit
                                 )
                             }
-                            Text(s.productName, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                            Text(s.productName.orEmpty(), fontWeight = FontWeight.Black, fontSize = 16.sp)
                             Text("Purity: ${s.purity} • Weight: ${s.weightGrams}g • Qty: ${s.quantity}")
                             Text("Metal Value: ₹${s.metalValue} • GST (3%): ₹${s.gst}")
                             Text("Total Paid: ₹${s.total}", fontWeight = FontWeight.Black, color = Color(0xFFF5C96A))

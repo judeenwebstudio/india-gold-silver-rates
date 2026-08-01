@@ -223,9 +223,26 @@ fun RateStackApp(
 
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = backStackEntry?.destination?.route
+        var showLocationPicker by remember { mutableStateOf(false) }
+
+        if (showLocationPicker) {
+            val statesState by viewModel.states.collectAsState()
+            val citiesState by viewModel.cities.collectAsState()
+            val states = (statesState as? LoadState.Ready)?.data ?: emptyList()
+            val cities = (citiesState as? LoadState.Ready)?.data ?: emptyList()
+            com.ratestack.app.ui.components.LocationPickerDialog(
+                states = states,
+                cities = cities,
+                currentSelection = selection,
+                onDismiss = { showLocationPicker = false },
+                onSelectCity = { stateSlug, citySlug ->
+                    viewModel.select(stateSlug, citySlug)
+                }
+            )
+        }
 
         Scaffold(
-            topBar = { AppTopBar(currentRoute, selection, navController) },
+            topBar = { AppTopBar(currentRoute, selection, navController, onOpenLocationPicker = { viewModel.loadLocations(); showLocationPicker = true }) },
             bottomBar = {
                 NavigationBar {
                     BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
@@ -639,6 +656,7 @@ private fun AppTopBar(
     route: String?,
     selection: Pair<String?, String?>,
     navController: NavHostController,
+    onOpenLocationPicker: () -> Unit = {},
 ) {
     val isRoot = route == Routes.HOME || route == Routes.SCHEMES ||
         route == Routes.MY_ORDERS || route == Routes.FAVORITES || route == Routes.SETTINGS
@@ -658,11 +676,13 @@ private fun AppTopBar(
                             fontWeight = FontWeight.Bold,
                         ),
                     )
-                    if (route == Routes.HOME && selection.second != null) {
+                    if (route == Routes.HOME) {
+                        val locationText = if (selection.second != null) "📍 ${selection.second}, ${selection.first}" else "📍 Select Location"
                         Text(
-                            text = "${selection.second}, ${selection.first}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            text = locationText,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable { onOpenLocationPicker() },
                         )
                     }
                 }
@@ -794,6 +814,14 @@ private fun HomeScreen(
                             fromCache = rates.fromCache,
                         )
                     }
+
+                    item {
+                        com.ratestack.app.ui.components.GoldCalculatorCard(goldRates = details.goldRates)
+                    }
+
+                    item {
+                        com.ratestack.app.ui.components.SilverCalculatorCard(silverRate = details.silverRate, cityName = details.city.name)
+                    }
                 }
 
                 home is LoadState.Ready -> {
@@ -812,6 +840,14 @@ private fun HomeScreen(
                             sourceName = data.source.name,
                             fromCache = home.fromCache,
                         )
+                    }
+
+                    item {
+                        com.ratestack.app.ui.components.GoldCalculatorCard(goldRates = data.latestGoldRates)
+                    }
+
+                    item {
+                        com.ratestack.app.ui.components.SilverCalculatorCard(silverRate = data.latestSilverRate, cityName = "All India")
                     }
                 }
 

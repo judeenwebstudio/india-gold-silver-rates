@@ -2,8 +2,21 @@ import "server-only";
 import { CustomerActivityPlatform, CustomerLoginMethod, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { startOfIstDay } from "@/lib/customer-activity";
+import { usageMetricsFromGroups } from "@/lib/customer-usage-values";
+
+export { usageRow } from "@/lib/customer-usage-values";
 
 export type UsageFilters = { q?: string; platform?: string; status?: string; active?: string; from?: string; to?: string; method?: string; page?: string };
+
+function activityStorageUnavailable(error: unknown) {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2021") return false;
+  const meta = error.meta as { modelName?: unknown; table?: unknown } | undefined;
+  return meta?.modelName === "CustomerPlatformActivity" || String(meta?.table || "").includes("CustomerPlatformActivity") || error.message.includes("CustomerPlatformActivity");
+}
+
+function reportUnavailableStorage(operation: string) {
+  console.error("customer_usage_activity_storage_unavailable", { operation, prismaCode: "P2021", requiredMigration: "20260801123000_add_customer_platform_activity" });
+}
 const since = (filters: UsageFilters) => {
   const now = new Date();
   if (filters.active === "today") return startOfIstDay(now);
@@ -13,14 +26,20 @@ const since = (filters: UsageFilters) => {
   return null;
 };
 
+function usageBaseWhere(filters: UsageFilters): Prisma.SchemeUserWhereInput {
+  return {
+    ...(filters.q ? { OR: [{ fullName: { contains: filters.q, mode: "insensitive" } }, { phone: { contains: filters.q } }, { email: { contains: filters.q, mode: "insensitive" } }] } : {}),
+    ...(filters.status === "active" ? { isActive: true, accountStatus: "ACTIVE" } : filters.status === "inactive" ? { OR: [{ isActive: false }, { accountStatus: { not: "ACTIVE" } }] } : {}),
+  };
+}
+
 export function usageWhere(filters: UsageFilters): Prisma.SchemeUserWhereInput {
   const activityWhere: Prisma.CustomerPlatformActivityWhereInput = {};
   const activeSince = since(filters);
   if (activeSince) activityWhere.lastSeenAt = { gte: activeSince, ...(filters.active === "custom" && filters.to ? { lte: new Date(`${filters.to}T23:59:59.999+05:30`) } : {}) };
   if (Object.values(CustomerLoginMethod).includes(filters.method as CustomerLoginMethod)) activityWhere.loginMethod = filters.method as CustomerLoginMethod;
   const where: Prisma.SchemeUserWhereInput = {
-    ...(filters.q ? { OR: [{ fullName: { contains: filters.q, mode: "insensitive" } }, { phone: { contains: filters.q } }, { email: { contains: filters.q, mode: "insensitive" } }] } : {}),
-    ...(filters.status === "active" ? { isActive: true, accountStatus: "ACTIVE" } : filters.status === "inactive" ? { OR: [{ isActive: false }, { accountStatus: { not: "ACTIVE" } }] } : {}),
+    ...usageBaseWhere(filters),
     ...(Object.keys(activityWhere).length ? { platformActivities: { some: activityWhere } } : {}),
   };
   if (filters.platform === "web") where.platformActivities = { some: { ...activityWhere, platform: CustomerActivityPlatform.WEB } };
@@ -34,28 +53,41 @@ export function usageWhere(filters: UsageFilters): Prisma.SchemeUserWhereInput {
 
 export async function customerUsageMetrics() {
   const today = startOfIstDay(), now = Date.now();
-  const [registered, groups, activeToday, active7, active30] = await Promise.all([
-    prisma.schemeUser.count(),
-    prisma.customerPlatformActivity.groupBy({ by: ["customerId", "platform"] }),
-    prisma.customerPlatformActivity.groupBy({ by: ["customerId"], where: { lastSeenAt: { gte: today } } }),
-    prisma.customerPlatformActivity.groupBy({ by: ["customerId"], where: { lastSeenAt: { gte: new Date(now - 7 * 86400_000) } } }),
-    prisma.customerPlatformActivity.groupBy({ by: ["customerId"], where: { lastSeenAt: { gte: new Date(now - 30 * 86400_000) } } }),
-  ]);
-  const byCustomer = new Map<string, Set<CustomerActivityPlatform>>();
-  for (const row of groups) byCustomer.set(row.customerId, (byCustomer.get(row.customerId) || new Set()).add(row.platform));
-  const values = [...byCustomer.values()];
-  return { registered, unique: values.length, android: values.filter(x => x.has(CustomerActivityPlatform.ANDROID)).length, web: values.filter(x => x.has(CustomerActivityPlatform.WEB)).length, both: values.filter(x => x.size === 2).length, activeToday: activeToday.length, active7: active7.length, active30: active30.length, never: registered - values.length };
+  const registered = await prisma.schemeUser.count();
+  let groups: Array<{ customerId: string; platform: CustomerActivityPlatform }> = [], activeToday: Array<{ customerId: string }> = [], active7: Array<{ customerId: string }> = [], active30: Array<{ customerId: string }> = [];
+  try {
+    [groups, activeToday, active7, active30] = await Promise.all([
+      prisma.customerPlatformActivity.groupBy({ by: ["customerId", "platform"] }),
+      prisma.customerPlatformActivity.groupBy({ by: ["customerId"], where: { lastSeenAt: { gte: today } } }),
+      prisma.customerPlatformActivity.groupBy({ by: ["customerId"], where: { lastSeenAt: { gte: new Date(now - 7 * 86400_000) } } }),
+      prisma.customerPlatformActivity.groupBy({ by: ["customerId"], where: { lastSeenAt: { gte: new Date(now - 30 * 86400_000) } } }),
+    ]);
+  } catch (error) {
+    if (!activityStorageUnavailable(error)) throw error;
+    reportUnavailableStorage("metrics");
+  }
+  return usageMetricsFromGroups(registered, groups, activeToday, active7, active30);
 }
 
 export async function customerUsageRows(filters: UsageFilters, take = 25, skip?: number) {
-  return prisma.schemeUser.findMany({
-    where: usageWhere(filters), orderBy: { createdAt: "desc" }, take, ...(skip == null ? {} : { skip }),
-    select: { id: true, fullName: true, phone: true, email: true, isActive: true, accountStatus: true, platformActivities: { orderBy: { loggedInAt: "asc" }, select: { platform: true, loginMethod: true, loggedInAt: true, lastSeenAt: true, appVersion: true } } },
-  });
+  try {
+    return await prisma.schemeUser.findMany({
+      where: usageWhere(filters), orderBy: { createdAt: "desc" }, take, ...(skip == null ? {} : { skip }),
+      select: { id: true, fullName: true, phone: true, email: true, isActive: true, accountStatus: true, platformActivities: { orderBy: { loggedInAt: "asc" }, select: { platform: true, loginMethod: true, loggedInAt: true, lastSeenAt: true, appVersion: true } } },
+    });
+  } catch (error) {
+    if (!activityStorageUnavailable(error)) throw error;
+    reportUnavailableStorage("rows");
+    return [];
+  }
 }
 
-export function usageRow(user: Awaited<ReturnType<typeof customerUsageRows>>[number]) {
-  const platforms = new Set(user.platformActivities.map(x => x.platform));
-  const android = user.platformActivities.filter(x => x.platform === CustomerActivityPlatform.ANDROID);
-  return { ...user, platform: platforms.size === 2 ? "Both" : platforms.has(CustomerActivityPlatform.ANDROID) ? "Android" : platforms.has(CustomerActivityPlatform.WEB) ? "Website" : "Never", methods: [...new Set(user.platformActivities.map(x => x.loginMethod))].join(", ") || "—", firstLogin: user.platformActivities[0]?.loggedInAt || null, lastLogin: user.platformActivities.at(-1)?.loggedInAt || null, lastActive: user.platformActivities.reduce<Date | null>((max, x) => !max || x.lastSeenAt > max ? x.lastSeenAt : max, null), loginCount: user.platformActivities.filter(x => x.loginMethod !== CustomerLoginMethod.SESSION_RESTORE).length, appVersion: android.at(-1)?.appVersion || null };
+export async function customerUsageCount(filters: UsageFilters) {
+  try {
+    return await prisma.schemeUser.count({ where: usageWhere(filters) });
+  } catch (error) {
+    if (!activityStorageUnavailable(error)) throw error;
+    reportUnavailableStorage("count");
+    return 0;
+  }
 }

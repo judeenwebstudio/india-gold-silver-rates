@@ -13,11 +13,11 @@ test("usage identity remains SchemeUser and records only successful customer log
 });
 
 test("Android and website platform activity is distinct without duplicating customers", async () => {
-  const [service, android, report] = await Promise.all([read("lib/customer-activity.ts"), read("android-ratestack/app/src/main/java/com/ratestack/app/data/ApiProvider.kt"), read("lib/customer-usage-report.ts")]);
+  const [service, android, report, values] = await Promise.all([read("lib/customer-activity.ts"), read("android-ratestack/app/src/main/java/com/ratestack/app/data/ApiProvider.kt"), read("lib/customer-usage-report.ts"), read("lib/customer-usage-values.ts")]);
   assert.match(android, /X-RateStack-Platform.*ANDROID/s);
   assert.match(service, /CustomerActivityPlatform\.ANDROID/);
   assert.match(report, /groupBy\(\{ by: \["customerId", "platform"\]/);
-  assert.match(report, /platforms\.size === 2 \? "Both"/);
+  assert.match(values, /platforms\.size === 2 \? "Both"/);
 });
 
 test("session lastSeen updates are throttled and never expose sensitive credentials", async () => {
@@ -37,6 +37,19 @@ test("usage filters, pagination, IST today, CSV audit and authorization are enfo
   assert.match(route, /CUSTOMER_USAGE_CSV_EXPORTED/);
   assert.match(route, /CUSTOMER_USAGE_EXPORT/);
   assert.match(guard, /ADMIN_UNAUTHORIZED/);
+  assert.match(guard, /!admin\?\.isActive/);
+  assert.match(guard, /ADMIN_FORBIDDEN/);
   assert.match(guard, /CSRF_REJECTED/);
   for (const forbidden of ["passwordHash", "token", "deviceIdHash", "ipHash"]) assert.doesNotMatch(page + route, new RegExp(forbidden));
+});
+
+test("missing activity migration fails safely with sanitized diagnostics", async () => {
+  const [report, page] = await Promise.all([read("lib/customer-usage-report.ts"), read("app/admin/(workspace)/customers/usage/page.tsx")]);
+  assert.match(report, /error\.code !== "P2021"/);
+  assert.match(report, /20260801123000_add_customer_platform_activity/);
+  assert.match(report, /customer_usage_activity_storage_unavailable/);
+  assert.match(report, /reportUnavailableStorage\("rows"\);\s*return \[\]/);
+  assert.match(report, /reportUnavailableStorage\("count"\);\s*return 0/);
+  assert.match(page, /customerUsageCount\(filters\)/);
+  for (const forbidden of ["password", "rawIp", "deviceId", "fcmToken"]) assert.doesNotMatch(report, new RegExp(`console\\.error[^;]*${forbidden}`, "i"));
 });

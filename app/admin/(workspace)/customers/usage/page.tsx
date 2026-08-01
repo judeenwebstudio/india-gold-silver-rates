@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { requireCustomerAdmin } from "@/lib/customer-admin";
-import { customerUsageMetrics, customerUsageRows, usageRow, usageWhere, type UsageFilters } from "@/lib/customer-usage-report";
+import { customerUsageCount, customerUsageMetrics, customerUsageRows, usageRow, type UsageFilters } from "@/lib/customer-usage-report";
 
 export const dynamic = "force-dynamic";
 const dt = (value: Date | null) => value ? value.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—";
@@ -9,7 +8,7 @@ const dt = (value: Date | null) => value ? value.toLocaleString("en-IN", { timeZ
 export default async function CustomerUsagePage({ searchParams }: { searchParams: Promise<UsageFilters> }) {
   await requireCustomerAdmin();
   const filters = await searchParams, page = Math.max(1, Number(filters.page) || 1), take = 25;
-  const [metrics, users, total] = await Promise.all([customerUsageMetrics(), customerUsageRows(filters, take, (page - 1) * take), prisma.schemeUser.count({ where: usageWhere(filters) })]);
+  const [metrics, users, total] = await Promise.all([customerUsageMetrics(), customerUsageRows(filters, take, (page - 1) * take), customerUsageCount(filters)]);
   const rows = users.map(usageRow), query = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][]);
   return <div className="space-y-6"><div><p className="text-xs font-black uppercase tracking-[.2em] text-amber-700">Customers</p><h1 className="font-display text-4xl font-bold">Customer Usage &amp; Login Overview</h1><p className="mt-2 text-stone-600">Distinct customer accounts across the RateStack website and Android app.</p></div>
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Object.entries({"Total Registered Customers":metrics.registered,"Total Unique Customers Who Have Logged In":metrics.unique,"Android App Users":metrics.android,"Website Users":metrics.web,"Users on Both Platforms":metrics.both,"Active Today":metrics.activeToday,"Active in Last 7 Days":metrics.active7,"Active in Last 30 Days":metrics.active30,"Never Logged In":metrics.never}).map(([label,value])=><article key={label} className="rounded-2xl border bg-white p-5"><p className="text-xs font-black uppercase text-stone-500">{label}</p><p className="mt-2 text-3xl font-black">{value.toLocaleString("en-IN")}</p></article>)}</section>

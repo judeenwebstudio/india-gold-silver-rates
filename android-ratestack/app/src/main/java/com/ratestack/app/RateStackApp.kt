@@ -99,6 +99,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.navArgument
 import com.ratestack.app.data.ApiProvider
 import com.ratestack.app.data.AppThemeMode
@@ -685,17 +686,22 @@ private fun RowScope.BottomItem(
     currentRoute: String?,
     navController: NavHostController,
 ) {
+    val isSelected = currentRoute == route
     NavigationBarItem(
-        selected = currentRoute == route,
+        selected = isSelected,
         onClick = {
-            navController.navigate(route) {
-                popUpTo(Routes.HOME) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
+            if (!isSelected) {
+                navController.navigate(route) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
             }
         },
         icon = { Icon(icon, contentDescription = label) },
-        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        label = { Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
     )
 }
 

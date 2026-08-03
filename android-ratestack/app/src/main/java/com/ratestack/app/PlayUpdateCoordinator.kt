@@ -16,7 +16,6 @@ import com.google.android.play.core.install.model.UpdateAvailability
 
 internal class PlayUpdateCoordinator(
     private val activity: ComponentActivity,
-    private val snackbarHost: View,
 ) {
     private val appUpdateManager: AppUpdateManager = AppUpdateManagerFactory.create(activity)
     private val preferences = activity.getSharedPreferences(
@@ -25,6 +24,7 @@ internal class PlayUpdateCoordinator(
     )
     private var updateReadySnackbar: Snackbar? = null
 
+    // Register ActivityResultLauncher during field initialization (before Activity STARTED)
     private val updateFlowLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) {
@@ -81,12 +81,13 @@ internal class PlayUpdateCoordinator(
     }
 
     private fun showCompleteUpdatePrompt() {
+        val root = activity.findViewById<View>(android.R.id.content) ?: return
         if (updateReadySnackbar?.isShown == true) {
             return
         }
 
         updateReadySnackbar = Snackbar.make(
-            snackbarHost,
+            root,
             R.string.update_downloaded,
             Snackbar.LENGTH_INDEFINITE,
         ).setAction(R.string.restart_to_update) {

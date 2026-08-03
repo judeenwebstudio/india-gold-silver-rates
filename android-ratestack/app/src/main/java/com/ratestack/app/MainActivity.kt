@@ -41,7 +41,10 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     private var incomingUrl: String? = null
     private var notificationPermissionChecked = false
     private var successfulSessionRecorded = false
-    private lateinit var playUpdateCoordinator: PlayUpdateCoordinator
+
+    // Registered during Activity field initialization (before STARTED)
+    private val playUpdateCoordinator = PlayUpdateCoordinator(this)
+
     private var razorpaySuccess: ((String, String) -> Unit)? = null
     private var razorpayError: ((String?) -> Unit)? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -191,7 +194,6 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                 onRateApp = ::openStoreListing,
             )
         }
-        playUpdateCoordinator = PlayUpdateCoordinator(this, findViewById(android.R.id.content))
         playUpdateCoordinator.start()
         window.decorView.postDelayed({ maybeRequestNotificationPermission() }, 1_500)
     }
@@ -263,7 +265,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
     override fun onResume() {
         super.onResume()
-        if (::playUpdateCoordinator.isInitialized) playUpdateCoordinator.onResume()
+        playUpdateCoordinator.onResume()
         if (!successfulSessionRecorded) {
             successfulSessionRecorded = true
             val sessions = PlayReviewCoordinator.recordSuccessfulSession(this)
@@ -302,7 +304,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             splashPlayer?.release()
         } catch (_: Exception) {}
         splashPlayer = null
-        if (::playUpdateCoordinator.isInitialized) playUpdateCoordinator.destroy()
+        playUpdateCoordinator.destroy()
         super.onDestroy()
     }
 

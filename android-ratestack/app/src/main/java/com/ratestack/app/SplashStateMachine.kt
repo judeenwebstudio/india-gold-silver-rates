@@ -24,7 +24,6 @@ class SplashStateMachine(private val onAppStartRequested: () -> Unit) {
         try {
             Log.d("RateStackSplash", message)
         } catch (_: Throwable) {
-            // Log fallback for non-Android unit test environments
             println("RateStackSplash: $message")
         }
     }
@@ -47,17 +46,13 @@ class SplashStateMachine(private val onAppStartRequested: () -> Unit) {
     }
 
     @Synchronized
-    fun onPlaybackEnded(firstFrameRendered: Boolean) {
+    fun onPlaybackEnded(firstFrameRendered: Boolean = true) {
         val current = currentState.get()
         if (current == SplashState.APP_STARTED) return
 
-        if (firstFrameRendered || current == SplashState.FIRST_FRAME_RENDERED) {
-            currentState.set(SplashState.COMPLETED)
-            logDiagnostic("State transition: $current -> COMPLETED")
-            triggerAppStartOnce()
-        } else {
-            logDiagnostic("Playback ended ignored: first frame was not rendered yet")
-        }
+        currentState.set(SplashState.COMPLETED)
+        logDiagnostic("State transition: $current -> COMPLETED (firstFrameRendered=$firstFrameRendered)")
+        triggerAppStartOnce()
     }
 
     @Synchronized

@@ -1,7 +1,6 @@
 package com.ratestack.app
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -57,14 +56,14 @@ class SplashStateMachineTest {
     }
 
     @Test
-    fun testCompletionIgnoredIfFirstFrameNotRendered() {
+    fun testCompletionTriggersAppStart() {
         var appStartedCount = 0
         val stateMachine = SplashStateMachine { appStartedCount++ }
 
         stateMachine.onReady()
         stateMachine.onPlaybackEnded(firstFrameRendered = false)
 
-        assertEquals(SplashState.READY, stateMachine.state)
-        assertEquals(0, appStartedCount)
+        assertEquals(SplashState.APP_STARTED, stateMachine.state)
+        assertEquals(1, appStartedCount)
     }
 }

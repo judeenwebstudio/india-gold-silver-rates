@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     private var razorpayError: ((String?) -> Unit)? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var splashPlayer: ExoPlayer? = null
+    private var splashPlayerView: PlayerView? = null
     private var splashTimeout: Runnable? = null
     private var systemSplashRemover: (() -> Unit)? = null
     private var splashFirstFrameRendered = false
@@ -75,16 +76,18 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                 debugSplash("Back press intercepted during splash: advancing to app content")
                 splashStateMachine.onTimeout()
             } else {
-                isEnabled = false
+                remove()
                 onBackPressedDispatcher.onBackPressed()
             }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             splashScreen.setOnExitAnimationListener { splashView ->
-                systemSplashRemover = { splashView.remove() }
+                systemSplashRemover = { runCatching { splashView.remove() } }
                 debugSplash("Android 12 system splash exit requested")
-                if (splashFirstFrameRendered || appContentStarted) splashView.remove()
+                if (splashFirstFrameRendered || appContentStarted) {
+                    runCatching { splashView.remove() }
+                }
             }
         }
 
@@ -97,67 +100,73 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
     @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
     private fun showSplashVideo() {
-        val videoUri = "android.resource://$packageName/${R.raw.ratestack_splash}".toUri()
-        debugSplash("Video resource resolved: ${R.raw.ratestack_splash}")
+        try {
+            val videoUri = "android.resource://$packageName/${R.raw.ratestack_splash}".toUri()
+            debugSplash("Video resource resolved: ${R.raw.ratestack_splash}")
 
-        val playerView = PlayerView(this).apply {
-            useController = false
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-            setShutterBackgroundColor(android.graphics.Color.BLACK)
-            setBackgroundColor(android.graphics.Color.BLACK)
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            )
-        }
-        setContentView(playerView)
-        debugSplash("setContentView displayed Media3 PlayerView (Edge-to-edge, RESIZE_MODE_ZOOM)")
+            val playerView = PlayerView(this).apply {
+                useController = false
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                setShutterBackgroundColor(android.graphics.Color.BLACK)
+                setBackgroundColor(android.graphics.Color.BLACK)
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                )
+            }
+            splashPlayerView = playerView
+            setContentView(playerView)
+            debugSplash("setContentView displayed Media3 PlayerView (Edge-to-edge, RESIZE_MODE_ZOOM)")
 
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            hide(WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
+            WindowInsetsControllerCompat(window, window.decorView).apply {
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
 
-        splashPlayer = ExoPlayer.Builder(this).build().also { player ->
-            player.volume = 0f
-            player.repeatMode = Player.REPEAT_MODE_OFF
-            player.addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    when (playbackState) {
-                        Player.STATE_READY -> {
-                            splashStateMachine.onReady()
-                            debugSplash("onPrepared / STATE_READY")
-                            player.play()
-                            debugSplash("start() / play() called")
+            splashPlayer = ExoPlayer.Builder(this).build().also { player ->
+                player.volume = 0f
+                player.repeatMode = Player.REPEAT_MODE_OFF
+                player.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        when (playbackState) {
+                            Player.STATE_READY -> {
+                                splashStateMachine.onReady()
+                                debugSplash("onPrepared / STATE_READY")
+                                player.play()
+                                debugSplash("start() / play() called")
+                            }
+                            Player.STATE_ENDED -> {
+                                debugSplash("onCompletion / STATE_ENDED")
+                                splashStateMachine.onPlaybackEnded(splashFirstFrameRendered)
+                            }
+                            Player.STATE_BUFFERING, Player.STATE_IDLE -> Unit
                         }
-                        Player.STATE_ENDED -> {
-                            debugSplash("onCompletion / STATE_ENDED")
-                            splashStateMachine.onPlaybackEnded(splashFirstFrameRendered)
-                        }
-                        Player.STATE_BUFFERING, Player.STATE_IDLE -> Unit
                     }
-                }
 
-                override fun onRenderedFirstFrame() {
-                    splashFirstFrameRendered = true
-                    splashStateMachine.onFirstFrameRendered()
-                    debugSplash("first frame rendered")
-                    systemSplashRemover?.invoke()
-                    systemSplashRemover = null
-                }
+                    override fun onRenderedFirstFrame() {
+                        splashFirstFrameRendered = true
+                        splashStateMachine.onFirstFrameRendered()
+                        debugSplash("first frame rendered")
+                        runCatching { systemSplashRemover?.invoke() }
+                        systemSplashRemover = null
+                    }
 
-                override fun onPlayerError(error: PlaybackException) {
-                    debugSplash("playback error: ${error.errorCodeName}")
-                    splashStateMachine.onError(error.errorCodeName ?: "UNKNOWN_ERROR")
-                }
-            })
-            playerView.player = player
-            player.setMediaItem(MediaItem.fromUri(videoUri))
-            debugSplash("setMediaItem called: bundled raw MP4")
-            player.prepare()
-            player.playWhenReady = true
+                    override fun onPlayerError(error: PlaybackException) {
+                        debugSplash("playback error: ${error.errorCodeName}")
+                        splashStateMachine.onError(error.errorCodeName ?: "UNKNOWN_ERROR")
+                    }
+                })
+                playerView.player = player
+                player.setMediaItem(MediaItem.fromUri(videoUri))
+                debugSplash("setMediaItem called: bundled raw MP4")
+                player.prepare()
+                player.playWhenReady = true
+            }
+            armSplashTimeout()
+        } catch (e: Exception) {
+            debugSplash("showSplashVideo exception fallback: ${e.message}")
+            splashStateMachine.onError(e.message ?: "SPLASH_SETUP_FAILED")
         }
-        armSplashTimeout()
     }
 
     private fun armSplashTimeout() {
@@ -172,18 +181,20 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         if (appContentStarted) return
         appContentStarted = true
         debugSplash("navigation executed: existing app content started")
+
         splashTimeout?.let(mainHandler::removeCallbacks)
         splashTimeout = null
-        systemSplashRemover?.invoke()
+
+        runCatching { systemSplashRemover?.invoke() }
         systemSplashRemover = null
 
-        try {
+        runCatching {
+            splashPlayerView?.player = null
             splashPlayer?.stop()
             splashPlayer?.release()
-        } catch (e: Exception) {
-            debugSplash("ExoPlayer release exception: ${e.message}")
         }
         splashPlayer = null
+        splashPlayerView = null
 
         WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
         setContent {
@@ -194,8 +205,12 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                 onRateApp = ::openStoreListing,
             )
         }
-        playUpdateCoordinator.start()
-        window.decorView.postDelayed({ maybeRequestNotificationPermission() }, 1_500)
+        runCatching { playUpdateCoordinator.start() }
+        window.decorView.postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                runCatching { maybeRequestNotificationPermission() }
+            }
+        }, 1_500)
     }
 
     fun startPhonePePaymentSheet(
@@ -265,7 +280,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
     override fun onResume() {
         super.onResume()
-        playUpdateCoordinator.onResume()
+        runCatching { playUpdateCoordinator.onResume() }
         if (!successfulSessionRecorded) {
             successfulSessionRecorded = true
             val sessions = PlayReviewCoordinator.recordSuccessfulSession(this)
@@ -299,12 +314,14 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
     override fun onDestroy() {
         splashTimeout?.let(mainHandler::removeCallbacks)
-        try {
+        runCatching {
+            splashPlayerView?.player = null
             splashPlayer?.stop()
             splashPlayer?.release()
-        } catch (_: Exception) {}
+        }
         splashPlayer = null
-        playUpdateCoordinator.destroy()
+        splashPlayerView = null
+        runCatching { playUpdateCoordinator.destroy() }
         super.onDestroy()
     }
 

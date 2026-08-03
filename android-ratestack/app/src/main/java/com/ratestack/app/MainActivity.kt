@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_RateStack)
         super.onCreate(savedInstanceState)
+        window.setBackgroundDrawableResource(R.color.splash_background)
         enableEdgeToEdge()
         incomingUrl = resolveIncomingUrl(intent)
         setContent {

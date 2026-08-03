@@ -97,6 +97,7 @@ fun MyOrdersScreen(
             runCatching { ApiProvider.service.getCustomerDashboard("Bearer $token") }
                 .onSuccess { response ->
                     if (response.isSuccessful) dashboard = response.body()?.data
+                    else if (response.code() == 401) onLogout()
                     else error = ApiProvider.errorMessage(response, "Unable to load your Dashboard.")
                 }
                 .onFailure { error = "Unable to load your Dashboard." }

@@ -680,7 +680,7 @@ private fun AppTopBar(
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(end = 12.dp),
             ) {
                 Image(
                     painter = painterResource(R.drawable.ratestack_logo),

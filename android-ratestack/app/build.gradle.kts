@@ -119,6 +119,7 @@ android {
         )
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigPresent.toString())
         buildConfigField("boolean", "ENABLE_VIDEO_SPLASH", "false")
+        buildConfigField("boolean", "ENABLE_MINIMAL_STARTUP", "false")
         buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", quotedBuildConfig(googleServerClientId))
         buildConfigField("String", "BUILD_COMMIT", quotedBuildConfig(buildCommit))
         manifestPlaceholders["trustedHost"] = trustedHost

@@ -193,10 +193,31 @@ fun RateStackApp(
         if (pending?.type != AuthDestinationType.CHECKOUT) schemeViewModel.clearPendingAuthDestination()
     }
 
+    if (BuildConfig.DEBUG) {
+        android.util.Log.d("RateStackStartup", "12. RateStackApp entered")
+        android.util.Log.d("RateStackStartup", "13. session repository initialized")
+        android.util.Log.d("RateStackStartup", "14. navigation controller initialized")
+        android.util.Log.d("RateStackStartup", "15. start destination resolved: ${Routes.HOME}")
+    }
+
+    LaunchedEffect(Unit) {
+        if (BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackStartup", "16. first Compose frame rendered")
+        }
+        delay(5_000)
+        if (BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackStartup", "17. app remained alive for 5 seconds")
+        }
+    }
+
     val themeMode by viewModel.themeMode.collectAsState()
 
     LaunchedEffect(initialUrl) {
         if (!initialUrl.isNullOrBlank()) navigateLink(navController, initialUrl)
+    }
+
+    if (BuildConfig.DEBUG) {
+        android.util.Log.d("RateStackStartup", "11. RateStackTheme entered")
     }
 
     RateStackTheme(themeMode = themeMode) {

@@ -1,6 +1,7 @@
 package com.ratestack.app
 
 import android.content.Context
+import android.util.Log
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,7 +18,9 @@ import com.google.android.play.core.install.model.UpdateAvailability
 internal class PlayUpdateCoordinator(
     private val activity: ComponentActivity,
 ) {
-    private val appUpdateManager: AppUpdateManager = AppUpdateManagerFactory.create(activity)
+    private val appUpdateManager: AppUpdateManager? by lazy {
+        runCatching { AppUpdateManagerFactory.create(activity) }.getOrNull()
+    }
     private val preferences = activity.getSharedPreferences(
         PREFERENCES_NAME,
         Context.MODE_PRIVATE,
@@ -39,64 +42,70 @@ internal class PlayUpdateCoordinator(
     }
 
     fun start() {
-        appUpdateManager.registerListener(installStateListener)
-        appUpdateManager.appUpdateInfo.addOnSuccessListener(activity) { updateInfo ->
-            val isAvailable =
-                updateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-            val isFlexibleAllowed = updateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
-            val availableVersion = updateInfo.availableVersionCode()
-            val alreadyPromptedVersion = preferences.getInt(KEY_LAST_PROMPTED_VERSION, 0)
+        val manager = appUpdateManager ?: return
+        runCatching {
+            manager.registerListener(installStateListener)
+            manager.appUpdateInfo.addOnSuccessListener { info ->
+                if (info.installStatus() == InstallStatus.DOWNLOADED) {
+                    showCompleteUpdatePrompt()
+                    return@addOnSuccessListener
+                }
 
-            if (
-                isAvailable &&
-                isFlexibleAllowed &&
-                availableVersion != alreadyPromptedVersion
-            ) {
-                val started = runCatching {
-                    appUpdateManager.startUpdateFlowForResult(
-                        updateInfo,
+                val available = info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
+                val allowed = info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
+                if (!available || !allowed) return@addOnSuccessListener
+
+                val lastPromptedVersion = preferences.getInt(KEY_LAST_PROMPTED_VERSION, -1)
+                val currentVersion = info.availableVersionCode()
+                if (lastPromptedVersion >= currentVersion) return@addOnSuccessListener
+
+                preferences.edit { putInt(KEY_LAST_PROMPTED_VERSION, currentVersion) }
+                runCatching {
+                    manager.startUpdateFlowForResult(
+                        info,
                         updateFlowLauncher,
                         AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build(),
                     )
-                }.getOrDefault(false)
-                if (started) {
-                    preferences.edit { putInt(KEY_LAST_PROMPTED_VERSION, availableVersion) }
+                }
+            }
+        }.onFailure { e ->
+            if (BuildConfig.DEBUG) Log.w("RateStackStartup", "PlayUpdateCoordinator non-fatal error: ${e.message}")
+        }
+    }
+
+    fun onResume() {
+        val manager = appUpdateManager ?: return
+        runCatching {
+            manager.appUpdateInfo.addOnSuccessListener { info ->
+                if (info.installStatus() == InstallStatus.DOWNLOADED) {
+                    showCompleteUpdatePrompt()
                 }
             }
         }
     }
 
-    fun onResume() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener(activity) { updateInfo ->
-            if (updateInfo.installStatus() == InstallStatus.DOWNLOADED) {
-                showCompleteUpdatePrompt()
-            }
-        }
-    }
-
     fun destroy() {
-        updateReadySnackbar?.dismiss()
-        updateReadySnackbar = null
-        appUpdateManager.unregisterListener(installStateListener)
+        val manager = appUpdateManager ?: return
+        runCatching { manager.unregisterListener(installStateListener) }
     }
 
     private fun showCompleteUpdatePrompt() {
-        val root = activity.findViewById<View>(android.R.id.content) ?: return
-        if (updateReadySnackbar?.isShown == true) {
-            return
-        }
-
+        if (updateReadySnackbar?.isShown == true) return
+        val contentView = activity.findViewById<View>(android.R.id.content) ?: return
         updateReadySnackbar = Snackbar.make(
-            root,
-            R.string.update_downloaded,
+            contentView,
+            "An update for RateStack was downloaded and is ready to install.",
             Snackbar.LENGTH_INDEFINITE,
-        ).setAction(R.string.restart_to_update) {
-            appUpdateManager.completeUpdate()
-        }.also { it.show() }
+        ).apply {
+            setAction("RESTART") {
+                runCatching { appUpdateManager?.completeUpdate() }
+            }
+            show()
+        }
     }
 
     private companion object {
-        const val PREFERENCES_NAME = "ratestack_updates"
-        const val KEY_LAST_PROMPTED_VERSION = "last_prompted_version"
+        const val PREFERENCES_NAME = "ratestack_in_app_update_prefs"
+        const val KEY_LAST_PROMPTED_VERSION = "last_prompted_update_version"
     }
 }

@@ -18,6 +18,23 @@ import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -37,6 +54,12 @@ import com.razorpay.PaymentResultWithDataListener
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
+
+    init {
+        if (BuildConfig.DEBUG) {
+            Log.d("RateStackStartup", "2. MainActivity class loaded")
+        }
+    }
 
     private var incomingUrl: String? = null
     private var notificationPermissionChecked = false
@@ -62,12 +85,23 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     ) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (BuildConfig.DEBUG) {
+            Log.d("RateStackStartup", "3. MainActivity.onCreate entered")
+        }
         setTheme(R.style.Theme_RateStack)
+        if (BuildConfig.DEBUG) {
+            Log.d("RateStackStartup", "4. theme applied")
+            Log.d("RateStackStartup", "5. installSplashScreen completed")
+        }
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setBackgroundDrawableResource(R.color.splash_background)
         enableEdgeToEdge()
         incomingUrl = resolveIncomingUrl(intent)
+        if (BuildConfig.DEBUG) {
+            Log.d("RateStackStartup", "6. original Intent captured: ${incomingUrl ?: "none"}")
+            Log.d("RateStackStartup", "7. ENABLE_VIDEO_SPLASH value: ${BuildConfig.ENABLE_VIDEO_SPLASH}")
+        }
         debugSplash("SplashActivity created (MainActivity launcher path)")
 
         // Prevent back press during splash from finishing activity
@@ -91,7 +125,20 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             }
         }
 
+        if (BuildConfig.ENABLE_MINIMAL_STARTUP) {
+            if (BuildConfig.DEBUG) {
+                Log.d("RateStackStartup", "ENABLE_MINIMAL_STARTUP is true: rendering diagnostic screen")
+            }
+            setContent {
+                MinimalDiagnosticScreen(onContinue = { showAppContent() })
+            }
+            return
+        }
+
         if (!BuildConfig.ENABLE_VIDEO_SPLASH || savedInstanceState?.getBoolean(STATE_APP_CONTENT_STARTED) == true) {
+            if (BuildConfig.DEBUG) {
+                Log.d("RateStackStartup", "8. direct Compose startup selected")
+            }
             debugSplash("Direct Compose startup path selected (ENABLE_VIDEO_SPLASH=false)")
             showAppContent()
         } else {
@@ -181,6 +228,9 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     fun showAppContent() {
         if (appContentStarted) return
         appContentStarted = true
+        if (BuildConfig.DEBUG) {
+            Log.d("RateStackStartup", "9. showAppContent entered")
+        }
         debugSplash("navigation executed: existing app content started")
 
         splashTimeout?.let(mainHandler::removeCallbacks)
@@ -198,6 +248,9 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         splashPlayerView = null
 
         WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
+        if (BuildConfig.DEBUG) {
+            Log.d("RateStackStartup", "10. setContent called")
+        }
         setContent {
             RateStackApp(
                 initialUrl = incomingUrl,
@@ -284,10 +337,12 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         runCatching { playUpdateCoordinator.onResume() }
         if (!successfulSessionRecorded) {
             successfulSessionRecorded = true
-            val sessions = PlayReviewCoordinator.recordSuccessfulSession(this)
-            window.decorView.postDelayed({ PlayReviewCoordinator.requestIfEligible(this, sessions) }, 30_000)
+            runCatching {
+                val sessions = PlayReviewCoordinator.recordSuccessfulSession(this)
+                window.decorView.postDelayed({ PlayReviewCoordinator.requestIfEligible(this, sessions) }, 30_000)
+            }
         }
-        FcmTokenSync.refresh(this)
+        runCatching { FcmTokenSync.refresh(this) }
     }
 
     override fun onStart() {
@@ -388,5 +443,41 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         const val SPLASH_TIMEOUT_MS = 4_500L
         const val SPLASH_LOG_TAG = "RateStackSplash"
         const val STATE_APP_CONTENT_STARTED = "app_content_started"
+    }
+}
+
+@Composable
+private fun MinimalDiagnosticScreen(onContinue: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color(0xFF1C1917),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = "RateStack",
+                style = MaterialTheme.typography.headlineLarge,
+                color = Color(0xFFF5C96A),
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "App startup diagnostic mode",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White,
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = onContinue,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE2AD3D)),
+            ) {
+                Text("Continue to App", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.ratestack.app
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import com.google.firebase.messaging.FirebaseMessaging
 import com.ratestack.app.data.ApiProvider
 import kotlinx.coroutines.CoroutineScope
@@ -23,9 +24,15 @@ internal object FcmTokenSync {
         if (!BuildConfig.FIREBASE_CONFIGURED) return
         status = "Syncing"
         if (!syncInProgress.compareAndSet(false, true)) return
-        FirebaseMessaging.getInstance().token
-            .addOnSuccessListener { token -> registerClaimed(context, token) }
-            .addOnFailureListener { status = "Token unavailable"; syncInProgress.set(false) }
+        runCatching {
+            FirebaseMessaging.getInstance().token
+                .addOnSuccessListener { token -> registerClaimed(context, token) }
+                .addOnFailureListener { status = "Token unavailable"; syncInProgress.set(false) }
+        }.onFailure { e ->
+            if (BuildConfig.DEBUG) Log.w("RateStackStartup", "FcmTokenSync refresh non-fatal error: ${e.message}")
+            status = "Token unavailable"
+            syncInProgress.set(false)
+        }
     }
 
     fun register(context: Context, fcmToken: String) {
@@ -70,14 +77,19 @@ internal object FcmTokenSync {
             onComplete()
             return
         }
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            val token = task.result
-            if (token.isNullOrBlank()) onComplete() else CoroutineScope(Dispatchers.IO).launch {
-                runCatching { ApiProvider.service.revokePushDevice("Bearer $auth", mapOf("token" to token)) }
-                lastRegisteredKey = null
-                status = "Signed out"
-                onComplete()
+        runCatching {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                val token = runCatching { task.result }.getOrNull()
+                if (token.isNullOrBlank()) onComplete() else CoroutineScope(Dispatchers.IO).launch {
+                    runCatching { ApiProvider.service.revokePushDevice("Bearer $auth", mapOf("token" to token)) }
+                    lastRegisteredKey = null
+                    status = "Signed out"
+                    onComplete()
+                }
             }
+        }.onFailure { e ->
+            if (BuildConfig.DEBUG) Log.w("RateStackStartup", "FcmTokenSync revoke non-fatal error: ${e.message}")
+            onComplete()
         }
     }
 }

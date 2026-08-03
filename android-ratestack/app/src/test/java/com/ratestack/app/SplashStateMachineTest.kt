@@ -1,10 +1,16 @@
 package com.ratestack.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SplashStateMachineTest {
+
+    @Test
+    fun testEnableVideoSplashFeatureFlagDefaultsToFalse() {
+        assertFalse(BuildConfig.ENABLE_VIDEO_SPLASH)
+    }
 
     @Test
     fun testNormalPlaybackFlowTriggersAppStartOnce() {

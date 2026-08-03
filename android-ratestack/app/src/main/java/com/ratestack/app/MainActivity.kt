@@ -91,7 +91,8 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
             }
         }
 
-        if (savedInstanceState?.getBoolean(STATE_APP_CONTENT_STARTED) == true) {
+        if (!BuildConfig.ENABLE_VIDEO_SPLASH || savedInstanceState?.getBoolean(STATE_APP_CONTENT_STARTED) == true) {
+            debugSplash("Direct Compose startup path selected (ENABLE_VIDEO_SPLASH=false)")
             showAppContent()
         } else {
             showSplashVideo()

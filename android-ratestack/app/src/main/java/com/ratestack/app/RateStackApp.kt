@@ -43,14 +43,20 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -248,13 +254,38 @@ fun RateStackApp(
             )
         }
 
+        val userToken by schemeViewModel.userToken.collectAsState()
+        val userName by schemeViewModel.userName.collectAsState()
+
         Scaffold(
-            topBar = { AppTopBar(currentRoute, selection, navController, onOpenLocationPicker = { viewModel.loadLocations(); showLocationPicker = true }) },
+            topBar = {
+                AppTopBar(
+                    route = currentRoute,
+                    selection = selection,
+                    userToken = userToken,
+                    userName = userName,
+                    navController = navController,
+                    onOpenLocationPicker = { viewModel.loadLocations(); showLocationPicker = true },
+                    onOpenLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DEFAULT)) },
+                    onOpenRegister = { navController.navigate(Routes.CUSTOMER_REGISTER) },
+                    onLogout = { schemeViewModel.logout() },
+                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                )
+            },
             bottomBar = {
                 NavigationBar {
                     BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
-                    BottomItem(Routes.SCHEMES, "Shop", Icons.Default.Star, currentRoute, navController)
-                    BottomItem(Routes.MY_ORDERS, "Dashboard", Icons.Default.Person, currentRoute, navController)
+                    BottomItem(Routes.SCHEMES, "Shop", Icons.Outlined.ShoppingCart, currentRoute, navController)
+                    BottomItem(
+                        Routes.MY_ORDERS,
+                        "Dashboard",
+                        Icons.Default.Person,
+                        currentRoute,
+                        navController,
+                        onLoggedOutClick = if (userToken.isNullOrBlank()) {
+                            { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) }
+                        } else null,
+                    )
                 }
             },
         ) { padding ->
@@ -631,35 +662,125 @@ fun RateStackApp(
 private fun AppTopBar(
     route: String?,
     selection: Pair<String?, String?>,
+    userToken: String?,
+    userName: String?,
     navController: NavHostController,
     onOpenLocationPicker: () -> Unit = {},
+    onOpenLogin: () -> Unit = {},
+    onOpenRegister: () -> Unit = {},
+    onLogout: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     val isRoot = route == Routes.HOME || route == Routes.SCHEMES ||
         route == Routes.MY_ORDERS || route == Routes.FAVORITES || route == Routes.SETTINGS
+    val isLoggedIn = !userToken.isNullOrBlank()
+    var showAccountMenu by remember { mutableStateOf(false) }
+
     SmallTopAppBar(
         title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Image(
                     painter = painterResource(R.drawable.ratestack_logo),
                     contentDescription = "RateStack Logo",
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(32.dp),
                 )
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (route == Routes.HOME) "RateStack" else routeTitle(route),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
                         ),
+                        maxLines = 1,
                     )
                     if (route == Routes.HOME) {
                         val locationText = if (selection.second != null) "📍 ${selection.second}, ${selection.first}" else "📍 Select Location"
                         Text(
                             text = locationText,
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
                             modifier = Modifier.clickable { onOpenLocationPicker() },
                         )
+                    }
+                }
+
+                if (isRoot) {
+                    if (isLoggedIn) {
+                        Box {
+                            Surface(
+                                modifier = Modifier.clickable { showAccountMenu = true },
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Default.Person, contentDescription = "Account", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = userName?.split(" ")?.firstOrNull() ?: "Account",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = showAccountMenu,
+                                onDismissRequest = { showAccountMenu = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("My Dashboard") },
+                                    onClick = {
+                                        showAccountMenu = false
+                                        navController.navigate(Routes.MY_ORDERS) { launchSingleTop = true }
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Account Settings") },
+                                    onClick = {
+                                        showAccountMenu = false
+                                        onOpenSettings()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                )
+                                Divider()
+                                DropdownMenuItem(
+                                    text = { Text("Logout") },
+                                    onClick = {
+                                        showAccountMenu = false
+                                        onLogout()
+                                    },
+                                )
+                            }
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TextButton(
+                                onClick = onOpenLogin,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp),
+                            ) {
+                                Text("Login", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Button(
+                                onClick = onOpenRegister,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            ) {
+                                Text("Register", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
+                        }
                     }
                 }
             }
@@ -685,11 +806,16 @@ private fun RowScope.BottomItem(
     icon: ImageVector,
     currentRoute: String?,
     navController: NavHostController,
+    onLoggedOutClick: (() -> Unit)? = null,
 ) {
     val isSelected = currentRoute == route
     NavigationBarItem(
         selected = isSelected,
         onClick = {
+            if (onLoggedOutClick != null) {
+                onLoggedOutClick()
+                return@NavigationBarItem
+            }
             if (!isSelected) {
                 navController.navigate(route) {
                     popUpTo(navController.graph.findStartDestination().id) {

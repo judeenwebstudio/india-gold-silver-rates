@@ -1,9 +1,6 @@
 package com.ratestack.app
 
 import android.content.Context
-import android.app.Activity
-import android.util.Log
-import android.widget.VideoView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -75,7 +72,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -88,7 +84,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -98,9 +93,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.net.toUri
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -173,7 +165,6 @@ fun RateStackApp(
     )
 
     val navController = rememberNavController()
-    var splashVisible by remember { mutableStateOf(true) }
 
     fun openCustomerLogin(destination: PendingAuthDestination) {
         schemeViewModel.requireAuthentication(destination)
@@ -209,11 +200,6 @@ fun RateStackApp(
     }
 
     RateStackTheme(themeMode = themeMode) {
-        if (splashVisible) {
-            SplashVideoScreen(onFinished = { splashVisible = false })
-            return@RateStackTheme
-        }
-
         val selection by viewModel.selection.collectAsState()
         LaunchedEffect(selection) {
             val (state, city) = selection
@@ -616,48 +602,6 @@ fun RateStackApp(
             }
         }
     }
-}
-
-@Composable
-private fun SplashVideoScreen(onFinished: () -> Unit) {
-    val context = LocalContext.current
-    val playbackGate = remember(onFinished) { SplashPlaybackGate(onFinished) }
-
-    DisposableEffect(context) {
-        val window = (context as? Activity)?.window
-        val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
-        controller?.hide(WindowInsetsCompat.Type.systemBars())
-        controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
-    }
-
-    LaunchedEffect(Unit) {
-        delay(5_500)
-        if (playbackGate.finish()) {
-            Log.w("SplashVideo", "Splash playback timed out; continuing startup")
-        }
-    }
-
-    AndroidView(
-        modifier = Modifier.fillMaxSize(),
-        factory = { viewContext ->
-            VideoView(viewContext).apply {
-                setBackgroundColor(android.graphics.Color.rgb(5, 11, 18))
-                setVideoURI("android.resource://${viewContext.packageName}/${R.raw.ratestack_splash}".toUri())
-                setOnPreparedListener { player ->
-                    player.setVolume(0f, 0f)
-                    player.isLooping = false
-                    start()
-                }
-                setOnCompletionListener { playbackGate.finish() }
-                setOnErrorListener { _, what, extra ->
-                    Log.w("SplashVideo", "Splash playback failed (code=$what, detail=$extra); continuing startup")
-                    playbackGate.finish()
-                    true
-                }
-            }
-        },
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

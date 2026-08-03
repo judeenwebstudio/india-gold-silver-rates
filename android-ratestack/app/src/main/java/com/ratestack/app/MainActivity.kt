@@ -7,6 +7,9 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +20,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import com.google.android.material.snackbar.Snackbar
 import com.razorpay.Checkout
 import com.razorpay.PaymentData
@@ -30,6 +42,14 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
     private lateinit var playUpdateCoordinator: PlayUpdateCoordinator
     private var razorpaySuccess: ((String, String) -> Unit)? = null
     private var razorpayError: ((String?) -> Unit)? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val splashGate by lazy { SplashPlaybackGate(::showAppContent) }
+    private var splashPlayer: ExoPlayer? = null
+    private var splashTimeout: Runnable? = null
+    private var systemSplashRemover: (() -> Unit)? = null
+    private var splashFirstFrameRendered = false
+    private var splashPlaybackStarted = false
+    private var appContentStarted = false
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -41,6 +61,95 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         window.setBackgroundDrawableResource(R.color.splash_background)
         enableEdgeToEdge()
         incomingUrl = resolveIncomingUrl(intent)
+        debugSplash("SplashActivity created (MainActivity launcher path)")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            splashScreen.setOnExitAnimationListener { splashView ->
+                systemSplashRemover = { splashView.remove() }
+                debugSplash("Android 12 system splash exit requested")
+                if (splashFirstFrameRendered || appContentStarted) splashView.remove()
+            }
+        }
+        if (savedInstanceState?.getBoolean(STATE_APP_CONTENT_STARTED) == true) showAppContent() else showSplashVideo()
+    }
+
+    @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+    private fun showSplashVideo() {
+        val videoUri = "android.resource://$packageName/${R.raw.ratestack_splash}".toUri()
+        debugSplash("Video resource resolved: ${R.raw.ratestack_splash}")
+        val playerView = PlayerView(this).apply {
+            useController = false
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            setShutterBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.splash_background))
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.splash_background))
+        }
+        setContentView(playerView)
+        debugSplash("setContentView displayed Media3 PlayerView")
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+
+        splashPlayer = ExoPlayer.Builder(this).build().also { player ->
+            player.volume = 0f
+            player.repeatMode = Player.REPEAT_MODE_OFF
+            player.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    when (playbackState) {
+                        Player.STATE_READY -> {
+                            splashPlaybackStarted = true
+                            debugSplash("onPrepared / STATE_READY")
+                            player.play()
+                            debugSplash("start() / play() called")
+                        }
+                        Player.STATE_ENDED -> {
+                            debugSplash("onCompletion / STATE_ENDED")
+                            if (splashFirstFrameRendered) splashGate.finish()
+                            else debugSplash("completion ignored because no video frame rendered")
+                        }
+                        Player.STATE_BUFFERING, Player.STATE_IDLE -> Unit
+                    }
+                }
+
+                override fun onRenderedFirstFrame() {
+                    splashFirstFrameRendered = true
+                    debugSplash("first frame rendered")
+                    systemSplashRemover?.invoke()
+                    systemSplashRemover = null
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    debugSplash("playback error: ${error.errorCodeName}")
+                    splashGate.finish()
+                }
+            })
+            playerView.player = player
+            player.setMediaItem(MediaItem.fromUri(videoUri))
+            debugSplash("setMediaItem called: bundled raw MP4")
+            player.prepare()
+            player.playWhenReady = true
+        }
+        armSplashTimeout()
+    }
+
+    private fun armSplashTimeout() {
+        splashTimeout?.let(mainHandler::removeCallbacks)
+        splashTimeout = Runnable {
+            debugSplash("timeout fired; started=$splashPlaybackStarted firstFrame=$splashFirstFrameRendered")
+            splashGate.finish()
+        }.also { mainHandler.postDelayed(it, SPLASH_TIMEOUT_MS) }
+    }
+
+    private fun showAppContent() {
+        if (appContentStarted) return
+        appContentStarted = true
+        debugSplash("navigation executed: existing app content started")
+        splashTimeout?.let(mainHandler::removeCallbacks)
+        splashTimeout = null
+        systemSplashRemover?.invoke()
+        systemSplashRemover = null
+        splashPlayer?.release()
+        splashPlayer = null
+        WindowInsetsControllerCompat(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
         setContent {
             RateStackApp(
                 initialUrl = incomingUrl,
@@ -130,7 +239,33 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         FcmTokenSync.refresh(this)
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (!appContentStarted && splashPlayer != null) {
+            splashPlayer?.play()
+            armSplashTimeout()
+            debugSplash("activity resumed splash playback")
+        }
+    }
+
+    override fun onStop() {
+        if (!appContentStarted) {
+            splashPlayer?.pause()
+            splashTimeout?.let(mainHandler::removeCallbacks)
+            debugSplash("activity paused splash playback")
+        }
+        super.onStop()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(STATE_APP_CONTENT_STARTED, appContentStarted)
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onDestroy() {
+        splashTimeout?.let(mainHandler::removeCallbacks)
+        splashPlayer?.release()
+        splashPlayer = null
         if (::playUpdateCoordinator.isInitialized) playUpdateCoordinator.destroy()
         super.onDestroy()
     }
@@ -187,5 +322,15 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
     private fun showMessage(message: String) {
         Snackbar.make(findViewById<View>(android.R.id.content), message, Snackbar.LENGTH_LONG).show()
+    }
+
+    private fun debugSplash(message: String) {
+        if (BuildConfig.DEBUG) Log.d(SPLASH_LOG_TAG, message)
+    }
+
+    private companion object {
+        const val SPLASH_TIMEOUT_MS = 6_500L
+        const val SPLASH_LOG_TAG = "RateStackSplash"
+        const val STATE_APP_CONTENT_STARTED = "app_content_started"
     }
 }

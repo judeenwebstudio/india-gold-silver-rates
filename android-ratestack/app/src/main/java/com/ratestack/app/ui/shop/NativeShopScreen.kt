@@ -114,11 +114,19 @@ fun NativeShopScreen(
             fontWeight = FontWeight.Black,
         )
         Text("Shop 22K Gold and Silver Coins at the current Tiruchirappalli market rate.")
-        if (token.isNullOrBlank()) Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = onLogin) { Text("Login") }; OutlinedButton(onClick = onRegister) { Text("Register") } }
-            OutlinedButton(onClick = onGoogleLogin) { Text("Continue with Google") }
+        if (token.isNullOrBlank()) {
+            com.ratestack.app.ui.components.AuthActionPanel(
+                variant = com.ratestack.app.ui.components.AuthActionPanelVariant.COMPACT,
+                heading = "Ready to shop?",
+                supportingText = "Sign in to purchase, track orders and download invoices.",
+                onLogin = onLogin,
+                onRegister = onRegister,
+                onGoogleLogin = onGoogleLogin,
+                googleErrorMessage = errorMessage,
+            )
+        } else {
+            errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
-        errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (loading) CircularProgressIndicator()
         products.forEach { product ->
             val id = product.productId.orEmpty()

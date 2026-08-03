@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       trichyRatePerGramPaise: rate, rateSource, rateDate: parsedRateDate && !Number.isNaN(parsedRateDate.getTime()) ? parsedRateDate : null,
       metalValuePaise: price.metalValuePaise, serviceChargeBasisPoints: product.serviceChargeBasisPoints,
       serviceChargePaise: price.serviceChargePaise, gstBasisPoints: product.gstBasisPoints,
-      shippingAmountPaise: price.shippingAmountPaise, gstPaise:adjusted?.gstPaise??price.gstPaise,totalAmountPaise:adjusted?.totalPaise??price.totalPaise,
+      shippingAmountPaise: price.shippingAmountPaise, gstPaise: adjusted?.gstPaise ?? price.gstPaise, totalAmountPaise: price.totalPaise,
       discountAmountPaise:coupon?.discountAmountPaise??0n,couponCode:coupon?.code,couponDiscountType:coupon?.discountType,couponDiscountValue:coupon?.discountValue,
       originalSubtotalPaise:coupon?.originalSubtotalPaise??(price.metalValuePaise+price.serviceChargePaise),finalSubtotalPaise:coupon?.finalSubtotalPaise??(price.metalValuePaise+price.serviceChargePaise),
       customerName: parsed.data.customer.fullName, customerPhone: parsed.data.customer.mobile, customerEmail: parsed.data.customer.email,

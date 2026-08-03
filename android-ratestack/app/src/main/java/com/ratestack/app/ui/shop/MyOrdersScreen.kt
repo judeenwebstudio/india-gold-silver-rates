@@ -80,18 +80,25 @@ fun MyOrdersScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Surface(color = Color(0xFF1C1917), shape = MaterialTheme.shapes.extraLarge, border = BorderStroke(1.dp, Color(0x55E2AD3D))) {
-                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("MY DASHBOARD", color = Color(0xFFF5C96A), fontWeight = FontWeight.Black)
-                    Text("Welcome, ${data?.customer?.fullName ?: "Customer"}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White)
-                    Text("Orders, deliveries, addresses and account settings in one premium space.", color = Color(0xFFD6D3D1))
-                    if (token.isNullOrBlank()) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onLogin) { Text("Login") }; OutlinedButton(onRegister) { Text("Register") } }
-                        OutlinedButton(onGoogleLogin) { Text("Continue with Google") }
-                    } else {
+            if (token.isNullOrBlank()) {
+                com.ratestack.app.ui.components.AuthActionPanel(
+                    variant = com.ratestack.app.ui.components.AuthActionPanelVariant.CARD,
+                    heading = "Welcome to RateStack",
+                    supportingText = "Sign in to manage orders, invoices, delivery tracking, saved addresses and account preferences.",
+                    onLogin = onLogin,
+                    onRegister = onRegister,
+                    onGoogleLogin = onGoogleLogin,
+                    googleErrorMessage = error,
+                )
+            } else {
+                Surface(color = Color(0xFF1C1917), shape = MaterialTheme.shapes.extraLarge, border = BorderStroke(1.dp, Color(0x55E2AD3D))) {
+                    Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text("MY DASHBOARD", color = Color(0xFFF5C96A), fontWeight = FontWeight.Black)
+                        Text("Welcome, ${data?.customer?.fullName ?: "Customer"}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White)
+                        Text("Orders, deliveries, addresses and account settings in one premium space.", color = Color(0xFFD6D3D1))
                         OutlinedButton(onLogout) { Text("Logout") }
+                        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     }
-                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
             }
         }

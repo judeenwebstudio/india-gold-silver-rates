@@ -50,7 +50,7 @@ class SchemeRepository(
             callerClass = "SchemeRepository",
             callerMethod = "clearUserToken",
             currentTokenLength = currentToken.length,
-            currentSessionState = com.ratestack.app.ui.schemes.SessionState.UNAUTHENTICATED,
+            currentSessionState = com.ratestack.app.data.SessionState.Unauthenticated,
             reason = "clearUserToken called on SharedPreferences",
         )
         prefs.edit(commit = true) { remove("scheme_user_token") }
@@ -100,7 +100,7 @@ class SchemeRepository(
             callerClass = "SchemeRepository",
             callerMethod = "clearUserDetails",
             currentTokenLength = currentToken.length,
-            currentSessionState = com.ratestack.app.ui.schemes.SessionState.UNAUTHENTICATED,
+            currentSessionState = com.ratestack.app.data.SessionState.Unauthenticated,
             reason = "clearUserDetails called on SharedPreferences",
         )
         prefs.edit(commit = true) {

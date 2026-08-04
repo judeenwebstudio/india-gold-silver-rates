@@ -2,7 +2,7 @@ package com.ratestack.app.data
 
 import android.util.Log
 import com.ratestack.app.BuildConfig
-import com.ratestack.app.ui.schemes.SessionState
+import com.ratestack.app.data.SessionState
 
 object SessionLogger {
     fun logSessionMutation(

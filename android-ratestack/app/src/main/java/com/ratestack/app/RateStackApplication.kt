@@ -5,12 +5,22 @@ import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 
+import android.content.Context
+import com.ratestack.app.data.ApiProvider
+import com.ratestack.app.data.SessionRepository
+
 class RateStackApplication : Application() {
+    lateinit var sessionRepository: SessionRepository
+        private set
+
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.DEBUG) {
             Log.d("RateStackStartup", "1. Application process started: RateStackApplication.onCreate()")
         }
+
+        sessionRepository = SessionRepository(this)
+        ApiProvider.setTokenProvider { sessionRepository.currentToken }
 
         runCatching {
             NotificationHelper.createChannels(this)
@@ -29,3 +39,6 @@ class RateStackApplication : Application() {
         }
     }
 }
+
+val Context.sessionRepository: SessionRepository
+    get() = (applicationContext as RateStackApplication).sessionRepository

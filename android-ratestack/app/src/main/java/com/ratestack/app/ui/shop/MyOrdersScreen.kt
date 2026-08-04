@@ -20,7 +20,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import com.ratestack.app.BuildConfig
-import com.ratestack.app.ui.schemes.SessionState
+import com.ratestack.app.data.SessionState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -71,17 +71,17 @@ internal data class TrackBadge(val icon: String, val label: String)
 
 @Composable
 fun MyOrdersScreen(
+    sessionState: SessionState,
     token: String?,
-    sessionState: SessionState = SessionState.AUTHENTICATED,
     onLogin: () -> Unit,
-    onRegister: () -> Unit,
-    onGoogleLogin: () -> Unit,
+    onRegister: () -> Unit = {},
+    onGoogleLogin: () -> Unit = {},
     onLogout: () -> Unit,
     onShop: () -> Unit,
     onTrackOrder: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
 ) {
-    if (sessionState == SessionState.RESTORING) {
+    if (sessionState is SessionState.Restoring) {
         Column(
             modifier = Modifier.fillMaxSize().padding(32.dp),
             verticalArrangement = Arrangement.Center,
@@ -93,7 +93,7 @@ fun MyOrdersScreen(
         return
     }
 
-    if (sessionState == SessionState.UNAUTHENTICATED || sessionState == SessionState.EXPIRED || token.isNullOrBlank()) {
+    if (sessionState is SessionState.Unauthenticated || sessionState is SessionState.Expired || token.isNullOrBlank()) {
         LaunchedEffect(Unit) {
             com.ratestack.app.data.SessionLogger.logSessionMutation(
                 action = "navigate to CUSTOMER_LOGIN",
@@ -125,13 +125,8 @@ fun MyOrdersScreen(
                     if (response.isSuccessful) {
                         dashboard = response.body()?.data
                         error = null
-                    } else if (response.code() == 401) {
-                        val errorCode = ApiProvider.errorMessage(response, "UNAUTHORIZED")
-                        if (BuildConfig.DEBUG) {
-                            android.util.Log.w("RateStackSession", "16. Dashboard endpoint error code=$errorCode | Calling onLogout()")
-                        }
-                        onLogout()
                     } else {
+                        // DO NOT CALL ONLOGOUT HERE FOR ANY API FAILURE!
                         error = ApiProvider.errorMessage(response, "Unable to load your Dashboard.")
                     }
                 }

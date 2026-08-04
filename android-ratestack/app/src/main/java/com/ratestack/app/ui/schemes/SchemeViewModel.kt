@@ -19,30 +19,31 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class SessionState {
-    RESTORING,
-    AUTHENTICATED,
-    UNAUTHENTICATED,
-    EXPIRED
-}
+import com.ratestack.app.data.CustomerSession
+import com.ratestack.app.data.SessionRepository
+import com.ratestack.app.data.SessionState
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 class SchemeViewModel(
     private val repository: SchemeRepository,
+    val sessionRepository: SessionRepository,
 ) : ViewModel() {
 
-    private val _sessionState = MutableStateFlow<SessionState>(SessionState.RESTORING)
-    val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+    val sessionState: StateFlow<SessionState> = sessionRepository.sessionState
 
-    private var activeSessionJob: kotlinx.coroutines.Job? = null
+    val userToken: StateFlow<String?> = sessionRepository.sessionState
+        .map { (it as? SessionState.Authenticated)?.token }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, sessionRepository.currentToken)
 
-    private val _userToken = MutableStateFlow<String?>(repository.getUserToken())
-    val userToken: StateFlow<String?> = _userToken.asStateFlow()
+    val userName: StateFlow<String?> = sessionRepository.sessionState
+        .map { (it as? SessionState.Authenticated)?.customer?.fullName }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    private val _userName = MutableStateFlow<String?>(repository.getUserName())
-    val userName: StateFlow<String?> = _userName.asStateFlow()
-
-    private val _userPhone = MutableStateFlow<String?>(repository.getUserPhone())
-    val userPhone: StateFlow<String?> = _userPhone.asStateFlow()
+    val userPhone: StateFlow<String?> = sessionRepository.sessionState
+        .map { (it as? SessionState.Authenticated)?.customer?.phone }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _pendingAuthDestination = MutableStateFlow(repository.pendingAuthDestination())
     val pendingAuthDestination: StateFlow<PendingAuthDestination?> = _pendingAuthDestination.asStateFlow()
@@ -92,16 +93,13 @@ class SchemeViewModel(
 
     init {
         loadSchemePlans()
-        val initialToken = repository.getUserToken()
-        if (!initialToken.isNullOrEmpty()) {
-            _sessionState.value = SessionState.AUTHENTICATED
-            _userToken.value = initialToken
-            activeSessionJob = viewModelScope.launch {
-                loadMySchemes()
-                loadCustomerProfile()
+        viewModelScope.launch {
+            sessionRepository.sessionState.collect { state ->
+                if (state is SessionState.Authenticated) {
+                    loadMySchemes()
+                    loadCustomerProfile()
+                }
             }
-        } else {
-            _sessionState.value = SessionState.UNAUTHENTICATED
         }
     }
 
@@ -138,7 +136,7 @@ class SchemeViewModel(
     }
 
     fun loadMySchemes() {
-        val token = _userToken.value ?: repository.getUserToken()
+        val token = userToken.value
         if (token.isNullOrEmpty()) {
             _mySchemes.value = LoadState.Ready(emptyList())
             return
@@ -151,7 +149,7 @@ class SchemeViewModel(
     }
 
     fun loadSchemeDashboard(enrollmentId: String) {
-        val token = _userToken.value ?: repository.getUserToken()
+        val token = userToken.value
         if (token.isNullOrEmpty()) {
             _schemeDashboard.value = LoadState.Error("Authentication required")
             return
@@ -179,33 +177,27 @@ class SchemeViewModel(
             return
         }
 
-        activeSessionJob?.cancel()
+        val user = authData.user
+        val customer = CustomerSession(
+            id = user?.id ?: "cust_${System.currentTimeMillis()}",
+            fullName = user?.fullName ?: fallbackName,
+            phone = user?.phone ?: fallbackPhone,
+            email = user?.email,
+        )
 
-        if (com.ratestack.app.BuildConfig.DEBUG) {
-            android.util.Log.d("RateStackAuth", "3. Response success field: true | 4. Token length: ${token.length} | 5. Customer ID: ${authData.user?.id ?: "unknown"}")
+        val success = sessionRepository.completeLogin(token, customer)
+
+        if (success) {
+            _authActionState.value = LoadState.Ready(authData)
+            viewModelScope.launch {
+                runCatching { repository.syncPushToken() }
+                runCatching { loadMySchemes() }
+                runCatching { sessionRepository.validateSessionWithBackend(ApiProvider.service) }
+            }
+            onSuccess()
+        } else {
+            _authActionState.value = LoadState.Error("Failed to save authentication token.")
         }
-
-        repository.saveUserToken(token)
-        repository.saveUserDetails(authData.user?.fullName ?: fallbackName, authData.user?.phone ?: fallbackPhone)
-
-        _userToken.value = token
-        _userName.value = authData.user?.fullName ?: fallbackName
-        _userPhone.value = authData.user?.phone ?: fallbackPhone
-        _sessionState.value = SessionState.AUTHENTICATED
-        _authActionState.value = LoadState.Ready(authData)
-
-        if (com.ratestack.app.BuildConfig.DEBUG) {
-            android.util.Log.d("RateStackAuth", "10. Authenticated state changed to true (SessionState=AUTHENTICATED)")
-            android.util.Log.d("RateStackSession", "10. Session state updated to AUTHENTICATED")
-        }
-
-        activeSessionJob = viewModelScope.launch {
-            runCatching { repository.syncPushToken() }
-            runCatching { loadMySchemes() }
-            runCatching { loadCustomerProfile() }
-        }
-
-        onSuccess()
     }
 
     fun login(phone: String, pass: String, onSuccess: () -> Unit) {
@@ -271,75 +263,20 @@ class SchemeViewModel(
     }
 
     fun loadCustomerProfile() {
-        val token = _userToken.value ?: repository.getUserToken() ?: return
-        viewModelScope.launch {
-            if (com.ratestack.app.BuildConfig.DEBUG) {
-                android.util.Log.d("RateStackSession", "13. Background session validation started | 14. Authorization header attached: Bearer (len=${token.length})")
-            }
-            runCatching { ApiProvider.service.getCustomerProfile("Bearer $token") }
-                .onSuccess { response ->
-                    if (com.ratestack.app.BuildConfig.DEBUG) {
-                        android.util.Log.d("RateStackSession", "15. Validation endpoint HTTP status=${response.code()}")
-                    }
-                    if (response.isSuccessful && response.body()?.success == true) {
-                        _customerProfile.value = response.body()?.data
-                    } else if (response.code() == 401) {
-                        if (com.ratestack.app.BuildConfig.DEBUG) {
-                            android.util.Log.w("RateStackSession", "16. Validation response body error code=401 | 17. Session state changed to EXPIRED")
-                        }
-                        expireSession()
-                    }
-                }
-                .onFailure { e ->
-                    if (com.ratestack.app.BuildConfig.DEBUG) {
-                        android.util.Log.w("RateStackSession", "Background session validation network exception (keeping local session): ${e.message}")
-                    }
-                }
-        }
+        sessionRepository.validateSessionWithBackend(ApiProvider.service)
     }
 
     fun expireSession() {
-        val currentTokenLen = _userToken.value?.length ?: 0
-        com.ratestack.app.data.SessionLogger.logSessionMutation(
-            action = "expireSession / set SessionState.EXPIRED",
-            callerClass = "SchemeViewModel",
-            callerMethod = "expireSession",
-            currentTokenLength = currentTokenLen,
-            currentSessionState = SessionState.EXPIRED,
-            reason = "Session expired due to confirmed 401 token invalidity",
-            httpStatus = 401,
-        )
-        activeSessionJob?.cancel()
-        _sessionState.value = SessionState.EXPIRED
-        repository.clearUserToken()
-        repository.clearUserDetails()
-        _userToken.value = null
-        _userName.value = null
-        _userPhone.value = null
+        sessionRepository.expireSession()
         _mySchemes.value = LoadState.Ready(emptyList())
         _schemeDashboard.value = null
         _customerProfile.value = null
     }
 
     fun logout() {
-        val currentTokenLen = _userToken.value?.length ?: 0
-        com.ratestack.app.data.SessionLogger.logSessionMutation(
-            action = "logout / set SessionState.UNAUTHENTICATED",
-            callerClass = "SchemeViewModel",
-            callerMethod = "logout",
-            currentTokenLength = currentTokenLen,
-            currentSessionState = SessionState.UNAUTHENTICATED,
-            reason = "User requested explicit logout",
-        )
-        activeSessionJob?.cancel()
-        _sessionState.value = SessionState.UNAUTHENTICATED
         clearPendingAuthDestination()
         repository.revokePushToken {
-            repository.clearUserToken()
-            repository.clearUserDetails()
-            _userToken.value = null
-            _userName.value = null
-            _userPhone.value = null
+            sessionRepository.logout()
             _mySchemes.value = LoadState.Ready(emptyList())
             _schemeDashboard.value = null
             _customerProfile.value = null
@@ -347,7 +284,7 @@ class SchemeViewModel(
     }
 
     fun connectGoogleAccount(idToken: String) {
-        val token = _userToken.value ?: return
+        val token = userToken.value ?: return
         viewModelScope.launch {
             val response = runCatching {
                 ApiProvider.service.connectGoogleAccount("Bearer $token", mapOf("idToken" to idToken))
@@ -357,7 +294,7 @@ class SchemeViewModel(
     }
 
     fun disconnectGoogleAccount() {
-        val token = _userToken.value ?: return
+        val token = userToken.value ?: return
         viewModelScope.launch {
             val response = runCatching { ApiProvider.service.disconnectGoogleAccount("Bearer $token") }.getOrNull()
             if (response?.isSuccessful == true && response.body()?.success == true) loadCustomerProfile()

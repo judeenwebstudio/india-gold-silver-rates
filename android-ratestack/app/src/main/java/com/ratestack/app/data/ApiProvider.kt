@@ -11,18 +11,31 @@ import java.util.concurrent.TimeUnit
 
 object ApiProvider {
     private val gson = Gson()
+    @Volatile private var tokenProvider: (() -> String?)? = null
+
+    fun setTokenProvider(provider: () -> String?) {
+        tokenProvider = provider
+    }
+
     val service: RateStackApi by lazy {
         Retrofit.Builder()
             .baseUrl(BuildConfig.WEBSITE_URL.trimEnd('/') + "/")
             .client(
                 OkHttpClient.Builder()
                     .addInterceptor { chain ->
-                        chain.proceed(
-                            chain.request().newBuilder()
-                                .header("X-RateStack-Platform", "ANDROID")
-                                .header("X-RateStack-App-Version", BuildConfig.VERSION_NAME)
-                                .build(),
-                        )
+                        val requestBuilder = chain.request().newBuilder()
+                            .header("X-RateStack-Platform", "ANDROID")
+                            .header("X-RateStack-App-Version", BuildConfig.VERSION_NAME)
+
+                        val existingAuth = chain.request().header("Authorization")
+                        if (existingAuth.isNullOrBlank()) {
+                            val token = tokenProvider?.invoke()
+                            if (!token.isNullOrBlank()) {
+                                requestBuilder.header("Authorization", "Bearer ${token.trim()}")
+                            }
+                        }
+
+                        chain.proceed(requestBuilder.build())
                     }
                     .connectTimeout(10, TimeUnit.SECONDS)
                     .readTimeout(15, TimeUnit.SECONDS)

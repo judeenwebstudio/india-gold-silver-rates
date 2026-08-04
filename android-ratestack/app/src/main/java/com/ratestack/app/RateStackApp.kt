@@ -166,9 +166,10 @@ fun RateStackApp(
     val viewModel: RateStackViewModel = viewModel(
         factory = remember { RateStackViewModelFactory(repository, preferences) },
     )
+    val sessionRepository = context.sessionRepository
     val schemeRepository = remember { com.ratestack.app.data.SchemeRepository(ApiProvider.service, context.applicationContext) }
     val schemeViewModel: com.ratestack.app.ui.schemes.SchemeViewModel = viewModel(
-        factory = remember { SchemeViewModelFactory(schemeRepository) },
+        factory = remember { SchemeViewModelFactory(schemeRepository, sessionRepository) },
     )
 
     val navController = rememberNavController()
@@ -633,13 +634,11 @@ fun RateStackApp(
                 }
                 composable(Routes.MY_ORDERS) {
                     val userToken by schemeViewModel.userToken.collectAsState()
-                    val sessionState by schemeViewModel.sessionState.collectAsState()
+                    val sessionState by sessionRepository.sessionState.collectAsState()
                     com.ratestack.app.ui.shop.MyOrdersScreen(
-                        token = userToken,
                         sessionState = sessionState,
+                        token = userToken,
                         onLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) },
-                        onRegister = { schemeViewModel.requireAuthentication(PendingAuthDestination(AuthDestinationType.DASHBOARD)); navController.navigate(Routes.CUSTOMER_REGISTER) },
-                        onGoogleLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) },
                         onLogout = { schemeViewModel.logout() },
                         onShop = { navController.navigate(Routes.SCHEMES) },
                         onTrackOrder = { orderId -> navController.navigate("order_tracking/$orderId") },
@@ -1919,9 +1918,12 @@ class RateStackViewModelFactory(private val repository: RateRepository, private 
     override fun <T : ViewModel> create(modelClass: Class<T>): T = RateStackViewModel(repository, preferences) as T
 }
 
-class SchemeViewModelFactory(private val repository: com.ratestack.app.data.SchemeRepository) : ViewModelProvider.Factory {
+class SchemeViewModelFactory(
+    private val repository: com.ratestack.app.data.SchemeRepository,
+    private val sessionRepository: com.ratestack.app.data.SessionRepository,
+) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = com.ratestack.app.ui.schemes.SchemeViewModel(repository) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = com.ratestack.app.ui.schemes.SchemeViewModel(repository, sessionRepository) as T
 }
 
 private fun LoadState.Ready<RateDetails>.fromCache(): Boolean = fromCache

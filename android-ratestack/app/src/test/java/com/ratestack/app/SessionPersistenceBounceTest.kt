@@ -1,6 +1,7 @@
 package com.ratestack.app
 
-import com.ratestack.app.ui.schemes.SessionState
+import com.ratestack.app.data.CustomerSession
+import com.ratestack.app.data.SessionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -12,109 +13,120 @@ class SessionPersistenceBounceTest {
 
     @Test
     fun testRestoringStateDoesNotRedirect() {
-        val state = SessionState.RESTORING
-        assertTrue("RESTORING state must not trigger login redirect", state == SessionState.RESTORING)
-        assertFalse("RESTORING state is not expired", state == SessionState.EXPIRED)
-        assertFalse("RESTORING state is not unauthenticated", state == SessionState.UNAUTHENTICATED)
+        val state: SessionState = SessionState.Restoring
+        assertTrue("Restoring state must not trigger login redirect", state is SessionState.Restoring)
+        assertFalse("Restoring state is not Expired", state is SessionState.Expired)
+        assertFalse("Restoring state is not Unauthenticated", state is SessionState.Unauthenticated)
     }
 
     @Test
     fun testAuthenticatedStatePersistsAfter2Seconds() {
-        var state = SessionState.AUTHENTICATED
+        val customer = CustomerSession("c1", "Test Customer", "9999999999", "test@ratestack.com")
+        var state: SessionState = SessionState.Authenticated("valid_token_123", customer)
         val simulatedElapsedMs = 2000L
         if (simulatedElapsedMs >= 2000L) {
             // Keep authenticated unless explicit 401 occurs
         }
-        assertEquals(SessionState.AUTHENTICATED, state)
+        assertTrue(state is SessionState.Authenticated)
+        assertEquals("valid_token_123", (state as SessionState.Authenticated).token)
     }
 
     @Test
     fun testAuthenticatedStatePersistsAfter10Seconds() {
-        val state = SessionState.AUTHENTICATED
+        val customer = CustomerSession("c1", "Test Customer", "9999999999", "test@ratestack.com")
+        val state: SessionState = SessionState.Authenticated("valid_token_123", customer)
         val simulatedElapsedMs = 10000L
         if (simulatedElapsedMs >= 10000L) {
             // Keep authenticated unless explicit 401 occurs
         }
-        assertEquals(SessionState.AUTHENTICATED, state)
+        assertTrue(state is SessionState.Authenticated)
     }
 
     @Test
     fun testNetworkErrorDoesNotClearSession() {
-        var state = SessionState.AUTHENTICATED
+        val customer = CustomerSession("c1", "Test Customer", "9999999999")
+        var state: SessionState = SessionState.Authenticated("token_net_test", customer)
         val isNetworkError = true
         if (isNetworkError) {
             // Keep local session
         }
-        assertEquals(SessionState.AUTHENTICATED, state)
+        assertTrue(state is SessionState.Authenticated)
     }
 
     @Test
     fun testLoginSuccessFollowedByDashboardApi500() {
-        var state = SessionState.AUTHENTICATED
+        val customer = CustomerSession("c1", "Test Customer", "9999999999")
+        var state: SessionState = SessionState.Authenticated("token_500_test", customer)
         val httpStatus = 500
         if (httpStatus >= 500) {
             // Keep local session, show retry state on Dashboard
         }
-        assertEquals(SessionState.AUTHENTICATED, state)
+        assertTrue(state is SessionState.Authenticated)
     }
 
     @Test
     fun testLoginSuccessFollowedByProfileApiTimeout() {
-        var state = SessionState.AUTHENTICATED
+        val customer = CustomerSession("c1", "Test Customer", "9999999999")
+        var state: SessionState = SessionState.Authenticated("token_timeout", customer)
         val isTimeout = true
         if (isTimeout) {
             // Keep local session, profile loading fails gracefully
         }
-        assertEquals(SessionState.AUTHENTICATED, state)
+        assertTrue(state is SessionState.Authenticated)
     }
 
     @Test
     fun testLoginSuccessFollowedByFcmFailure() {
-        var state = SessionState.AUTHENTICATED
+        val customer = CustomerSession("c1", "Test Customer", "9999999999")
+        var state: SessionState = SessionState.Authenticated("token_fcm", customer)
         val fcmSuccess = false
         if (!fcmSuccess) {
             // Non-fatal failure
         }
-        assertEquals(SessionState.AUTHENTICATED, state)
+        assertTrue(state is SessionState.Authenticated)
     }
 
     @Test
     fun testLoginSuccessFollowedByStaleRestoreCompletion() {
-        var state = SessionState.AUTHENTICATED
+        val customer = CustomerSession("c1", "Test Customer", "9999999999")
+        var state: SessionState = SessionState.Authenticated("token_fresh", customer)
         val staleJobCompleted = true
         if (staleJobCompleted) {
-            // Stale job cancellation ensures state remains AUTHENTICATED
+            // Stale job cancellation ensures state remains Authenticated
         }
-        assertEquals(SessionState.AUTHENTICATED, state)
+        assertTrue(state is SessionState.Authenticated)
     }
 
     @Test
     fun testLoginSuccessFollowedByNonAuth401Or403BusinessResponse() {
-        var state = SessionState.AUTHENTICATED
+        val customer = CustomerSession("c1", "Test Customer", "9999999999")
+        var state: SessionState = SessionState.Authenticated("token_403", customer)
         val httpStatus = 403
         if (httpStatus == 403) {
             // 403 business permission error must not clear session
         }
-        assertEquals(SessionState.AUTHENTICATED, state)
+        assertTrue(state is SessionState.Authenticated)
     }
 
     @Test
     fun testAppRecreationAfterLogin() {
         val savedToken = "valid_jwt_token_sample_12345"
-        var restoredState = SessionState.RESTORING
+        val customer = CustomerSession("c1", "Restored Name", "9876543210")
+        var restoredState: SessionState = SessionState.Restoring
         if (savedToken.isNotEmpty()) {
-            restoredState = SessionState.AUTHENTICATED
+            restoredState = SessionState.Authenticated(savedToken, customer)
         }
-        assertEquals(SessionState.AUTHENTICATED, restoredState)
+        assertTrue(restoredState is SessionState.Authenticated)
     }
 
     @Test
     fun testMultipleViewModelCreationSharesCanonicalRepository() {
         val tokenInRepo = "shared_token_999"
-        val vm1State = if (tokenInRepo.isNotEmpty()) SessionState.AUTHENTICATED else SessionState.UNAUTHENTICATED
-        val vm2State = if (tokenInRepo.isNotEmpty()) SessionState.AUTHENTICATED else SessionState.UNAUTHENTICATED
+        val customer = CustomerSession("c1", "Shared Customer", "9999999999")
+        val vm1State = if (tokenInRepo.isNotEmpty()) SessionState.Authenticated(tokenInRepo, customer) else SessionState.Unauthenticated
+        val vm2State = if (tokenInRepo.isNotEmpty()) SessionState.Authenticated(tokenInRepo, customer) else SessionState.Unauthenticated
         assertEquals(vm1State, vm2State)
-        assertEquals(SessionState.AUTHENTICATED, vm1State)
+        assertTrue(vm1State is SessionState.Authenticated)
     }
 
     @Test
@@ -127,24 +139,24 @@ class SessionPersistenceBounceTest {
 
     @Test
     fun testConfirmed401ExpiresSession() {
-        var state = SessionState.AUTHENTICATED
+        val customer = CustomerSession("c1", "Test Customer", "9999999999")
+        var state: SessionState = SessionState.Authenticated("expired_token", customer)
         val httpStatus = 401
-        if (httpStatus == 401) {
-            state = SessionState.EXPIRED
+        val errorCode = "TOKEN_EXPIRED"
+        if (httpStatus == 401 && errorCode == "TOKEN_EXPIRED") {
+            state = SessionState.Expired
         }
-        assertEquals(SessionState.EXPIRED, state)
+        assertTrue(state is SessionState.Expired)
     }
 
     @Test
     fun testExplicitLogoutClearsSession() {
-        var state = SessionState.AUTHENTICATED
-        var token: String? = "sample_token_12345"
+        val customer = CustomerSession("c1", "Test Customer", "9999999999")
+        var state: SessionState = SessionState.Authenticated("sample_token_12345", customer)
         
         // Perform explicit logout
-        state = SessionState.UNAUTHENTICATED
-        token = null
+        state = SessionState.Unauthenticated
 
-        assertEquals(SessionState.UNAUTHENTICATED, state)
-        assertNull(token)
+        assertTrue(state is SessionState.Unauthenticated)
     }
 }

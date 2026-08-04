@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -109,7 +110,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                 put("currency", "INR")
                 put("amount", amountPaise)
                 put("order_id", gatewayOrderId)
-                put("theme.color", "#E2AD3D")
+                put("theme.color", "#D4AF37")
             })
         } catch (e: Exception) {
             razorpayError?.invoke(e.message)
@@ -162,27 +163,35 @@ fun PremiumStaticSplashScreen(onSplashFinished: () -> Unit) {
     )
     val scaleAnim by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0.92f,
-        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "splashScale",
     )
 
     LaunchedEffect(Unit) {
         startAnimation = true
-        delay(1800L)
+        delay(1300L)
         onSplashFinished()
     }
+
+    val goldGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFE7C55A),
+            Color(0xFFD4AF37),
+            Color(0xFFC9981A),
+        ),
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFE2AD3D)),
+            .background(goldGradient),
         contentAlignment = Alignment.Center,
     ) {
         Image(
             painter = painterResource(id = R.drawable.ratestack_logo_transparent),
             contentDescription = null,
             modifier = Modifier
-                .width(220.dp)
+                .width(180.dp)
                 .graphicsLayer {
                     alpha = alphaAnim
                     scaleX = scaleAnim

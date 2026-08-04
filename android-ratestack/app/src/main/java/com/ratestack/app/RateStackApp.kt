@@ -736,9 +736,10 @@ private fun AppTopBar(
                 modifier = Modifier.fillMaxWidth().padding(end = 12.dp),
             ) {
                 Image(
-                    painter = painterResource(R.drawable.ratestack_logo),
+                    painter = painterResource(R.drawable.ratestack_logo_transparent),
                     contentDescription = "RateStack Logo",
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(40.dp),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {

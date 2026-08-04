@@ -22,11 +22,11 @@ class SchemeRepository(
     }
 
     fun savePendingAuthDestination(destination: PendingAuthDestination) {
-        prefs.edit { putString("pending_auth_destination", gson.toJson(destination)) }
+        prefs.edit(commit = true) { putString("pending_auth_destination", gson.toJson(destination)) }
     }
 
     fun clearPendingAuthDestination() {
-        prefs.edit { remove("pending_auth_destination") }
+        prefs.edit(commit = true) { remove("pending_auth_destination") }
     }
 
     fun getUserToken(): String? {
@@ -34,11 +34,20 @@ class SchemeRepository(
     }
 
     fun saveUserToken(token: String) {
-        prefs.edit { putString("scheme_user_token", token) }
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackSession", "6. Session save started | 7. Token writing to SharedPreferences (len=${token.length})")
+        }
+        prefs.edit(commit = true) { putString("scheme_user_token", token) }
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackSession", "7. Token written to SharedPreferences successfully")
+        }
     }
 
     fun clearUserToken() {
-        prefs.edit { remove("scheme_user_token") }
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackSession", "18. Logout/clear-session caller: clearing scheme_user_token")
+        }
+        prefs.edit(commit = true) { remove("scheme_user_token") }
     }
 
     fun syncPushToken() {
@@ -66,14 +75,20 @@ class SchemeRepository(
     }
 
     fun saveUserDetails(name: String, phone: String) {
-        prefs.edit {
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackSession", "8. User/profile writing to SharedPreferences")
+        }
+        prefs.edit(commit = true) {
             putString("scheme_user_name", name)
             putString("scheme_user_phone", phone)
+        }
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackSession", "8. User/profile written to SharedPreferences | 9. Session save completed")
         }
     }
 
     fun clearUserDetails() {
-        prefs.edit {
+        prefs.edit(commit = true) {
             remove("scheme_user_name")
             remove("scheme_user_phone")
         }

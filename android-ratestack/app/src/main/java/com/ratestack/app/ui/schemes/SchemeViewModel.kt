@@ -19,9 +19,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+enum class SessionState {
+    RESTORING,
+    AUTHENTICATED,
+    UNAUTHENTICATED,
+    EXPIRED
+}
+
 class SchemeViewModel(
     private val repository: SchemeRepository,
 ) : ViewModel() {
+
+    private val _sessionState = MutableStateFlow<SessionState>(SessionState.RESTORING)
+    val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+
+    private var activeSessionJob: kotlinx.coroutines.Job? = null
 
     private val _userToken = MutableStateFlow<String?>(repository.getUserToken())
     val userToken: StateFlow<String?> = _userToken.asStateFlow()
@@ -80,9 +92,16 @@ class SchemeViewModel(
 
     init {
         loadSchemePlans()
-        if (!repository.getUserToken().isNull_or_empty()) {
-            loadMySchemes()
-            loadCustomerProfile()
+        val initialToken = repository.getUserToken()
+        if (!initialToken.isNullOrEmpty()) {
+            _sessionState.value = SessionState.AUTHENTICATED
+            _userToken.value = initialToken
+            activeSessionJob = viewModelScope.launch {
+                loadMySchemes()
+                loadCustomerProfile()
+            }
+        } else {
+            _sessionState.value = SessionState.UNAUTHENTICATED
         }
     }
 
@@ -110,46 +129,37 @@ class SchemeViewModel(
         _joinSchemeActionState.value = null
     }
 
-    private fun String?.isNull_or_empty(): Boolean = this == null || this.trim().isEmpty()
-
     fun loadSchemePlans() {
         viewModelScope.launch {
             _schemePlans.value = LoadState.Loading
-            _schemePlans.value = repository.getSchemes().toLoadState()
+            val res = repository.getSchemes()
+            _schemePlans.value = res.toLoadState()
         }
     }
 
     fun loadMySchemes() {
-        val token = repository.getUserToken()
-        if (token.isNull_or_empty()) {
+        val token = _userToken.value ?: repository.getUserToken()
+        if (token.isNullOrEmpty()) {
             _mySchemes.value = LoadState.Ready(emptyList())
             return
         }
         viewModelScope.launch {
             _mySchemes.value = LoadState.Loading
-            val res = repository.getMySchemes(token!!)
-            if (res is RepositoryResult.Failure && res.message.contains("Authentication required", ignoreCase = true)) {
-                logout()
-            } else {
-                _mySchemes.value = res.toLoadState()
-            }
+            val res = repository.getMySchemes(token)
+            _mySchemes.value = res.toLoadState()
         }
     }
 
     fun loadSchemeDashboard(enrollmentId: String) {
-        val token = repository.getUserToken()
-        if (token.isNull_or_empty()) {
+        val token = _userToken.value ?: repository.getUserToken()
+        if (token.isNullOrEmpty()) {
             _schemeDashboard.value = LoadState.Error("Authentication required")
             return
         }
         viewModelScope.launch {
             _schemeDashboard.value = LoadState.Loading
-            val res = repository.getSchemeDashboard(token!!, enrollmentId)
-            if (res is RepositoryResult.Failure && res.message.contains("Authentication required", ignoreCase = true)) {
-                logout()
-            } else {
-                _schemeDashboard.value = res.toLoadState()
-            }
+            val res = repository.getSchemeDashboard(token, enrollmentId)
+            _schemeDashboard.value = res.toLoadState()
         }
     }
 
@@ -163,13 +173,50 @@ class SchemeViewModel(
         return digits
     }
 
+    private fun commitLoginSuccess(authData: AuthResponseDto, fallbackName: String, fallbackPhone: String, onSuccess: () -> Unit) {
+        val token = authData.token ?: run {
+            _authActionState.value = LoadState.Error("Invalid response from server")
+            return
+        }
+
+        activeSessionJob?.cancel()
+
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackAuth", "3. Response success field: true | 4. Token length: ${token.length} | 5. Customer ID: ${authData.user?.id ?: "unknown"}")
+        }
+
+        repository.saveUserToken(token)
+        repository.saveUserDetails(authData.user?.fullName ?: fallbackName, authData.user?.phone ?: fallbackPhone)
+
+        _userToken.value = token
+        _userName.value = authData.user?.fullName ?: fallbackName
+        _userPhone.value = authData.user?.phone ?: fallbackPhone
+        _sessionState.value = SessionState.AUTHENTICATED
+        _authActionState.value = LoadState.Ready(authData)
+
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackAuth", "10. Authenticated state changed to true (SessionState=AUTHENTICATED)")
+            android.util.Log.d("RateStackSession", "10. Session state updated to AUTHENTICATED")
+        }
+
+        activeSessionJob = viewModelScope.launch {
+            runCatching { repository.syncPushToken() }
+            runCatching { loadMySchemes() }
+            runCatching { loadCustomerProfile() }
+        }
+
+        onSuccess()
+    }
+
     fun login(phone: String, pass: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _authActionState.value = LoadState.Loading
             val normalizedPhone = if (phone.contains("@")) phone.trim().lowercase() else normalizePhoneNumber(phone)
+            if (com.ratestack.app.BuildConfig.DEBUG) {
+                android.util.Log.d("RateStackAuth", "1. Login request started for identifier=$normalizedPhone")
+            }
             try {
                 val body = mapOf(
-                    "identifier" to normalizedPhone,
                     "identifier" to normalizedPhone,
                     "password" to pass,
                 )
@@ -178,23 +225,14 @@ class SchemeViewModel(
                 if (com.ratestack.app.BuildConfig.DEBUG) {
                     android.util.Log.d(
                         "RateStackAuth",
-                        "Login Endpoint: ${com.ratestack.app.BuildConfig.WEBSITE_URL}/api/v1/auth/login | Code: ${res.code()} | Mobile: $normalizedPhone | Error: ${res.body()?.error?.message}",
+                        "2. Login API response status: ${res.code()} | Success: ${res.body()?.success}",
                     )
                 }
 
                 if (res.isSuccessful && res.body()?.success == true) {
                     val authData = res.body()?.data
                     if (authData?.token != null) {
-                        repository.saveUserToken(authData.token)
-                        repository.syncPushToken()
-                        repository.saveUserDetails(authData.user?.fullName ?: "Customer", authData.user?.phone ?: normalizedPhone)
-                        _userToken.value = authData.token
-                        _userName.value = authData.user?.fullName ?: "Customer"
-                        _userPhone.value = authData.user?.phone ?: normalizedPhone
-                        _authActionState.value = LoadState.Ready(authData)
-                        loadMySchemes()
-                        loadCustomerProfile()
-                        onSuccess()
+                        commitLoginSuccess(authData, "Customer", normalizedPhone, onSuccess)
                     } else {
                         _authActionState.value = LoadState.Error("Invalid response from server")
                     }
@@ -211,43 +249,81 @@ class SchemeViewModel(
     fun googleSignIn(idToken: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _authActionState.value = LoadState.Loading
+            if (com.ratestack.app.BuildConfig.DEBUG) {
+                android.util.Log.d("RateStackAuth", "1. Google login request started (idToken len=${idToken.length})")
+            }
             try {
-                android.util.Log.d("RateStackGoogleAuth", "Stage 5 Diagnostic: Sending ID token to backend /api/v1/auth/google (len=${idToken.length}, prefix=${idToken.take(15)}...)")
                 val res = ApiProvider.service.googleSignIn(mapOf("idToken" to idToken))
                 val authData = res.body()?.data
+                if (com.ratestack.app.BuildConfig.DEBUG) {
+                    android.util.Log.d("RateStackAuth", "2. Google Login API response status: ${res.code()} | Success: ${res.body()?.success}")
+                }
                 if (res.isSuccessful && res.body()?.success == true && authData?.token != null) {
-                    android.util.Log.d("RateStackGoogleAuth", "Stage 6 Diagnostic: Backend verification SUCCESS! User ID=${authData.user?.id}")
-                    repository.saveUserToken(authData.token)
-                    repository.syncPushToken()
-                    repository.saveUserDetails(authData.user?.fullName ?: "Customer", authData.user?.phone.orEmpty())
-                    _userToken.value = authData.token
-                    _userName.value = authData.user?.fullName ?: "Customer"
-                    _userPhone.value = authData.user?.phone.orEmpty()
-                    _authActionState.value = LoadState.Ready(authData)
-                    loadMySchemes()
-                    loadCustomerProfile()
-                    onSuccess()
+                    commitLoginSuccess(authData, "Customer", authData.user?.phone.orEmpty(), onSuccess)
                 } else {
-                    val serverMsg = res.body()?.error?.message ?: extractSafeErrorMessage(res, "Backend rejected Google token.")
-                    android.util.Log.w("RateStackGoogleAuth", "Stage 6 Diagnostic: Backend rejected ID token. HTTP Status=${res.code()} Error Message='$serverMsg'")
+                    val serverMsg = res.body()?.error?.message ?: "Backend rejected Google token."
                     _authActionState.value = LoadState.Error("Backend rejected ID token: $serverMsg")
                 }
             } catch (e: Exception) {
-                android.util.Log.e("RateStackGoogleAuth", "Stage 6 Diagnostic: Exception verifying token with server: ${e.javaClass.simpleName}: ${e.message}")
-                _authActionState.value = LoadState.Error(extractExceptionMessage(e, "Network error during Google authentication."))
+                _authActionState.value = LoadState.Error(e.message ?: "Network error during Google authentication.")
             }
         }
     }
 
     fun loadCustomerProfile() {
-        val token = _userToken.value ?: return
+        val token = _userToken.value ?: repository.getUserToken() ?: return
         viewModelScope.launch {
+            if (com.ratestack.app.BuildConfig.DEBUG) {
+                android.util.Log.d("RateStackSession", "13. Background session validation started | 14. Authorization header attached: Bearer (len=${token.length})")
+            }
             runCatching { ApiProvider.service.getCustomerProfile("Bearer $token") }
                 .onSuccess { response ->
+                    if (com.ratestack.app.BuildConfig.DEBUG) {
+                        android.util.Log.d("RateStackSession", "15. Validation endpoint HTTP status=${response.code()}")
+                    }
                     if (response.isSuccessful && response.body()?.success == true) {
                         _customerProfile.value = response.body()?.data
+                    } else if (response.code() == 401) {
+                        if (com.ratestack.app.BuildConfig.DEBUG) {
+                            android.util.Log.w("RateStackSession", "16. Validation response body error code=401 | 17. Session state changed to EXPIRED")
+                        }
+                        expireSession()
                     }
                 }
+                .onFailure { e ->
+                    if (com.ratestack.app.BuildConfig.DEBUG) {
+                        android.util.Log.w("RateStackSession", "Background session validation network exception (keeping local session): ${e.message}")
+                    }
+                }
+        }
+    }
+
+    fun expireSession() {
+        activeSessionJob?.cancel()
+        _sessionState.value = SessionState.EXPIRED
+        repository.clearUserToken()
+        repository.clearUserDetails()
+        _userToken.value = null
+        _userName.value = null
+        _userPhone.value = null
+        _mySchemes.value = LoadState.Ready(emptyList())
+        _schemeDashboard.value = null
+        _customerProfile.value = null
+    }
+
+    fun logout() {
+        activeSessionJob?.cancel()
+        _sessionState.value = SessionState.UNAUTHENTICATED
+        clearPendingAuthDestination()
+        repository.revokePushToken {
+            repository.clearUserToken()
+            repository.clearUserDetails()
+            _userToken.value = null
+            _userName.value = null
+            _userPhone.value = null
+            _mySchemes.value = LoadState.Ready(emptyList())
+            _schemeDashboard.value = null
+            _customerProfile.value = null
         }
     }
 
@@ -292,16 +368,7 @@ class SchemeViewModel(
                 if (res.isSuccessful && res.body()?.success == true) {
                     val authData = res.body()?.data
                     if (authData?.token != null) {
-                        repository.saveUserToken(authData.token)
-                        repository.syncPushToken()
-                        repository.saveUserDetails(authData.user?.fullName ?: fullName, authData.user?.phone ?: normalizedPhone)
-                        _userToken.value = authData.token
-                        _userName.value = authData.user?.fullName ?: fullName
-                        _userPhone.value = authData.user?.phone ?: normalizedPhone
-                        _authActionState.value = LoadState.Ready(authData)
-                        loadMySchemes()
-                        loadCustomerProfile()
-                        onSuccess()
+                        commitLoginSuccess(authData, fullName, normalizedPhone, onSuccess)
                     } else if (isEmail && res.body()?.success == true) {
                         _authActionState.value = LoadState.Ready(requireNotNull(authData))
                         onSuccess()
@@ -674,20 +741,9 @@ class SchemeViewModel(
             else -> defaultFallback
         }
     }
-
-    fun logout() {
-        clearPendingAuthDestination()
-        repository.revokePushToken {
-            repository.clearUserToken()
-            repository.clearUserDetails()
-            _userToken.value = null
-            _userName.value = null
-            _userPhone.value = null
-            _mySchemes.value = LoadState.Ready(emptyList())
-            _schemeDashboard.value = null
-        }
-    }
 }
+
+private fun String?.isNull_or_empty(): Boolean = this == null || this.trim().isEmpty()
 
 private fun <T> RepositoryResult<T>.toLoadState(): LoadState<T> = when (this) {
     is RepositoryResult.Success -> LoadState.Ready(data, fromCache, warning)

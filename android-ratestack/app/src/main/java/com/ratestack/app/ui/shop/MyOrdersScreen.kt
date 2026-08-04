@@ -18,6 +18,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import com.ratestack.app.BuildConfig
+import com.ratestack.app.ui.schemes.SessionState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -42,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
-import com.ratestack.app.BuildConfig
 import com.ratestack.app.data.ApiProvider
 import com.ratestack.app.data.CustomerDashboardDto
 import com.ratestack.app.data.DashboardOrderDto
@@ -70,6 +72,7 @@ internal data class TrackBadge(val icon: String, val label: String)
 @Composable
 fun MyOrdersScreen(
     token: String?,
+    sessionState: SessionState = SessionState.AUTHENTICATED,
     onLogin: () -> Unit,
     onRegister: () -> Unit,
     onGoogleLogin: () -> Unit,
@@ -78,8 +81,23 @@ fun MyOrdersScreen(
     onTrackOrder: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
 ) {
-    if (token.isNullOrBlank()) {
+    if (sessionState == SessionState.RESTORING) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            Text("Restoring session...", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 16.dp))
+        }
+        return
+    }
+
+    if (sessionState == SessionState.UNAUTHENTICATED || sessionState == SessionState.EXPIRED || token.isNullOrBlank()) {
         LaunchedEffect(Unit) {
+            if (BuildConfig.DEBUG) {
+                android.util.Log.d("RateStackNavigation", "19. Login redirect caller: MyOrdersScreen (sessionState=$sessionState)")
+            }
             onLogin()
         }
         return
@@ -94,13 +112,27 @@ fun MyOrdersScreen(
     fun refresh() {
         if (token.isBlank()) return
         scope.launch {
+            if (BuildConfig.DEBUG) {
+                android.util.Log.d("RateStackSession", "12. Dashboard destination displayed | Dashboard data fetch starting")
+            }
             runCatching { ApiProvider.service.getCustomerDashboard("Bearer $token") }
                 .onSuccess { response ->
-                    if (response.isSuccessful) dashboard = response.body()?.data
-                    else if (response.code() == 401) onLogout()
-                    else error = ApiProvider.errorMessage(response, "Unable to load your Dashboard.")
+                    if (response.isSuccessful) {
+                        dashboard = response.body()?.data
+                        error = null
+                    } else if (response.code() == 401) {
+                        val errorCode = ApiProvider.errorMessage(response, "UNAUTHORIZED")
+                        if (BuildConfig.DEBUG) {
+                            android.util.Log.w("RateStackSession", "16. Dashboard endpoint error code=$errorCode | Calling onLogout()")
+                        }
+                        onLogout()
+                    } else {
+                        error = ApiProvider.errorMessage(response, "Unable to load your Dashboard.")
+                    }
                 }
-                .onFailure { error = "Unable to load your Dashboard." }
+                .onFailure { e ->
+                    error = "Unable to connect: ${e.message ?: "Network error"}"
+                }
         }
     }
 

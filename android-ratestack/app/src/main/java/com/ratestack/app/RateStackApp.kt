@@ -181,6 +181,9 @@ fun RateStackApp(
     fun navigateAfterCustomerAuth(authRoute: String = Routes.CUSTOMER_LOGIN) {
         val pendingJoinPlanId = schemeViewModel.pendingJoinPlanId.value
         if (!pendingJoinPlanId.isNullOrBlank()) {
+            if (BuildConfig.DEBUG) {
+                android.util.Log.d("RateStackNavigation", "11. Dashboard navigation requested -> scheme_join/$pendingJoinPlanId")
+            }
             navController.navigate("scheme_join/${android.net.Uri.encode(pendingJoinPlanId)}") {
                 popUpTo(authRoute) { inclusive = true }
                 launchSingleTop = true
@@ -193,9 +196,15 @@ fun RateStackApp(
             AuthDestinationType.SHOP, AuthDestinationType.CHECKOUT -> Routes.SCHEMES
             else -> Routes.SCHEMES
         }
+        if (BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackNavigation", "11. Dashboard navigation requested -> destination route=$route")
+        }
         navController.navigate(route) {
             popUpTo(authRoute) { inclusive = true }
             launchSingleTop = true
+        }
+        if (BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackNavigation", "20. Navigation route after redirect -> currentDestination=${navController.currentDestination?.route}")
         }
         if (pending?.type != AuthDestinationType.CHECKOUT) schemeViewModel.clearPendingAuthDestination()
     }
@@ -614,8 +623,10 @@ fun RateStackApp(
                 }
                 composable(Routes.MY_ORDERS) {
                     val userToken by schemeViewModel.userToken.collectAsState()
+                    val sessionState by schemeViewModel.sessionState.collectAsState()
                     com.ratestack.app.ui.shop.MyOrdersScreen(
                         token = userToken,
+                        sessionState = sessionState,
                         onLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) },
                         onRegister = { schemeViewModel.requireAuthentication(PendingAuthDestination(AuthDestinationType.DASHBOARD)); navController.navigate(Routes.CUSTOMER_REGISTER) },
                         onGoogleLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) },

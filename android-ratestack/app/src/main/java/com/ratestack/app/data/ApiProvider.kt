@@ -30,6 +30,15 @@ private fun JsonElement?.stringOrNull(): String? = runCatching {
     this?.takeUnless { it.isJsonNull }?.asString?.takeIf { it.isNotBlank() }
 }.getOrNull()
 
+internal fun sanitizeToken(raw: String?): String {
+    if (raw.isNullOrBlank()) return ""
+    var t = raw.trim()
+    while (t.startsWith("Bearer ", ignoreCase = true)) {
+        t = t.substring(7).trim()
+    }
+    return t.removeSurrounding("\"").removeSurrounding("'").trim()
+}
+
 object ApiProvider {
     @Volatile private var tokenProvider: (() -> String?)? = null
 
@@ -43,19 +52,50 @@ object ApiProvider {
             .client(
                 OkHttpClient.Builder()
                     .addInterceptor { chain ->
-                        val requestBuilder = chain.request().newBuilder()
+                        val originalRequest = chain.request()
+                        var finalAuth = originalRequest.header("Authorization")?.trim()
+
+                        if (finalAuth.isNullOrBlank() || finalAuth.equals("Bearer", ignoreCase = true) || finalAuth.equals("Bearer ", ignoreCase = true)) {
+                            val token = tokenProvider?.invoke()
+                            val cleanToken = sanitizeToken(token)
+                            if (cleanToken.isNotBlank()) {
+                                finalAuth = "Bearer $cleanToken"
+                            }
+                        } else {
+                            var clean = finalAuth.orEmpty()
+                            while (clean.startsWith("Bearer ", ignoreCase = true)) {
+                                clean = clean.substring(7).trim()
+                            }
+                            clean = clean.removeSurrounding("\"").removeSurrounding("'").trim()
+                            finalAuth = if (clean.isNotBlank()) "Bearer $clean" else null
+                        }
+
+                        val requestBuilder = originalRequest.newBuilder()
                             .header("X-RateStack-Platform", "ANDROID")
                             .header("X-RateStack-App-Version", BuildConfig.VERSION_NAME)
 
-                        val existingAuth = chain.request().header("Authorization")
-                        if (existingAuth.isNullOrBlank()) {
-                            val token = tokenProvider?.invoke()
-                            if (!token.isNullOrBlank()) {
-                                requestBuilder.header("Authorization", "Bearer ${token.trim()}")
+                        if (!finalAuth.isNullOrBlank()) {
+                            requestBuilder.header("Authorization", finalAuth)
+                        }
+
+                        var response = chain.proceed(requestBuilder.build())
+
+                        // Follow domain redirects (e.g., HTTP 301/302/307/308) while preserving Authorization header
+                        if ((response.code == 301 || response.code == 302 || response.code == 307 || response.code == 308) && !finalAuth.isNullOrBlank()) {
+                            val location = response.header("Location")
+                            if (!location.isNullOrBlank()) {
+                                response.close()
+                                val redirectRequest = originalRequest.newBuilder()
+                                    .url(location)
+                                    .header("X-RateStack-Platform", "ANDROID")
+                                    .header("X-RateStack-App-Version", BuildConfig.VERSION_NAME)
+                                    .header("Authorization", finalAuth)
+                                    .build()
+                                response = chain.proceed(redirectRequest)
                             }
                         }
 
-                        chain.proceed(requestBuilder.build())
+                        response
                     }
                     .connectTimeout(10, TimeUnit.SECONDS)
                     .readTimeout(15, TimeUnit.SECONDS)

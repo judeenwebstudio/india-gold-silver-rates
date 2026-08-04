@@ -15,13 +15,13 @@ fun quotedBuildConfig(value: String): String =
     "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 val websiteUrl = providers.gradleProperty("RATESTACK_WEBSITE_URL")
-    .orElse("https://ratestack.in")
+    .orElse("https://www.ratestack.in")
     .get()
 val trustedHost = providers.gradleProperty("RATESTACK_TRUSTED_HOST")
-    .orElse(URI(websiteUrl).host ?: "ratestack.in")
+    .orElse(URI(websiteUrl).host ?: "www.ratestack.in")
     .get()
 val privacyPolicyUrl = providers.gradleProperty("RATESTACK_PRIVACY_POLICY_URL")
-    .orElse("https://ratestack.in/privacy-policy")
+    .orElse("https://www.ratestack.in/privacy-policy")
     .get()
 fun findEnvProperty(key: String): String? {
     val envFiles = listOf(

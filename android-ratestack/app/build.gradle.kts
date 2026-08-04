@@ -142,6 +142,7 @@ android {
         getByName("debug") {
             isMinifyEnabled = false
             manifestPlaceholders["crashlyticsCollectionEnabled"] = false
+            buildConfigField("boolean", "ENABLE_VIDEO_SPLASH", "true")
         }
 
         getByName("release") {
@@ -149,6 +150,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             manifestPlaceholders["crashlyticsCollectionEnabled"] = true
+            buildConfigField("boolean", "ENABLE_VIDEO_SPLASH", "false")
             signingConfig = if (releaseSigningConfigured) {
                 signingConfigs.getByName("release")
             } else {

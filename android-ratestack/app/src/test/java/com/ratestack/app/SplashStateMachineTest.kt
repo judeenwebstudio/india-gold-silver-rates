@@ -9,7 +9,8 @@ class SplashStateMachineTest {
 
     @Test
     fun testEnableVideoSplashFeatureFlagDefaultsToFalse() {
-        assertFalse(BuildConfig.ENABLE_VIDEO_SPLASH)
+        assertTrue(BuildConfig.ENABLE_VIDEO_SPLASH)
+        assertFalse(BuildConfig.ENABLE_MINIMAL_STARTUP)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.ratestack.app.data
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
@@ -20,6 +21,11 @@ data class CustomerSession(
     val email: String? = null,
 )
 
+internal fun isExplicitSessionExpiryCode(code: String?): Boolean =
+    code.equals("INVALID_TOKEN", ignoreCase = true) ||
+        code.equals("TOKEN_EXPIRED", ignoreCase = true) ||
+        code.equals("SESSION_EXPIRED", ignoreCase = true)
+
 sealed interface SessionState {
     data object Restoring : SessionState
     data class Authenticated(
@@ -30,6 +36,7 @@ sealed interface SessionState {
     data object Expired : SessionState
 }
 
+@SuppressLint("ApplySharedPref", "UseKtx")
 class SessionRepository(
     private val context: Context,
 ) {
@@ -67,6 +74,7 @@ class SessionRepository(
             val customer = CustomerSession(id = id, fullName = name, phone = phone.orEmpty(), email = email)
             val newState = SessionState.Authenticated(token, customer)
             _sessionState.value = newState
+            SessionLogger.logStateChange(prevState, newState, "SessionRepository.restoreSession", token)
 
             SessionLogger.logSessionMutation(
                 action = "restoreSession -> Authenticated",
@@ -79,6 +87,7 @@ class SessionRepository(
         } else {
             val newState = SessionState.Unauthenticated
             _sessionState.value = newState
+            SessionLogger.logStateChange(prevState, newState, "SessionRepository.restoreSession", token)
 
             SessionLogger.logSessionMutation(
                 action = "restoreSession -> Unauthenticated",
@@ -115,6 +124,7 @@ class SessionRepository(
         if (isVerified) {
             val newState = SessionState.Authenticated(token.trim(), customer)
             _sessionState.value = newState
+            SessionLogger.logStateChange(prevState, newState, "SessionRepository.completeLogin", token)
 
             SessionLogger.logSessionMutation(
                 action = "completeLogin -> Authenticated",
@@ -154,6 +164,7 @@ class SessionRepository(
 
         val newState = SessionState.Unauthenticated
         _sessionState.value = newState
+        SessionLogger.logStateChange(prevState, newState, "SessionRepository.logout", currentToken)
 
         SessionLogger.logSessionMutation(
             action = "logout -> Unauthenticated",
@@ -183,6 +194,7 @@ class SessionRepository(
 
         val newState = SessionState.Expired
         _sessionState.value = newState
+        SessionLogger.logStateChange(prevState, newState, "SessionRepository.expireSession", currentToken)
 
         SessionLogger.logSessionMutation(
             action = "expireSession -> Expired",
@@ -207,6 +219,7 @@ class SessionRepository(
             runCatching {
                 api.getCustomerProfile("Bearer ${currentState.token}")
             }.onSuccess { response ->
+                SessionLogger.recordApiStatus(response.code(), "session validation")
                 if (generationId.get() != currentGen) {
                     if (BuildConfig.DEBUG) {
                         Log.d("RateStackSession", "Ignored validation result from stale session generation (staleGen=$currentGen, activeGen=${generationId.get()})")
@@ -225,12 +238,12 @@ class SessionRepository(
                         }.commit()
                     }
                 } else if (response.code() == 401) {
-                    val errorPayload = ApiProvider.errorMessage(response, "UNAUTHORIZED")
-                    if (errorPayload.contains("INVALID_TOKEN", true) || errorPayload.contains("TOKEN_EXPIRED", true) || errorPayload.contains("Authentication required", true)) {
+                    val error = ApiProvider.errorInfo(response)
+                    if (isExplicitSessionExpiryCode(error.code)) {
                         Log.w("RateStackSession", "Confirmed 401 token expiry from backend. Expiring session.")
-                        expireSession(401, errorPayload)
+                        expireSession(401, error.code ?: "TOKEN_EXPIRED")
                     } else {
-                        Log.w("RateStackSession", "401 response without token expiry code. Keeping local session.")
+                        Log.w("RateStackSession", "401 response without a structured token-expiry code. Keeping local session.")
                     }
                 } else {
                     Log.d("RateStackSession", "Validation API returned status=${response.code()}. Keeping local authenticated session.")

@@ -69,10 +69,12 @@ internal fun displayStatus(raw: String?): String? {
 
 internal data class TrackBadge(val icon: String, val label: String)
 
+internal fun shouldRedirectMyOrdersToLogin(sessionState: SessionState): Boolean =
+    sessionState is SessionState.Unauthenticated || sessionState is SessionState.Expired
+
 @Composable
 fun MyOrdersScreen(
     sessionState: SessionState,
-    token: String?,
     onLogin: () -> Unit,
     onRegister: () -> Unit = {},
     onGoogleLogin: () -> Unit = {},
@@ -93,20 +95,21 @@ fun MyOrdersScreen(
         return
     }
 
-    if (sessionState is SessionState.Unauthenticated || sessionState is SessionState.Expired || token.isNullOrBlank()) {
-        LaunchedEffect(Unit) {
-            com.ratestack.app.data.SessionLogger.logSessionMutation(
-                action = "navigate to CUSTOMER_LOGIN",
+    if (shouldRedirectMyOrdersToLogin(sessionState)) {
+        LaunchedEffect(sessionState) {
+            com.ratestack.app.data.SessionLogger.logLoginRedirect(
                 callerClass = "MyOrdersScreen",
                 callerMethod = "LaunchedEffect auth guard",
-                currentTokenLength = token?.length ?: 0,
+                currentToken = null,
                 currentSessionState = sessionState,
-                reason = "MyOrdersScreen redirect guard triggered for sessionState=$sessionState tokenLength=${token?.length ?: 0}",
+                reason = "MyOrdersScreen redirect guard triggered for terminal sessionState=$sessionState",
             )
             onLogin()
         }
         return
     }
+
+    val token = (sessionState as SessionState.Authenticated).token
 
     var dashboard by remember { mutableStateOf<CustomerDashboardDto?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -157,7 +160,7 @@ fun MyOrdersScreen(
         }
     }
 
-    LaunchedEffect(token) { refresh() }
+    LaunchedEffect(sessionState) { refresh() }
     val data = dashboard
 
     LazyColumn(

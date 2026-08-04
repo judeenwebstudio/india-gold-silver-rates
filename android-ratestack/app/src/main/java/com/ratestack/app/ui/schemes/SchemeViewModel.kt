@@ -192,7 +192,6 @@ class SchemeViewModel(
             viewModelScope.launch {
                 runCatching { repository.syncPushToken() }
                 runCatching { loadMySchemes() }
-                runCatching { sessionRepository.validateSessionWithBackend(ApiProvider.service) }
             }
             onSuccess()
         } else {
@@ -213,6 +212,7 @@ class SchemeViewModel(
                     "password" to pass,
                 )
                 val res = ApiProvider.service.loginUser(body)
+                com.ratestack.app.data.SessionLogger.recordApiStatus(res.code(), "customer login")
 
                 if (com.ratestack.app.BuildConfig.DEBUG) {
                     android.util.Log.d(
@@ -246,6 +246,7 @@ class SchemeViewModel(
             }
             try {
                 val res = ApiProvider.service.googleSignIn(mapOf("idToken" to idToken))
+                com.ratestack.app.data.SessionLogger.recordApiStatus(res.code(), "Google login")
                 val authData = res.body()?.data
                 if (com.ratestack.app.BuildConfig.DEBUG) {
                     android.util.Log.d("RateStackAuth", "2. Google Login API response status: ${res.code()} | Success: ${res.body()?.success}")

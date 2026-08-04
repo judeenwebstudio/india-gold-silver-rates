@@ -3,14 +3,34 @@ package com.ratestack.app.data
 import android.util.Log
 import com.ratestack.app.BuildConfig
 import com.google.gson.Gson
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
+data class ApiErrorInfo(
+    val code: String?,
+    val message: String?,
+)
+
+internal fun parseApiErrorInfo(rawBody: String?): ApiErrorInfo {
+    val payload = runCatching {
+        rawBody?.let { Gson().fromJson(it, JsonObject::class.java) }
+    }.getOrNull()
+    val error = payload?.getAsJsonObject("error")
+    return ApiErrorInfo(
+        code = (error?.get("code") ?: payload?.get("code")).stringOrNull(),
+        message = (error?.get("message") ?: payload?.get("message")).stringOrNull(),
+    )
+}
+
+private fun JsonElement?.stringOrNull(): String? = runCatching {
+    this?.takeUnless { it.isJsonNull }?.asString?.takeIf { it.isNotBlank() }
+}.getOrNull()
+
 object ApiProvider {
-    private val gson = Gson()
     @Volatile private var tokenProvider: (() -> String?)? = null
 
     fun setTokenProvider(provider: () -> String?) {
@@ -47,14 +67,13 @@ object ApiProvider {
             .create(RateStackApi::class.java)
     }
 
+    fun errorInfo(response: retrofit2.Response<*>): ApiErrorInfo {
+        val error = parseApiErrorInfo(runCatching { response.errorBody()?.string() }.getOrNull())
+        Log.w("RateStackApi", "request failed status=${response.code()} code=${error.code ?: "UNKNOWN"}")
+        return error
+    }
+
     fun errorMessage(response: retrofit2.Response<*>, fallback: String): String {
-        val payload = runCatching {
-            response.errorBody()?.string()?.let { gson.fromJson(it, JsonObject::class.java) }
-        }.getOrNull()
-        val error = payload?.getAsJsonObject("error")
-        val code = error?.get("code")?.asString
-        val message = error?.get("message")?.asString
-        Log.w("RateStackApi", "request failed status=${response.code()} code=${code ?: "UNKNOWN"}")
-        return message?.takeIf { it.isNotBlank() } ?: fallback
+        return errorInfo(response).message ?: fallback
     }
 }

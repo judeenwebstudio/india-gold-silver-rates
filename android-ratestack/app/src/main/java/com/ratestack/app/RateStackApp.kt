@@ -78,6 +78,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -127,6 +128,7 @@ import com.ratestack.app.ui.components.PriceDeltaBadge
 import com.ratestack.app.ui.components.ProminentGoldHeroCard
 import com.ratestack.app.ui.components.SilverRateCard
 import com.ratestack.app.ui.components.SkeletonListCard
+import com.ratestack.app.ui.settings.SessionDebugPanel
 import com.ratestack.app.ui.components.SkeletonMarketCard
 import com.ratestack.app.ui.components.formatInr
 import kotlinx.coroutines.delay
@@ -174,14 +176,39 @@ fun RateStackApp(
 
     val navController = rememberNavController()
 
+    DisposableEffect(navController) {
+        var previousRoute: String? = null
+        val listener = androidx.navigation.NavController.OnDestinationChangedListener { controller, destination, _ ->
+            val currentRoute = destination.route
+            val stack = listOfNotNull(previousRoute, currentRoute).joinToString(" -> ")
+            com.ratestack.app.data.SessionLogger.logNavigation(
+                previous = previousRoute,
+                current = currentRoute,
+                next = currentRoute,
+                backStack = stack,
+            )
+            previousRoute = currentRoute
+        }
+        navController.addOnDestinationChangedListener(listener)
+        onDispose { navController.removeOnDestinationChangedListener(listener) }
+    }
+
+    fun traceLoginRedirect(callerMethod: String, reason: String) {
+        com.ratestack.app.data.SessionLogger.logLoginRedirect(
+            callerClass = "RateStackApp",
+            callerMethod = callerMethod,
+            currentToken = schemeViewModel.userToken.value,
+            currentSessionState = schemeViewModel.sessionState.value,
+            reason = reason,
+        )
+    }
+
     fun openCustomerLogin(destination: PendingAuthDestination) {
-        val currentTokenLen = schemeViewModel.userToken.value?.length ?: 0
         val currentState = schemeViewModel.sessionState.value
-        com.ratestack.app.data.SessionLogger.logSessionMutation(
-            action = "navigate to CUSTOMER_LOGIN",
+        com.ratestack.app.data.SessionLogger.logLoginRedirect(
             callerClass = "RateStackApp",
             callerMethod = "openCustomerLogin",
-            currentTokenLength = currentTokenLen,
+            currentToken = schemeViewModel.userToken.value,
             currentSessionState = currentState,
             reason = "openCustomerLogin invoked for destination type: ${destination.type}",
         )
@@ -435,7 +462,10 @@ fun RateStackApp(
                         onRegisterSubmit = { fullName, phone, pass ->
                             schemeViewModel.register(fullName, phone, pass) {
                                 schemeViewModel.resetAuthActionState()
-                                if (schemeViewModel.userToken.value.isNullOrBlank()) navController.navigate(Routes.CUSTOMER_LOGIN) { popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }; launchSingleTop = true }
+                                if (schemeViewModel.userToken.value.isNullOrBlank()) {
+                                    traceLoginRedirect("CustomerRegisterScreen.onRegisterSubmit", "Registration completed without an authenticated token")
+                                    navController.navigate(Routes.CUSTOMER_LOGIN) { popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }; launchSingleTop = true }
+                                }
                                 else navigateAfterCustomerAuth(Routes.CUSTOMER_REGISTER)
                             }
                         },
@@ -447,6 +477,7 @@ fun RateStackApp(
                         },
                         onNavigateLogin = {
                             schemeViewModel.resetAuthActionState()
+                            traceLoginRedirect("CustomerRegisterScreen.onNavigateLogin", "Customer explicitly selected Login from Register")
                             navController.navigate(Routes.CUSTOMER_LOGIN) {
                                 popUpTo(Routes.CUSTOMER_REGISTER) { inclusive = true }
                             }
@@ -505,6 +536,7 @@ fun RateStackApp(
                         errorMessage = errorMsg,
                         onResetPasswordSubmit = { newPass ->
                             schemeViewModel.resetPassword(newPass) {
+                                traceLoginRedirect("ResetPasswordScreen.onResetPasswordSubmit", "Password reset completed; customer must sign in again")
                                 navController.navigate(Routes.CUSTOMER_LOGIN) {
                                     popUpTo(Routes.CUSTOMER_LOGIN) { inclusive = true }
                                 }
@@ -633,11 +665,9 @@ fun RateStackApp(
                     }
                 }
                 composable(Routes.MY_ORDERS) {
-                    val userToken by schemeViewModel.userToken.collectAsState()
                     val sessionState by sessionRepository.sessionState.collectAsState()
                     com.ratestack.app.ui.shop.MyOrdersScreen(
                         sessionState = sessionState,
-                        token = userToken,
                         onLogin = { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) },
                         onLogout = { schemeViewModel.logout() },
                         onShop = { navController.navigate(Routes.SCHEMES) },
@@ -1638,6 +1668,11 @@ private fun SettingsScreen(
                         },
                     )
                 }
+            }
+
+            // Category: About & Legal
+            if (BuildConfig.DEBUG) {
+                item { SessionDebugPanel() }
             }
 
             // Category: About & Legal

@@ -299,6 +299,16 @@ class SchemeViewModel(
     }
 
     fun expireSession() {
+        val currentTokenLen = _userToken.value?.length ?: 0
+        com.ratestack.app.data.SessionLogger.logSessionMutation(
+            action = "expireSession / set SessionState.EXPIRED",
+            callerClass = "SchemeViewModel",
+            callerMethod = "expireSession",
+            currentTokenLength = currentTokenLen,
+            currentSessionState = SessionState.EXPIRED,
+            reason = "Session expired due to confirmed 401 token invalidity",
+            httpStatus = 401,
+        )
         activeSessionJob?.cancel()
         _sessionState.value = SessionState.EXPIRED
         repository.clearUserToken()
@@ -312,6 +322,15 @@ class SchemeViewModel(
     }
 
     fun logout() {
+        val currentTokenLen = _userToken.value?.length ?: 0
+        com.ratestack.app.data.SessionLogger.logSessionMutation(
+            action = "logout / set SessionState.UNAUTHENTICATED",
+            callerClass = "SchemeViewModel",
+            callerMethod = "logout",
+            currentTokenLength = currentTokenLen,
+            currentSessionState = SessionState.UNAUTHENTICATED,
+            reason = "User requested explicit logout",
+        )
         activeSessionJob?.cancel()
         _sessionState.value = SessionState.UNAUTHENTICATED
         clearPendingAuthDestination()

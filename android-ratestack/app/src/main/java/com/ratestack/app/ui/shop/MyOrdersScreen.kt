@@ -95,9 +95,14 @@ fun MyOrdersScreen(
 
     if (sessionState == SessionState.UNAUTHENTICATED || sessionState == SessionState.EXPIRED || token.isNullOrBlank()) {
         LaunchedEffect(Unit) {
-            if (BuildConfig.DEBUG) {
-                android.util.Log.d("RateStackNavigation", "19. Login redirect caller: MyOrdersScreen (sessionState=$sessionState)")
-            }
+            com.ratestack.app.data.SessionLogger.logSessionMutation(
+                action = "navigate to CUSTOMER_LOGIN",
+                callerClass = "MyOrdersScreen",
+                callerMethod = "LaunchedEffect auth guard",
+                currentTokenLength = token?.length ?: 0,
+                currentSessionState = sessionState,
+                reason = "MyOrdersScreen redirect guard triggered for sessionState=$sessionState tokenLength=${token?.length ?: 0}",
+            )
             onLogin()
         }
         return

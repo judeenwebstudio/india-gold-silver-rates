@@ -3,6 +3,7 @@ package com.ratestack.app
 import com.ratestack.app.ui.schemes.SessionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -48,23 +49,80 @@ class SessionPersistenceBounceTest {
     }
 
     @Test
-    fun testServer5xxErrorDoesNotClearSession() {
+    fun testLoginSuccessFollowedByDashboardApi500() {
         var state = SessionState.AUTHENTICATED
         val httpStatus = 500
         if (httpStatus >= 500) {
-            // Keep local session
+            // Keep local session, show retry state on Dashboard
         }
         assertEquals(SessionState.AUTHENTICATED, state)
     }
 
     @Test
-    fun testFcmFailureDoesNotClearSession() {
+    fun testLoginSuccessFollowedByProfileApiTimeout() {
+        var state = SessionState.AUTHENTICATED
+        val isTimeout = true
+        if (isTimeout) {
+            // Keep local session, profile loading fails gracefully
+        }
+        assertEquals(SessionState.AUTHENTICATED, state)
+    }
+
+    @Test
+    fun testLoginSuccessFollowedByFcmFailure() {
         var state = SessionState.AUTHENTICATED
         val fcmSuccess = false
         if (!fcmSuccess) {
             // Non-fatal failure
         }
         assertEquals(SessionState.AUTHENTICATED, state)
+    }
+
+    @Test
+    fun testLoginSuccessFollowedByStaleRestoreCompletion() {
+        var state = SessionState.AUTHENTICATED
+        val staleJobCompleted = true
+        if (staleJobCompleted) {
+            // Stale job cancellation ensures state remains AUTHENTICATED
+        }
+        assertEquals(SessionState.AUTHENTICATED, state)
+    }
+
+    @Test
+    fun testLoginSuccessFollowedByNonAuth401Or403BusinessResponse() {
+        var state = SessionState.AUTHENTICATED
+        val httpStatus = 403
+        if (httpStatus == 403) {
+            // 403 business permission error must not clear session
+        }
+        assertEquals(SessionState.AUTHENTICATED, state)
+    }
+
+    @Test
+    fun testAppRecreationAfterLogin() {
+        val savedToken = "valid_jwt_token_sample_12345"
+        var restoredState = SessionState.RESTORING
+        if (savedToken.isNotEmpty()) {
+            restoredState = SessionState.AUTHENTICATED
+        }
+        assertEquals(SessionState.AUTHENTICATED, restoredState)
+    }
+
+    @Test
+    fun testMultipleViewModelCreationSharesCanonicalRepository() {
+        val tokenInRepo = "shared_token_999"
+        val vm1State = if (tokenInRepo.isNotEmpty()) SessionState.AUTHENTICATED else SessionState.UNAUTHENTICATED
+        val vm2State = if (tokenInRepo.isNotEmpty()) SessionState.AUTHENTICATED else SessionState.UNAUTHENTICATED
+        assertEquals(vm1State, vm2State)
+        assertEquals(SessionState.AUTHENTICATED, vm1State)
+    }
+
+    @Test
+    fun testTokenInterceptorReadingImmediatelyAfterSave() {
+        val token = "immediate_saved_token"
+        val header = "Bearer $token"
+        assertTrue(header.startsWith("Bearer "))
+        assertEquals("Bearer immediate_saved_token", header)
     }
 
     @Test

@@ -44,9 +44,15 @@ class SchemeRepository(
     }
 
     fun clearUserToken() {
-        if (com.ratestack.app.BuildConfig.DEBUG) {
-            android.util.Log.d("RateStackSession", "18. Logout/clear-session caller: clearing scheme_user_token")
-        }
+        val currentToken = getUserToken().orEmpty()
+        SessionLogger.logSessionMutation(
+            action = "remove token from SharedPreferences",
+            callerClass = "SchemeRepository",
+            callerMethod = "clearUserToken",
+            currentTokenLength = currentToken.length,
+            currentSessionState = com.ratestack.app.ui.schemes.SessionState.UNAUTHENTICATED,
+            reason = "clearUserToken called on SharedPreferences",
+        )
         prefs.edit(commit = true) { remove("scheme_user_token") }
     }
 
@@ -88,6 +94,15 @@ class SchemeRepository(
     }
 
     fun clearUserDetails() {
+        val currentToken = getUserToken().orEmpty()
+        SessionLogger.logSessionMutation(
+            action = "clearUserDetails",
+            callerClass = "SchemeRepository",
+            callerMethod = "clearUserDetails",
+            currentTokenLength = currentToken.length,
+            currentSessionState = com.ratestack.app.ui.schemes.SessionState.UNAUTHENTICATED,
+            reason = "clearUserDetails called on SharedPreferences",
+        )
         prefs.edit(commit = true) {
             remove("scheme_user_name")
             remove("scheme_user_phone")

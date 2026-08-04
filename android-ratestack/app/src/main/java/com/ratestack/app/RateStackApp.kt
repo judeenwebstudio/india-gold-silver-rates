@@ -174,6 +174,16 @@ fun RateStackApp(
     val navController = rememberNavController()
 
     fun openCustomerLogin(destination: PendingAuthDestination) {
+        val currentTokenLen = schemeViewModel.userToken.value?.length ?: 0
+        val currentState = schemeViewModel.sessionState.value
+        com.ratestack.app.data.SessionLogger.logSessionMutation(
+            action = "navigate to CUSTOMER_LOGIN",
+            callerClass = "RateStackApp",
+            callerMethod = "openCustomerLogin",
+            currentTokenLength = currentTokenLen,
+            currentSessionState = currentState,
+            reason = "openCustomerLogin invoked for destination type: ${destination.type}",
+        )
         schemeViewModel.requireAuthentication(destination)
         navController.navigate(Routes.CUSTOMER_LOGIN) { launchSingleTop = true }
     }

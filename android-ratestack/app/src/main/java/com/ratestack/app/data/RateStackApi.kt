@@ -35,6 +35,44 @@ interface RateStackApi {
     @GET("api/v1/shop")
     suspend fun getShop(): Response<ApiEnvelope<ShopResponseDto>>
 
+    @GET("api/v1/shop/products/{productId}")
+    suspend fun getProductDetails(
+        @Path("productId") productId: String,
+    ): Response<ApiEnvelope<ShopProductDto>>
+
+    @GET("api/v1/me/wishlist")
+    suspend fun getWishlist(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+    ): Response<ApiEnvelope<List<ShopProductDto>>>
+
+    @POST("api/v1/me/wishlist")
+    suspend fun addToWishlist(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @retrofit2.http.Body body: Map<String, String>,
+    ): Response<ApiEnvelope<Map<String, Any>>>
+
+    @DELETE("api/v1/me/wishlist/{productId}")
+    suspend fun removeFromWishlist(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Path("productId") productId: String,
+    ): Response<ApiEnvelope<Map<String, Any>>>
+
+    @GET("api/v1/me/notifications")
+    suspend fun getNotifications(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+    ): Response<ApiEnvelope<List<Map<String, Any>>>>
+
+    @POST("api/v1/me/notifications/read-all")
+    suspend fun markAllNotificationsRead(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+    ): Response<ApiEnvelope<Map<String, Boolean>>>
+
+    @retrofit2.http.PATCH("api/v1/me/notifications/{id}/read")
+    suspend fun markNotificationRead(
+        @retrofit2.http.Header("Authorization") authHeader: String,
+        @Path("id") id: String,
+    ): Response<ApiEnvelope<Map<String, Boolean>>>
+
     @GET("api/v1/coupons/active")
     suspend fun getActiveCoupons(): Response<ApiEnvelope<List<CouponDto>>>
 

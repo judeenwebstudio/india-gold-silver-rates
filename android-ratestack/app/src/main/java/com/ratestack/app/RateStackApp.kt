@@ -128,12 +128,11 @@ import com.ratestack.app.ui.components.PriceDeltaBadge
 import com.ratestack.app.ui.components.ProminentGoldHeroCard
 import com.ratestack.app.ui.components.SilverRateCard
 import com.ratestack.app.ui.components.SkeletonListCard
-import com.ratestack.app.ui.settings.SessionDebugPanel
 import com.ratestack.app.ui.components.SkeletonMarketCard
 import com.ratestack.app.ui.components.formatInr
+import com.ratestack.app.ui.settings.SessionDebugPanel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
 private object Routes {
     const val HOME = "home"
     const val SCHEMES = "shop"
@@ -152,8 +151,12 @@ private object Routes {
     const val MY_ORDERS = "my_orders"
     const val ORDER_TRACKING = "order_tracking/{orderId}"
     const val SETTINGS = "settings"
+    const val CART = "cart"
+    const val WISHLIST = "wishlist"
+    const val ACCOUNT_SETTINGS = "account_settings"
+    const val SUPPORT = "support"
+    const val NOTIFICATIONS = "notifications"
 }
-
 
 @Composable
 fun RateStackApp(

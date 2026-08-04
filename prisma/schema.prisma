@@ -566,6 +566,8 @@ model SchemeUser {
   notificationPreferences CustomerNotificationPreference?
   rateAlertPreferences RateAlertPreference[]
   notificationOutbox NotificationOutbox[]
+  wishlists          CustomerWishlist[]
+  inboxNotifications CustomerNotification[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -630,6 +632,7 @@ model ShopProduct {
   isActive                  Boolean     @default(true)
   orders                    ShopOrder[]
   costAudits                ProductCostAudit[]
+  wishlists                 CustomerWishlist[]
   createdAt                 DateTime    @default(now())
   updatedAt                 DateTime    @updatedAt
 
@@ -941,6 +944,32 @@ model RateAlertPreference {
 
   @@unique([customerId, metal, alertType, citySlug])
   @@index([metal, alertType, enabled])
+}
+
+model CustomerWishlist {
+  id         String      @id @default(cuid())
+  customerId String
+  productId  String
+  createdAt  DateTime    @default(now())
+  customer   SchemeUser  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product    ShopProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, productId])
+  @@index([customerId])
+}
+
+model CustomerNotification {
+  id         String      @id @default(cuid())
+  customerId String
+  category   String      @default("SYSTEM")
+  title      String
+  message    String
+  deepLink   String?
+  isRead     Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  customer   SchemeUser  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, isRead])
 }
 
 model ProductCostAudit {

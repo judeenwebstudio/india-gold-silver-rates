@@ -136,19 +136,28 @@ fun MyOrdersScreen(
 
             if (BuildConfig.DEBUG) {
                 android.util.Log.d("RateStackDashboard", "FETCH REQUEST DETAILS:")
-                android.util.Log.d("RateStackDashboard", "  URL: $requestUrl")
+                android.util.Log.d("RateStackDashboard", "  Runtime Base URL: ${BuildConfig.WEBSITE_URL.trimEnd('/')}/")
+                android.util.Log.d("RateStackDashboard", "  Request URL: $requestUrl")
                 android.util.Log.d("RateStackDashboard", "  Method: GET")
+                android.util.Log.d("RateStackDashboard", "  Authorization Header Present: YES")
                 android.util.Log.d("RateStackDashboard", "  Authorization: $maskedTokenHeader")
-                android.util.Log.d("RateStackDashboard", "  X-RateStack-Platform: ANDROID")
             }
 
             runCatching { ApiProvider.service.getCustomerDashboard("Bearer $cleanToken") }
                 .onSuccess { response ->
                     val rawErrorBody = if (response.isSuccessful) null else runCatching { response.errorBody()?.string() }.getOrNull()
+                    val rawResponse = response.raw()
+                    val finalUrl = rawResponse.request.url.toString()
+                    val redirectCount = if (rawResponse.priorResponse != null) 1 else 0
+
                     if (BuildConfig.DEBUG) {
                         android.util.Log.d("RateStackDashboard", "FETCH RESPONSE DETAILS:")
-                        android.util.Log.d("RateStackDashboard", "  HTTP Response Code: ${response.code()}")
-                        android.util.Log.d("RateStackDashboard", "  HTTP Response Body: ${response.body() ?: rawErrorBody}")
+                        android.util.Log.d("RateStackDashboard", "  Runtime Base URL: ${BuildConfig.WEBSITE_URL.trimEnd('/')}/")
+                        android.util.Log.d("RateStackDashboard", "  Request URL: $requestUrl")
+                        android.util.Log.d("RateStackDashboard", "  Final URL: $finalUrl")
+                        android.util.Log.d("RateStackDashboard", "  Redirect Count: $redirectCount")
+                        android.util.Log.d("RateStackDashboard", "  Authorization Header Present: YES")
+                        android.util.Log.d("RateStackDashboard", "  HTTP Status: ${response.code()}")
                     }
                     if (response.isSuccessful) {
                         dashboard = response.body()?.data

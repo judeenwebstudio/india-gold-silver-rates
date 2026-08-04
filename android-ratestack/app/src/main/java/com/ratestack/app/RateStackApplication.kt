@@ -15,8 +15,10 @@ class RateStackApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        val runtimeBaseUrl = BuildConfig.WEBSITE_URL.trimEnd('/') + "/"
+        Log.d("RateStackStartup", "RateStack runtime base URL: $runtimeBaseUrl")
         if (BuildConfig.DEBUG) {
-            Log.d("RateStackStartup", "1. Application process started: RateStackApplication.onCreate()")
+            Log.d("RateStackStartup", "1. Application process started: RateStackApplication.onCreate() | Base URL: $runtimeBaseUrl")
         }
 
         sessionRepository = SessionRepository(this)

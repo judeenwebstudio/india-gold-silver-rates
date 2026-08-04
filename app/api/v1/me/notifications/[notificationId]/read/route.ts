@@ -4,7 +4,7 @@ import { authenticateSchemeUserFromRequest } from "@/lib/schemes/user-auth";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { notificationId: string } }
+  context: { params: Promise<{ notificationId: string }> }
 ) {
   try {
     const auth = await authenticateSchemeUserFromRequest(req);
@@ -12,7 +12,7 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, { status: 401 });
     }
 
-    const { notificationId } = params;
+    const { notificationId } = await context.params;
     if (!notificationId) {
       return NextResponse.json({ success: false, error: { code: "BAD_REQUEST", message: "notificationId is required" } }, { status: 400 });
     }

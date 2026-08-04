@@ -3,10 +3,10 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { productId: string } }
+  context: { params: Promise<{ productId: string }> }
 ) {
   try {
-    const { productId } = params;
+    const { productId } = await context.params;
     if (!productId) {
       return NextResponse.json({ success: false, error: { code: "BAD_REQUEST", message: "productId is required" } }, { status: 400 });
     }

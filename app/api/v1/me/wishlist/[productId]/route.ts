@@ -4,7 +4,7 @@ import { authenticateSchemeUserFromRequest } from "@/lib/schemes/user-auth";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { productId: string } }
+  context: { params: Promise<{ productId: string }> }
 ) {
   try {
     const auth = await authenticateSchemeUserFromRequest(req);
@@ -12,7 +12,7 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } }, { status: 401 });
     }
 
-    const { productId } = params;
+    const { productId } = await context.params;
     if (!productId) {
       return NextResponse.json({ success: false, error: { code: "BAD_REQUEST", message: "productId is required" } }, { status: 400 });
     }

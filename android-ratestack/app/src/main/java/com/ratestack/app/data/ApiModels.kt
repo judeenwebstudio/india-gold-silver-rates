@@ -571,6 +571,7 @@ data class SchemeUserDto(
     val email: String?,
     val emailVerified: Boolean? = null,
     val authProvider: String? = null,
+    val googleConnected: Boolean? = null,
     val profileImageUrl: String? = null,
 )
 

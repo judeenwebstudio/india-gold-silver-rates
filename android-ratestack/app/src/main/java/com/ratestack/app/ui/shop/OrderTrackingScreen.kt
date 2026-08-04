@@ -72,7 +72,7 @@ fun OrderTrackingScreen(
 
     fun loadTracking(isManual: Boolean = false) {
         if (token.isNullOrBlank()) {
-            errorMessage = "Authentication required."
+            errorMessage = "Please sign in to track this order."
             isLoading = false
             return
         }

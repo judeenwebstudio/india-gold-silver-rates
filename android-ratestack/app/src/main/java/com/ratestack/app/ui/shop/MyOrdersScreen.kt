@@ -21,6 +21,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import com.ratestack.app.BuildConfig
 import com.ratestack.app.data.SessionState
+import com.ratestack.app.data.parseApiErrorInfo
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -109,7 +110,9 @@ fun MyOrdersScreen(
         return
     }
 
-    val token = (sessionState as SessionState.Authenticated).token
+    val authenticatedSession = sessionState as SessionState.Authenticated
+    val token = authenticatedSession.token
+    val customer = authenticatedSession.customer
 
     var dashboard by remember { mutableStateOf<CustomerDashboardDto?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -125,12 +128,20 @@ fun MyOrdersScreen(
             }
             runCatching { ApiProvider.service.getCustomerDashboard("Bearer $token") }
                 .onSuccess { response ->
+                    val rawErrorBody = if (response.isSuccessful) null else runCatching { response.errorBody()?.string() }.getOrNull()
+                    if (BuildConfig.DEBUG) {
+                        android.util.Log.d("RateStackDashboard", "SessionState=$sessionState")
+                        android.util.Log.d("RateStackDashboard", "Session customer: name=${customer.fullName}, email=${customer.email}, mobile=${customer.phone}, googleConnected=${customer.googleConnected}")
+                        android.util.Log.d("RateStackDashboard", "Dashboard API HTTP code=${response.code()}")
+                        android.util.Log.d("RateStackDashboard", "Dashboard API body=${response.body() ?: rawErrorBody}")
+                    }
                     if (response.isSuccessful) {
                         dashboard = response.body()?.data
                         error = null
                     } else {
-                        // DO NOT CALL ONLOGOUT HERE FOR ANY API FAILURE!
-                        error = ApiProvider.errorMessage(response, "Unable to load your Dashboard.")
+                        val apiError = parseApiErrorInfo(rawErrorBody)
+                        if (BuildConfig.DEBUG) android.util.Log.d("RateStackDashboard", "Dashboard API error code=${apiError.code}, message=${apiError.message}")
+                        error = "Dashboard details are temporarily unavailable (HTTP ${response.code()}). Your session remains active."
                     }
                 }
                 .onFailure { e ->
@@ -172,7 +183,7 @@ fun MyOrdersScreen(
             Surface(color = Color(0xFF1C1917), shape = MaterialTheme.shapes.extraLarge, border = BorderStroke(1.dp, Color(0x55E2AD3D))) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("MY DASHBOARD", color = Color(0xFFF5C96A), fontWeight = FontWeight.Black)
-                    Text("Welcome, ${data?.customer?.fullName ?: "Customer"}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White)
+                    Text("Welcome, ${customer.fullName}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = Color.White)
                     Text("Orders, deliveries, addresses and account settings in one premium space.", color = Color(0xFFD6D3D1))
                     OutlinedButton(onLogout) { Text("Logout") }
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -199,9 +210,12 @@ fun MyOrdersScreen(
                     }
                 }
             ) {
-                Text(data?.customer?.fullName.orEmpty(), fontWeight = FontWeight.Black)
-                Text("${data?.customer?.phone ?: "No mobile"} • ${data?.customer?.email ?: "No email"}")
-                Text("Google Sign-In: ${if (data?.customer?.googleConnected == true) "Connected" else "Not connected"}")
+                Text(customer.fullName, fontWeight = FontWeight.Black)
+                customer.phone.takeIf { it.isNotBlank() }?.let { Text("Mobile: $it") }
+                customer.email?.takeIf { it.isNotBlank() }?.let { Text("Email: $it") }
+                customer.googleConnected?.let { connected ->
+                    Text("Google Sign-In: ${if (connected) "Connected" else "No linked Google account"}")
+                }
             }
         }
 
@@ -265,7 +279,7 @@ fun MyOrdersScreen(
                     val helpIntent = Intent(Intent.ACTION_SENDTO).apply {
                         setData("mailto:info@ratestack.in".toUri())
                         putExtra(Intent.EXTRA_SUBJECT, "RateStack Order Help: #${order.orderNumber} (${order.id})")
-                        putExtra(Intent.EXTRA_TEXT, "Hello RateStack Support Team,\n\nI need assistance with my order:\nOrder Number: #${order.orderNumber}\nOrder ID: ${order.id}\nProduct: ${order.productName}\nPayment Status: ${order.paymentStatus}\n\nCustomer: ${data?.customer?.fullName}\nPhone: ${data?.customer?.phone}\n\nDetails:\n")
+                        putExtra(Intent.EXTRA_TEXT, "Hello RateStack Support Team,\n\nI need assistance with my order:\nOrder Number: #${order.orderNumber}\nOrder ID: ${order.id}\nProduct: ${order.productName}\nPayment Status: ${order.paymentStatus}\n\nCustomer: ${customer.fullName}\nPhone: ${customer.phone}\n\nDetails:\n")
                     }
                     context.startActivity(Intent.createChooser(helpIntent, "Contact RateStack Support"))
                 },
@@ -276,7 +290,7 @@ fun MyOrdersScreen(
             DashboardSection(
                 title = "Saved Addresses",
                 action = {
-                    Button({ editing = ShopAddressDto(fullName = data?.customer?.fullName.orEmpty(), mobile = data?.customer?.phone.orEmpty(), addressLine1 = "", city = "", district = "", state = "", pincode = "") }) {
+                    Button({ editing = ShopAddressDto(fullName = customer.fullName, mobile = customer.phone, addressLine1 = "", city = "", district = "", state = "", pincode = "") }) {
                         Text("+ Add Address", fontWeight = FontWeight.Bold)
                     }
                 }

@@ -40,6 +40,7 @@ export async function POST(request: Request) {
         ],
         isActive: true,
       },
+      include: { authAccounts: { select: { provider: true } } },
     });
 
     if (!user) {
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
           fullName: user.fullName,
           phone: user.phone,
           email: user.email,
+          googleConnected: user.authAccounts.some((account) => account.provider === 'GOOGLE'),
         },
       },
     });

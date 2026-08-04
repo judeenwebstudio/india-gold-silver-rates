@@ -56,14 +56,27 @@ export function verifySchemeToken(token: string): SchemeAuthTokenPayload | null 
 }
 
 export async function authenticateSchemeUserFromRequest(request: Request): Promise<SchemeAuthTokenPayload | null> {
-  const authHeader = request.headers.get('Authorization');
-  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
-  const cookieToken = request.headers.get('cookie')
+  const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+  let bearer = '';
+  if (authHeader) {
+    const trimmed = authHeader.trim();
+    if (/^Bearer\s+/i.test(trimmed)) {
+      bearer = trimmed.replace(/^Bearer\s+/i, '').trim();
+    } else if (!trimmed.includes(' ')) {
+      bearer = trimmed;
+    }
+  }
+
+  const cookieHeader = request.headers.get('cookie') || request.headers.get('Cookie');
+  const cookieToken = cookieHeader
     ?.split(';')
     .map((part) => part.trim())
     .find((part) => part.startsWith('ratestack_scheme_session='))
     ?.slice('ratestack_scheme_session='.length);
-  const token = bearer || (cookieToken ? decodeURIComponent(cookieToken) : '');
+
+  const rawToken = bearer || (cookieToken ? decodeURIComponent(cookieToken) : '');
+  const token = rawToken.replace(/^"|"$/g, '').trim();
+
   if (!token) return null;
   return verifySchemeToken(token);
 }

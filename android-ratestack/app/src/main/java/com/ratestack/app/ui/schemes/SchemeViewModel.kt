@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.ratestack.app.LoadState
 import com.ratestack.app.data.ApiProvider
 import com.ratestack.app.data.AuthResponseDto
-import com.ratestack.app.data.CustomerProfileDto
 import com.ratestack.app.data.PaymentOrderResponseDto
 import com.ratestack.app.data.PendingAuthDestination
 import com.ratestack.app.data.RedemptionQuotationDto
@@ -17,6 +16,7 @@ import com.ratestack.app.data.SchemeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 import com.ratestack.app.data.CustomerSession
@@ -70,9 +70,6 @@ class SchemeViewModel(
     private val _authActionState = MutableStateFlow<LoadState<AuthResponseDto>?>(null)
     val authActionState: StateFlow<LoadState<AuthResponseDto>?> = _authActionState.asStateFlow()
 
-    private val _customerProfile = MutableStateFlow<CustomerProfileDto?>(null)
-    val customerProfile: StateFlow<CustomerProfileDto?> = _customerProfile.asStateFlow()
-
     private val _paymentOrderState = MutableStateFlow<LoadState<PaymentOrderResponseDto>?>(null)
     val paymentOrderState: StateFlow<LoadState<PaymentOrderResponseDto>?> = _paymentOrderState.asStateFlow()
 
@@ -94,8 +91,8 @@ class SchemeViewModel(
     init {
         loadSchemePlans()
         viewModelScope.launch {
-            sessionRepository.sessionState.collect { state ->
-                if (state is SessionState.Authenticated) {
+            sessionRepository.sessionState.map { it is SessionState.Authenticated }.distinctUntilChanged().collect { authenticated ->
+                if (authenticated) {
                     loadMySchemes()
                     loadCustomerProfile()
                 }
@@ -151,7 +148,7 @@ class SchemeViewModel(
     fun loadSchemeDashboard(enrollmentId: String) {
         val token = userToken.value
         if (token.isNullOrEmpty()) {
-            _schemeDashboard.value = LoadState.Error("Authentication required")
+            _schemeDashboard.value = LoadState.Error("Please sign in to continue.")
             return
         }
         viewModelScope.launch {
@@ -183,7 +180,12 @@ class SchemeViewModel(
             fullName = user?.fullName ?: fallbackName,
             phone = user?.phone ?: fallbackPhone,
             email = user?.email,
+            googleConnected = user?.googleConnected ?: user?.authProvider.equals("GOOGLE", ignoreCase = true),
         )
+
+        if (com.ratestack.app.BuildConfig.DEBUG) {
+            android.util.Log.d("RateStackDashboard", "Login customer: id=${customer.id}, name=${customer.fullName}, email=${customer.email}, mobile=${customer.phone}, googleConnected=${customer.googleConnected}")
+        }
 
         val success = sessionRepository.completeLogin(token, customer)
 
@@ -271,7 +273,6 @@ class SchemeViewModel(
         sessionRepository.expireSession()
         _mySchemes.value = LoadState.Ready(emptyList())
         _schemeDashboard.value = null
-        _customerProfile.value = null
     }
 
     fun logout() {
@@ -280,7 +281,6 @@ class SchemeViewModel(
             sessionRepository.logout()
             _mySchemes.value = LoadState.Ready(emptyList())
             _schemeDashboard.value = null
-            _customerProfile.value = null
         }
     }
 
@@ -355,8 +355,8 @@ class SchemeViewModel(
     ) {
         val token = repository.getUserToken()
         if (token.isNull_or_empty()) {
-            _joinSchemeActionState.value = LoadState.Error("Authentication required")
-            onError("Authentication required")
+            _joinSchemeActionState.value = LoadState.Error("Please sign in to continue.")
+            onError("Please sign in to continue.")
             return
         }
         viewModelScope.launch {
@@ -425,7 +425,7 @@ class SchemeViewModel(
     ) {
         val token = repository.getUserToken()
         if (token.isNull_or_empty()) {
-            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Authentication required")
+            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Please sign in to continue.")
             return
         }
 
@@ -515,7 +515,7 @@ class SchemeViewModel(
     ) {
         val token = repository.getUserToken()
         if (token.isNull_or_empty()) {
-            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Authentication required")
+            _paymentFlowState.value = com.ratestack.app.data.PaymentActionState.Error("Please sign in to continue.")
             return
         }
 

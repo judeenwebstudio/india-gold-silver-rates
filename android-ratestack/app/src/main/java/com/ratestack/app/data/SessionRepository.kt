@@ -19,12 +19,21 @@ data class CustomerSession(
     val fullName: String,
     val phone: String,
     val email: String? = null,
+    val googleConnected: Boolean? = null,
 )
 
 internal fun isExplicitSessionExpiryCode(code: String?): Boolean =
     code.equals("INVALID_TOKEN", ignoreCase = true) ||
         code.equals("TOKEN_EXPIRED", ignoreCase = true) ||
         code.equals("SESSION_EXPIRED", ignoreCase = true)
+
+internal fun mergeCustomerSession(current: CustomerSession, profile: CustomerProfileDto): CustomerSession =
+    current.copy(
+        fullName = profile.fullName?.takeIf { it.isNotBlank() } ?: current.fullName,
+        phone = profile.phone?.takeIf { it.isNotBlank() } ?: current.phone,
+        email = profile.email?.takeIf { it.isNotBlank() } ?: current.email,
+        googleConnected = profile.googleConnected ?: current.googleConnected,
+    )
 
 sealed interface SessionState {
     data object Restoring : SessionState
@@ -66,12 +75,13 @@ class SessionRepository(
         val name = prefs.getString("scheme_user_name", null)?.trim()
         val phone = prefs.getString("scheme_user_phone", null)?.trim()
         val email = prefs.getString("customer_email", null)?.trim()
+        val googleConnected = if (prefs.contains("customer_google_connected")) prefs.getBoolean("customer_google_connected", false) else null
         val id = prefs.getString("customer_id", null)?.trim() ?: "cust_restored"
 
         val prevState = _sessionState.value
 
         if (!token.isNullOrBlank() && !name.isNullOrBlank()) {
-            val customer = CustomerSession(id = id, fullName = name, phone = phone.orEmpty(), email = email)
+            val customer = CustomerSession(id = id, fullName = name, phone = phone.orEmpty(), email = email, googleConnected = googleConnected)
             val newState = SessionState.Authenticated(token, customer)
             _sessionState.value = newState
             SessionLogger.logStateChange(prevState, newState, "SessionRepository.restoreSession", token)
@@ -115,6 +125,7 @@ class SessionRepository(
             putString("scheme_user_name", customer.fullName.trim())
             putString("scheme_user_phone", customer.phone.trim())
             if (customer.email != null) putString("customer_email", customer.email.trim()) else remove("customer_email")
+            if (customer.googleConnected != null) putBoolean("customer_google_connected", customer.googleConnected) else remove("customer_google_connected")
         }.commit()
 
         // 2. Read back & verify
@@ -159,6 +170,7 @@ class SessionRepository(
             remove("scheme_user_name")
             remove("scheme_user_phone")
             remove("customer_email")
+            remove("customer_google_connected")
             remove("pending_auth_destination")
         }.commit()
 
@@ -189,6 +201,7 @@ class SessionRepository(
             remove("scheme_user_name")
             remove("scheme_user_phone")
             remove("customer_email")
+            remove("customer_google_connected")
             remove("pending_auth_destination")
         }.commit()
 
@@ -230,12 +243,17 @@ class SessionRepository(
                 if (response.isSuccessful && response.body()?.success == true) {
                     val user = response.body()?.data
                     if (user != null) {
-                        // Refresh user details
+                        val refreshedCustomer = mergeCustomerSession(currentState.customer, user)
                         prefs.edit().apply {
-                            putString("scheme_user_name", user.fullName)
-                            putString("scheme_user_phone", user.phone)
-                            if (user.email != null) putString("customer_email", user.email)
+                            putString("scheme_user_name", refreshedCustomer.fullName)
+                            putString("scheme_user_phone", refreshedCustomer.phone)
+                            if (refreshedCustomer.email != null) putString("customer_email", refreshedCustomer.email)
+                            if (refreshedCustomer.googleConnected != null) putBoolean("customer_google_connected", refreshedCustomer.googleConnected)
                         }.commit()
+                        val refreshedState = SessionState.Authenticated(currentState.token, refreshedCustomer)
+                        val previousState = _sessionState.value
+                        _sessionState.value = refreshedState
+                        SessionLogger.logStateChange(previousState, refreshedState, "SessionRepository.validateSessionWithBackend profile refresh", currentState.token)
                     }
                 } else if (response.code() == 401) {
                     val error = ApiProvider.errorInfo(response)

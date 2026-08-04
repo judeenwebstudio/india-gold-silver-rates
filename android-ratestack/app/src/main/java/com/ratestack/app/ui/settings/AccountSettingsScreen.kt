@@ -121,7 +121,7 @@ fun AccountSettingsScreen(
                     ) {
                         Column {
                             Text("Google Account", color = Color.White, fontWeight = FontWeight.Bold)
-                            Text(if (isGoogleConnected) "Connected to Google OAuth" else "Not connected", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                            Text(if (isGoogleConnected) "Connected to Google OAuth" else "No linked Google account", color = Color(0xFF94A3B8), fontSize = 12.sp)
                         }
                         if (isGoogleConnected) {
                             OutlinedButton(onClick = onDisconnectGoogle, shape = RoundedCornerShape(8.dp)) {

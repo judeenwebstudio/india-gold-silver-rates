@@ -1,8 +1,10 @@
 package com.ratestack.app
 
 import com.ratestack.app.data.CustomerSession
+import com.ratestack.app.data.CustomerProfileDto
 import com.ratestack.app.data.SessionState
 import com.ratestack.app.data.isExplicitSessionExpiryCode
+import com.ratestack.app.data.mergeCustomerSession
 import com.ratestack.app.data.parseApiErrorInfo
 import com.ratestack.app.ui.shop.shouldRedirectMyOrdersToLogin
 import org.junit.Assert.assertFalse
@@ -56,5 +58,25 @@ class SessionValidationRegressionTest {
     fun onlyTerminalUnauthenticatedStatesRedirect() {
         assertTrue(shouldRedirectMyOrdersToLogin(SessionState.Unauthenticated))
         assertTrue(shouldRedirectMyOrdersToLogin(SessionState.Expired))
+    }
+
+    @Test
+    fun profileRefreshEnrichesCanonicalSessionCustomer() {
+        val current = CustomerSession("customer-id", "Judeen", "9876543210")
+        val merged = mergeCustomerSession(
+            current,
+            CustomerProfileDto("Judeen", "9876543210", "customer@example.test", true, true, "customer@example.test"),
+        )
+
+        assertTrue(merged.googleConnected == true)
+        assertTrue(merged.email == "customer@example.test")
+    }
+
+    @Test
+    fun missingProfileFieldsNeverClearLoginCustomer() {
+        val current = CustomerSession("customer-id", "Judeen", "9876543210", "customer@example.test", true)
+        val merged = mergeCustomerSession(current, CustomerProfileDto(null, null, null, null, null, null))
+
+        assertTrue(merged == current)
     }
 }

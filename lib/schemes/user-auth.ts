@@ -6,7 +6,9 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
-const JWT_SECRET = process.env.AUTH_SECRET || 'ratestack_scheme_jwt_secret_key_2026';
+function getJwtSecret(): string {
+  return process.env.AUTH_SECRET || 'ratestack_scheme_jwt_secret_key_2026';
+}
 
 export interface SchemeAuthTokenPayload {
   userId: string;
@@ -24,7 +26,7 @@ export function signSchemeToken(userId: string, phone: string | null | undefined
   ).toString('base64url');
 
   const signature = crypto
-    .createHmac('sha256', JWT_SECRET)
+    .createHmac('sha256', getJwtSecret())
     .update(`${header}.${payload}`)
     .digest('base64url');
 
@@ -33,12 +35,13 @@ export function signSchemeToken(userId: string, phone: string | null | undefined
 
 export function verifySchemeToken(token: string): SchemeAuthTokenPayload | null {
   try {
-    const parts = token.split('.');
+    const cleanToken = decodeURIComponent(token.trim()).replace(/^["']|["']$/g, '').trim();
+    const parts = cleanToken.split('.');
     if (parts.length !== 3) return null;
 
     const [header, payload, signature] = parts;
     const expectedSig = crypto
-      .createHmac('sha256', JWT_SECRET)
+      .createHmac('sha256', getJwtSecret())
       .update(`${header}.${payload}`)
       .digest('base64url');
 
@@ -59,12 +62,11 @@ export async function authenticateSchemeUserFromRequest(request: Request): Promi
   const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
   let bearer = '';
   if (authHeader) {
-    const trimmed = authHeader.trim();
-    if (/^Bearer\s+/i.test(trimmed)) {
-      bearer = trimmed.replace(/^Bearer\s+/i, '').trim();
-    } else if (!trimmed.includes(' ')) {
-      bearer = trimmed;
+    let trimmed = authHeader.trim();
+    while (/^Bearer\s+/i.test(trimmed)) {
+      trimmed = trimmed.replace(/^Bearer\s+/i, '').trim();
     }
+    bearer = trimmed;
   }
 
   const cookieHeader = request.headers.get('cookie') || request.headers.get('Cookie');
@@ -75,10 +77,8 @@ export async function authenticateSchemeUserFromRequest(request: Request): Promi
     ?.slice('ratestack_scheme_session='.length);
 
   const rawToken = bearer || (cookieToken ? decodeURIComponent(cookieToken) : '');
-  const token = rawToken.replace(/^"|"$/g, '').trim();
-
-  if (!token) return null;
-  return verifySchemeToken(token);
+  if (!rawToken) return null;
+  return verifySchemeToken(rawToken);
 }
 
 export async function hashPassword(password: string): Promise<string> {

@@ -122,29 +122,45 @@ fun MyOrdersScreen(
 
     fun refresh() {
         if (token.isBlank()) return
+        val rawToken = token.trim()
+        var cleanToken = rawToken
+        while (cleanToken.startsWith("Bearer ", ignoreCase = true)) {
+            cleanToken = cleanToken.substring(7).trim()
+        }
+        cleanToken = cleanToken.removeSurrounding("\"").removeSurrounding("'").trim()
+        if (cleanToken.isBlank()) return
+
         scope.launch {
+            val requestUrl = "${BuildConfig.WEBSITE_URL.trimEnd('/')}/api/v1/me/dashboard"
+            val maskedTokenHeader = "Bearer ${cleanToken.take(20)}...********"
+
             if (BuildConfig.DEBUG) {
-                android.util.Log.d("RateStackSession", "12. Dashboard destination displayed | Dashboard data fetch starting")
+                android.util.Log.d("RateStackDashboard", "FETCH REQUEST DETAILS:")
+                android.util.Log.d("RateStackDashboard", "  URL: $requestUrl")
+                android.util.Log.d("RateStackDashboard", "  Method: GET")
+                android.util.Log.d("RateStackDashboard", "  Authorization: $maskedTokenHeader")
+                android.util.Log.d("RateStackDashboard", "  X-RateStack-Platform: ANDROID")
             }
-            runCatching { ApiProvider.service.getCustomerDashboard("Bearer $token") }
+
+            runCatching { ApiProvider.service.getCustomerDashboard("Bearer $cleanToken") }
                 .onSuccess { response ->
                     val rawErrorBody = if (response.isSuccessful) null else runCatching { response.errorBody()?.string() }.getOrNull()
                     if (BuildConfig.DEBUG) {
-                        android.util.Log.d("RateStackDashboard", "SessionState=$sessionState")
-                        android.util.Log.d("RateStackDashboard", "Session customer: name=${customer.fullName}, email=${customer.email}, mobile=${customer.phone}, googleConnected=${customer.googleConnected}")
-                        android.util.Log.d("RateStackDashboard", "Dashboard API HTTP code=${response.code()}")
-                        android.util.Log.d("RateStackDashboard", "Dashboard API body=${response.body() ?: rawErrorBody}")
+                        android.util.Log.d("RateStackDashboard", "FETCH RESPONSE DETAILS:")
+                        android.util.Log.d("RateStackDashboard", "  HTTP Response Code: ${response.code()}")
+                        android.util.Log.d("RateStackDashboard", "  HTTP Response Body: ${response.body() ?: rawErrorBody}")
                     }
                     if (response.isSuccessful) {
                         dashboard = response.body()?.data
                         error = null
                     } else {
                         val apiError = parseApiErrorInfo(rawErrorBody)
-                        if (BuildConfig.DEBUG) android.util.Log.d("RateStackDashboard", "Dashboard API error code=${apiError.code}, message=${apiError.message}")
+                        if (BuildConfig.DEBUG) android.util.Log.d("RateStackDashboard", "  Dashboard Error Code: ${apiError.code}, Message: ${apiError.message}")
                         error = "Dashboard details are temporarily unavailable (HTTP ${response.code()}). Your session remains active."
                     }
                 }
                 .onFailure { e ->
+                    if (BuildConfig.DEBUG) android.util.Log.d("RateStackDashboard", "  Network Error: ${e.message}")
                     error = "Unable to connect: ${e.message ?: "Network error"}"
                 }
         }

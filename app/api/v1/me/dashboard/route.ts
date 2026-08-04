@@ -6,14 +6,23 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const auth = await authenticateSchemeUserFromRequest(request);
-  if (!auth) return NextResponse.json({ success: false, error: { message: "Authentication required." } }, { status: 401 });
+  if (!auth) {
+    const rawHeader = request.headers.get("authorization") || request.headers.get("Authorization") || "NONE";
+    console.warn(`[Dashboard Auth Log] Unauthorized dashboard request. Header snippet: ${rawHeader.slice(0, 30)}... | HTTP 401`);
+    return NextResponse.json({ success: false, error: { message: "Authentication required." } }, { status: 401 });
+  }
+
+  console.log(`[Dashboard Auth Log] Authenticated request | customerId=${auth.userId} | token subject=${auth.email || auth.phone || auth.userId} | HTTP 200`);
   const [user, orders, addresses, gstProfile] = await Promise.all([
     prisma.schemeUser.findUnique({ where: { id: auth.userId }, include: { authAccounts: { select: { provider: true, providerEmail: true } } } }),
     prisma.shopOrder.findMany({ where: { userId: auth.userId }, include: { product: { select: { imageUrl: true, imageMimeType: true } }, trackingEvents: { select: { status: true, publicMessage: true, createdAt: true }, orderBy: { createdAt: "asc" } } }, orderBy: { createdAt: "desc" } }),
     prisma.deliveryAddress.findMany({ where: { userId: auth.userId }, orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }] }),
     prisma.customerGSTProfile.findFirst({where:{customerId:auth.userId,isDefault:true},orderBy:{updatedAt:"desc"}}),
   ]);
-  if (!user) return NextResponse.json({ success: false, error: { message: "Account not found." } }, { status: 404 });
+  if (!user) {
+    console.warn(`[Dashboard Auth Log] User record not found for customerId=${auth.userId} | HTTP 404`);
+    return NextResponse.json({ success: false, error: { message: "Account not found." } }, { status: 404 });
+  }
   const money = (value: bigint) => Number(value) / 100;
   const rows = orders.map(order => ({
     id: order.id, orderNumber: order.orderNumber, productId: order.productId, productName: order.productName,

@@ -4,174 +4,63 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
-import android.view.ViewGroup
-import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.annotation.OptIn
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import com.google.android.material.snackbar.Snackbar
 import com.razorpay.Checkout
 import com.razorpay.PaymentData
 import com.razorpay.PaymentResultWithDataListener
+import kotlinx.coroutines.delay
 import org.json.JSONObject
-import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
 
     private var razorpaySuccess: ((String, String) -> Unit)? = null
     private var razorpayError: ((String?) -> Unit)? = null
 
-    private var exoPlayer: ExoPlayer? = null
-    private var playerView: PlayerView? = null
-    private val appMountedGate = AtomicBoolean(false)
-    private var transitionCount = 0
-
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_RateStack)
         super.onCreate(savedInstanceState)
 
-        val isColdStart = savedInstanceState == null
-        val shouldPlaySplash = isColdStart && BuildConfig.ENABLE_VIDEO_SPLASH
-
-        if (BuildConfig.DEBUG) {
-            Log.d("RateStackSplash", "Cold-start eligibility: isColdStart=$isColdStart, ENABLE_VIDEO_SPLASH=${BuildConfig.ENABLE_VIDEO_SPLASH}")
-        }
-
-        if (shouldPlaySplash) {
-            setupFullWindow()
-            startVideoSplash()
-        } else {
-            showAppContentOnce("Direct launch without video splash (flag=${BuildConfig.ENABLE_VIDEO_SPLASH})")
-        }
-    }
-
-    private fun setupFullWindow() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
-    }
-
-    private fun restoreSystemBars() {
-        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-        windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
-    }
-
-    @OptIn(UnstableApi::class)
-    private fun startVideoSplash() {
-        try {
-            val videoUri = Uri.parse("android.resource://$packageName/${R.raw.ratestack_splash}")
-            if (BuildConfig.DEBUG) {
-                Log.d("RateStackSplash", "Video resource resolved: $videoUri")
-            }
-
-            val player = ExoPlayer.Builder(this).build().apply {
-                setMediaItem(MediaItem.fromUri(videoUri))
-                volume = 0f // Muted
-                repeatMode = Player.REPEAT_MODE_OFF
-            }
-            exoPlayer = player
-            if (BuildConfig.DEBUG) Log.d("RateStackSplash", "Player created")
-
-            val pView = PlayerView(this).apply {
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                setBackgroundColor(android.graphics.Color.parseColor("#1C1917"))
-                this.player = player
-            }
-            playerView = pView
-
-            val rootLayout = FrameLayout(this).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                )
-                setBackgroundColor(android.graphics.Color.parseColor("#1C1917"))
-                addView(pView, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                ))
-            }
-            setContentView(rootLayout)
-
-            player.addListener(object : Player.Listener {
-                override fun onRenderedFirstFrame() {
-                    if (BuildConfig.DEBUG) Log.d("RateStackSplash", "First frame rendered")
-                }
-
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    if (isPlaying && BuildConfig.DEBUG) Log.d("RateStackSplash", "Playback started")
-                }
-
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_ENDED) {
-                        if (BuildConfig.DEBUG) Log.d("RateStackSplash", "Playback completed naturally")
-                        showAppContentOnce("Playback completed naturally")
-                    }
-                }
-
-                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                    if (BuildConfig.DEBUG) Log.w("RateStackSplash", "Player error: ${error.message}")
-                    showAppContentOnce("Player error fallback: ${error.message}")
-                }
-            })
-
-            player.prepare()
-            if (BuildConfig.DEBUG) Log.d("RateStackSplash", "Media prepared")
-            player.play()
-
-            // 5.5-second total fallback timeout (video is 4.0s)
-            pView.postDelayed({
-                if (!appMountedGate.get()) {
-                    if (BuildConfig.DEBUG) Log.d("RateStackSplash", "Fallback timeout triggered")
-                    showAppContentOnce("Timeout fallback triggered")
-                }
-            }, 5500)
-
-        } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.w("RateStackSplash", "Exception during splash init: ${e.message}")
-            showAppContentOnce("Exception fallback: ${e.message}")
-        }
-    }
-
-    private fun showAppContentOnce(reason: String) {
-        if (!appMountedGate.compareAndSet(false, true)) {
-            return
-        }
-        transitionCount++
-        if (BuildConfig.DEBUG) {
-            Log.d("RateStackSplash", "Transition #$transitionCount triggered | Reason: $reason")
-        }
-
-        releasePlayerSafely()
-        restoreSystemBars()
+        val isColdStart = savedInstanceState == null
 
         setContent {
+            var showSplash by remember { mutableStateOf(isColdStart) }
+
             RateStackTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFF1C1917),
-                ) {
+                if (showSplash) {
+                    PremiumStaticSplashScreen(
+                        onSplashFinished = {
+                            showSplash = false
+                        },
+                    )
+                } else {
                     RateStackApp(
                         initialUrl = intent?.dataString,
                         onOpenExternal = { openExternalUri(it.toUri()) },
@@ -181,33 +70,6 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                 }
             }
         }
-        if (BuildConfig.DEBUG) Log.d("RateStackSplash", "App content mounted (RateStackApp)")
-    }
-
-    private fun releasePlayerSafely() {
-        try {
-            playerView?.player = null
-            playerView = null
-            exoPlayer?.stop()
-            exoPlayer?.clearMediaItems()
-            exoPlayer?.release()
-            exoPlayer = null
-            if (BuildConfig.DEBUG) Log.d("RateStackSplash", "Player detached and released safely")
-        } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.w("RateStackSplash", "Error releasing player: ${e.message}")
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        if (!appMountedGate.get()) {
-            showAppContentOnce("Activity stopped during splash")
-        }
-    }
-
-    override fun onDestroy() {
-        releasePlayerSafely()
-        super.onDestroy()
     }
 
     fun startPhonePePaymentSheet(
@@ -247,7 +109,7 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
                 put("currency", "INR")
                 put("amount", amountPaise)
                 put("order_id", gatewayOrderId)
-                put("theme.color", "#F59E0B")
+                put("theme.color", "#E2AD3D")
             })
         } catch (e: Exception) {
             razorpayError?.invoke(e.message)
@@ -287,5 +149,46 @@ class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
         } catch (_: ActivityNotFoundException) {
             openExternalUri("https://www.ratestack.in/privacy-policy".toUri())
         }
+    }
+}
+
+@Composable
+fun PremiumStaticSplashScreen(onSplashFinished: () -> Unit) {
+    var startAnimation by remember { mutableStateOf(false) }
+    val alphaAnim by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0f,
+        animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing),
+        label = "splashAlpha",
+    )
+    val scaleAnim by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0.92f,
+        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+        label = "splashScale",
+    )
+
+    LaunchedEffect(Unit) {
+        startAnimation = true
+        delay(1800L)
+        onSplashFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE2AD3D)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.ratestack_logo_transparent),
+            contentDescription = null,
+            modifier = Modifier
+                .width(220.dp)
+                .graphicsLayer {
+                    alpha = alphaAnim
+                    scaleX = scaleAnim
+                    scaleY = scaleAnim
+                },
+            contentScale = ContentScale.Fit,
+        )
     }
 }

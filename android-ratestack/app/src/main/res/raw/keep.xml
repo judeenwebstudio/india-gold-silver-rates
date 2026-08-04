@@ -1,3 +1,3 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@color/transparent,@drawable/splash_neutral,@raw/ratestack_splash,@string/restart_to_update,@string/update_downloaded" />
+    tools:keep="@color/transparent,@drawable/splash_neutral,@drawable/ratestack_logo_transparent,@string/restart_to_update,@string/update_downloaded" />

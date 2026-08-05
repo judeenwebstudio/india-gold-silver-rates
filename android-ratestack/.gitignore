@@ -9,6 +9,7 @@ captures/
 .cxx/
 *.jks
 *.keystore
+keystore.properties
 signing.properties
 **/google-services.json
 

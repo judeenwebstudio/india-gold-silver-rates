@@ -1,4 +1,5 @@
 import java.net.URI
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -75,24 +76,47 @@ val configuredVersionName = providers.gradleProperty("RATESTACK_VERSION_NAME")
     .orElse("1.1.0")
     .get()
 
+val keystorePropsFile = rootProject.file("keystore.properties").takeIf { it.isFile }
+    ?: file("../keystore.properties").takeIf { it.isFile }
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile != null) {
+        keystorePropsFile.inputStream().use { stream ->
+            load(stream)
+        }
+    }
+}
+
 val releaseStoreFile = providers.gradleProperty("RATESTACK_STORE_FILE")
     .orElse(providers.environmentVariable("RATESTACK_STORE_FILE"))
+    .orElse(providers.provider { keystoreProps.getProperty("storeFile") })
     .orNull
 val releaseStorePassword = providers.gradleProperty("RATESTACK_STORE_PASSWORD")
     .orElse(providers.environmentVariable("RATESTACK_STORE_PASSWORD"))
+    .orElse(providers.provider { keystoreProps.getProperty("storePassword") })
     .orNull
 val releaseKeyAlias = providers.gradleProperty("RATESTACK_KEY_ALIAS")
     .orElse(providers.environmentVariable("RATESTACK_KEY_ALIAS"))
+    .orElse(providers.provider { keystoreProps.getProperty("keyAlias") })
     .orNull
 val releaseKeyPassword = providers.gradleProperty("RATESTACK_KEY_PASSWORD")
     .orElse(providers.environmentVariable("RATESTACK_KEY_PASSWORD"))
+    .orElse(providers.provider { keystoreProps.getProperty("keyPassword") })
     .orNull
-val releaseSigningConfigured = listOf(
-    releaseStoreFile,
-    releaseStorePassword,
-    releaseKeyAlias,
-    releaseKeyPassword,
-).all { !it.isNullOrBlank() }
+
+val resolvedStoreFile = releaseStoreFile?.let { path ->
+    val f = file(path)
+    if (f.exists()) f
+    else {
+        val rootF = rootProject.file(path)
+        if (rootF.exists()) rootF
+        else file("../$path")
+    }
+}
+
+val releaseSigningConfigured = resolvedStoreFile != null && resolvedStoreFile.exists() &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
 
 android {
     namespace = "com.ratestack.app"
@@ -130,7 +154,7 @@ android {
     signingConfigs {
         if (releaseSigningConfigured) {
             create("release") {
-                storeFile = file(requireNotNull(releaseStoreFile))
+                storeFile = requireNotNull(resolvedStoreFile)
                 storePassword = releaseStorePassword
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword

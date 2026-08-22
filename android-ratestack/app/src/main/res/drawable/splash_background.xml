@@ -4,8 +4,8 @@
         <color android:color="#FFFFFF" />
     </item>
     <item
-        android:width="240dp"
-        android:height="240dp"
+        android:width="200dp"
+        android:height="200dp"
         android:gravity="center">
         <bitmap
             android:gravity="center"

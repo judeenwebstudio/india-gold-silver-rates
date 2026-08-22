@@ -46,3 +46,8 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+# Android generated release files
+android-ratestack/app/release/
+android-ratestack/app/build/
+*.aab
+*.apk

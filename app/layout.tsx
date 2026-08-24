@@ -56,6 +56,9 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [socialImage],
     },
     robots: { index: true, follow: true },
+    verification: {
+      google: "CEXauFKcvKjM5eIjOk2gfC8P1hR72P0b9u0PCrTNPcM",
+    },
     other: adsense.client
       ? { "google-adsense-account": adsense.client }
       : undefined,

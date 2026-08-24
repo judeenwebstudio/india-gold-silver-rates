@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const baseUrl = "https://ratestack.in";
   const legalPaths = ["/about-us", "/terms-and-conditions", "/refund-policy", "/shipping-policy", "/privacy-policy", "/faq", "/contact-us"];
   return [
     { url: baseUrl, lastModified: new Date(), changeFrequency: "daily", priority: 1 },

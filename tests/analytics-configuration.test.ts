@@ -18,15 +18,10 @@ test("GA4 configuration accepts measurement IDs and disables invalid values", ()
   assert.equal(normalizeGa4MeasurementId(" g-example123 "), "G-EXAMPLE123");
   assert.equal(normalizeGa4MeasurementId("UA-12345-1"), null);
 
-  assert.deepEqual(
-    getAnalyticsConfiguration({
-      NEXT_PUBLIC_GA_MEASUREMENT_ID: "G-EXAMPLE123",
-    }),
-    {
-      measurementId: "G-EXAMPLE123",
-      ga4Enabled: true,
-    },
-  );
+  assert.deepEqual(getAnalyticsConfiguration(), {
+    measurementId: "G-3BSKW3TWWW",
+    ga4Enabled: true,
+  });
 });
 
 test("AdSense configuration requires a valid client and never invents one", () => {

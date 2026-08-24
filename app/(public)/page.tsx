@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import { Footer } from "@/components/Footer";
 import { CouponBanner } from "@/components/CouponBanner";
 import { Header } from "@/components/Header";
@@ -8,6 +10,11 @@ import {
   getCityDisplayRates,
   getPublicLocations,
 } from "@/lib/city-rate-service";
+import { PRODUCTION_SITE_URL } from "@/lib/legal-metadata";
+
+export const metadata: Metadata = {
+  alternates: { canonical: PRODUCTION_SITE_URL },
+};
 
 export const dynamic = "force-dynamic";
 

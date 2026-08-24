@@ -1,7 +1,17 @@
+import type { Metadata } from "next";
+
 import { CalculatorExperience } from "@/components/CalculatorExperience";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { getCityDisplayRates, getPublicLocations } from "@/lib/city-rate-service";
+import { PRODUCTION_SITE_URL } from "@/lib/legal-metadata";
+
+export const metadata: Metadata = {
+  title: { absolute: "Gold Rate Calculator: Estimate Gold Price | RateStack" },
+  description:
+    "Use RateStack's gold rate calculator to estimate metal value by city, purity, and weight. You can also calculate silver value from current indicative rates.",
+  alternates: { canonical: `${PRODUCTION_SITE_URL}/calculator` },
+};
 
 export const dynamic = "force-dynamic";
 

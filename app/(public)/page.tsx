@@ -13,6 +13,9 @@ import {
 import { PRODUCTION_SITE_URL } from "@/lib/legal-metadata";
 
 export const metadata: Metadata = {
+  title: { absolute: "Gold Rate Today in India: 22K, 24K & Silver | RateStack" },
+  description:
+    "Check today's 22K and 24K gold rates and silver rates in India, compare indicative city prices, and estimate metal value with RateStack calculators.",
   alternates: { canonical: PRODUCTION_SITE_URL },
 };
 

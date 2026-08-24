@@ -29,6 +29,7 @@ function defaultWeight(product: Product) {
 }
 
 export function ShopCatalogue({ embedded = false }: { embedded?: boolean }) {
+  const CatalogueHeading = embedded ? "h2" : "h1";
   const [products, setProducts] = useState<Product[]>([]);
   const [location, setLocation] = useState("Loading shop location…");
   const [selections, setSelections] = useState<Record<string, { weight: number; quantity: number }>>({});
@@ -58,7 +59,7 @@ export function ShopCatalogue({ embedded = false }: { embedded?: boolean }) {
   return <section id={embedded ? "shop-catalogue" : undefined} className={embedded ? "bg-[#fbfaf7] py-14 sm:py-20" : undefined} aria-labelledby={embedded ? "home-shop-heading" : "shop-heading"}>
     <div className={embedded ? "mx-auto max-w-6xl px-4 sm:px-6 lg:px-8" : undefined}>
       <section className="shop-hero mb-8 overflow-hidden rounded-3xl border border-amber-900/10 px-5 py-7 text-center shadow-[0_12px_32px_rgba(89,59,18,0.07)] md:px-10 md:py-8">
-        <h1 id={embedded ? "home-shop-heading" : "shop-heading"} className="font-display mx-auto max-w-4xl text-3xl font-bold leading-tight tracking-[-0.035em] text-stone-900 sm:text-4xl md:text-5xl">Buy Certified <span className="shop-hero-gold">Gold &amp; Silver Coins</span> at Live Rates</h1>
+        <CatalogueHeading id={embedded ? "home-shop-heading" : "shop-heading"} className="font-display mx-auto max-w-4xl text-3xl font-bold leading-tight tracking-[-0.035em] text-stone-900 sm:text-4xl md:text-5xl">Buy Certified <span className="shop-hero-gold">Gold &amp; Silver Coins</span> at Live Rates</CatalogueHeading>
         <div className="shop-hero-divider mx-auto my-4 h-px w-32 overflow-hidden rounded-full" aria-hidden="true"><span className="block h-full w-1/2" /></div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-stone-600 sm:text-base">Shop pricing location: {location}. Select a city below for the informational silver calculator.</p>
       </section>

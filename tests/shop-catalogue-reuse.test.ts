@@ -16,6 +16,6 @@ test("homepage and Shop page reuse one catalogue implementation", () => {
   assert.match(read("components/shop/ShopCheckout.tsx"), /\/api\/v1\/shop\/checkout/);
   assert.match(catalogue, /Purity:/);
   assert.match(catalogue, /In stock/);
-  assert.match(catalogue, /Current Trichy price/);
+  assert.match(catalogue, /Shop pricing location:/);
   assert.doesNotMatch(home, /MajorCityRates/);
 });

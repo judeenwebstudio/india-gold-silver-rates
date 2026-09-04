@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 
-import { getAdSenseConfiguration } from "@/lib/adsense/config";
-
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -11,8 +9,6 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   const baseUrl = new URL(`${protocol}://${host}`);
   const socialImage = new URL("/og.png", baseUrl).toString();
-  const adsense = getAdSenseConfiguration();
-
   return {
     metadataBase: baseUrl,
     title: {
@@ -59,9 +55,9 @@ export async function generateMetadata(): Promise<Metadata> {
     verification: {
       google: "CEXauFKcvKjM5eIjOk2gfC8P1hR72P0b9u0PCrTNPcM",
     },
-    other: adsense.client
-      ? { "google-adsense-account": adsense.client }
-      : undefined,
+    other: {
+      "google-adsense-account": "ca-pub-1593649181553357",
+    },
   };
 }
 

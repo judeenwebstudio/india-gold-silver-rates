@@ -39,6 +39,14 @@ class RateStackApplication : Application() {
                 if (BuildConfig.DEBUG) Log.w("RateStackStartup", "Firebase Crashlytics non-fatal init error: ${e.message}")
             }
         }
+
+        runCatching {
+            com.google.android.gms.ads.MobileAds.initialize(this) { status ->
+                if (BuildConfig.DEBUG) Log.d("RateStackStartup", "Google Mobile Ads SDK initialized: $status")
+            }
+        }.onFailure { e ->
+            if (BuildConfig.DEBUG) Log.w("RateStackStartup", "MobileAds init non-fatal error: ${e.message}")
+        }
     }
 }
 

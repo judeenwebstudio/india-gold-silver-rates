@@ -164,6 +164,9 @@ android {
         getByName("debug") {
             isMinifyEnabled = false
             manifestPlaceholders["crashlyticsCollectionEnabled"] = false
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+            buildConfigField("String", "ADMOB_BANNER_ID", quotedBuildConfig("ca-app-pub-3940256099942544/6300978111"))
+            buildConfigField("String", "ADMOB_INTERSTITIAL_ID", quotedBuildConfig("ca-app-pub-3940256099942544/1033173712"))
         }
 
         getByName("release") {
@@ -171,6 +174,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             manifestPlaceholders["crashlyticsCollectionEnabled"] = true
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-1593649181553357~6124317925"
+            buildConfigField("String", "ADMOB_BANNER_ID", quotedBuildConfig("ca-app-pub-1593649181553357/3975921871"))
+            buildConfigField("String", "ADMOB_INTERSTITIAL_ID", quotedBuildConfig("ca-app-pub-1593649181553357/4267565917"))
             signingConfig = if (releaseSigningConfigured) {
                 signingConfigs.getByName("release")
             } else {
@@ -212,6 +218,9 @@ android {
             "AndroidGradlePluginVersion",
             "GradleDependency",
             "OldTargetApi",
+            "PropertyEscape",
+            "UnusedResources",
+            "UseKtx",
         )
     }
 }
@@ -246,6 +255,7 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     implementation(libs.play.services.auth)
+    implementation(libs.play.services.ads)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

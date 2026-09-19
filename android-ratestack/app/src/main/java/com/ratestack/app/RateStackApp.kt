@@ -190,6 +190,15 @@ fun RateStackApp(
                 next = currentRoute,
                 backStack = stack,
             )
+            val activity = context as? android.app.Activity
+            if (activity != null && previousRoute != null && currentRoute != null) {
+                com.ratestack.app.ads.AdMobManager.checkAndShowOnTransition(
+                    activity = activity,
+                    fromRoute = previousRoute,
+                    toRoute = currentRoute,
+                    onComplete = {},
+                )
+            }
             previousRoute = currentRoute
         }
         navController.addOnDestinationChangedListener(listener)
@@ -258,6 +267,7 @@ fun RateStackApp(
     }
 
     LaunchedEffect(Unit) {
+        com.ratestack.app.ads.AdMobManager.preloadInterstitial(context)
         if (BuildConfig.DEBUG) {
             android.util.Log.d("RateStackStartup", "16. first Compose frame rendered")
         }
@@ -323,19 +333,26 @@ fun RateStackApp(
                 )
             },
             bottomBar = {
-                NavigationBar {
-                    BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
-                    BottomItem(Routes.SCHEMES, "Shop", Icons.Outlined.ShoppingCart, currentRoute, navController)
-                    BottomItem(
-                        Routes.MY_ORDERS,
-                        "Dashboard",
-                        Icons.Default.Person,
-                        currentRoute,
-                        navController,
-                        onLoggedOutClick = if (userToken.isNullOrBlank()) {
-                            { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) }
-                        } else null,
-                    )
+                Column {
+                    if (com.ratestack.app.ads.AdMobManager.isRouteEligible(currentRoute)) {
+                        com.ratestack.app.ads.BannerAdView(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+                    NavigationBar {
+                        BottomItem(Routes.HOME, "Home", Icons.Default.Home, currentRoute, navController)
+                        BottomItem(Routes.SCHEMES, "Shop", Icons.Outlined.ShoppingCart, currentRoute, navController)
+                        BottomItem(
+                            Routes.MY_ORDERS,
+                            "Dashboard",
+                            Icons.Default.Person,
+                            currentRoute,
+                            navController,
+                            onLoggedOutClick = if (userToken.isNullOrBlank()) {
+                                { openCustomerLogin(PendingAuthDestination(AuthDestinationType.DASHBOARD)) }
+                            } else null,
+                        )
+                    }
                 }
             },
         ) { padding ->

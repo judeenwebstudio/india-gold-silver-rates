@@ -102,6 +102,7 @@ export async function signInOrCreateGoogleUser(identity: GoogleIdentity) {
       include: { user: true },
     });
     if (linked) {
+      if (!linked.user.isActive || linked.user.deletedAt || linked.user.accountStatus !== 'ACTIVE') throw new GoogleAuthError('ACCOUNT_BLOCKED');
       return tx.schemeUser.update({
         where: { id: linked.user.id },
         data: { lastLoginAt: new Date(), profileImageUrl: linked.user.profileImageUrl || identity.picture },
@@ -110,6 +111,7 @@ export async function signInOrCreateGoogleUser(identity: GoogleIdentity) {
 
     const existingEmailUser = await tx.schemeUser.findUnique({ where: { email: identity.email } });
     if (existingEmailUser) {
+      if (!existingEmailUser.isActive || existingEmailUser.deletedAt || existingEmailUser.accountStatus !== 'ACTIVE') throw new GoogleAuthError('ACCOUNT_BLOCKED');
       await tx.authAccount.create({
         data: {
           userId: existingEmailUser.id,
@@ -166,6 +168,8 @@ export async function signInOrCreateGoogleUser(identity: GoogleIdentity) {
 
 export async function connectGoogleAccount(userId: string, identity: GoogleIdentity) {
   return prisma.$transaction(async (tx) => {
+    const user = await tx.schemeUser.findUnique({ where: { id: userId } });
+    if (!user?.isActive || user.deletedAt || user.accountStatus !== 'ACTIVE') throw new GoogleAuthError('ACCOUNT_BLOCKED');
     const alreadyLinked = await tx.authAccount.findUnique({
       where: { provider_providerAccountId: { provider: 'GOOGLE', providerAccountId: identity.sub } },
     });

@@ -3,6 +3,7 @@ import test from "node:test";
 import { signSchemeToken, authenticateSchemeUserFromRequest } from "../lib/schemes/user-auth";
 
 test("GET /api/v1/me/dashboard accepts Bearer tokens, raw tokens, and session cookies", async () => {
+  const activeCustomer = async () => ({ isActive: true, accountStatus: "ACTIVE", deletedAt: null });
   const sampleToken = signSchemeToken("test-user-id", "9876543210", "Test Customer", "test@example.com");
   const maskedToken = `Bearer ${sampleToken.substring(0, 20)}...********`;
 
@@ -15,7 +16,7 @@ test("GET /api/v1/me/dashboard accepts Bearer tokens, raw tokens, and session co
     "X-RateStack-Platform": "ANDROID",
   });
   const reqAndroid = new Request("http://localhost:3000/api/v1/me/dashboard", { headers: androidHeaders });
-  const authAndroid = await authenticateSchemeUserFromRequest(reqAndroid);
+  const authAndroid = await authenticateSchemeUserFromRequest(reqAndroid, activeCustomer);
 
   assert.ok(authAndroid, "Android Bearer token must be authenticated successfully");
   assert.equal(authAndroid?.userId, "test-user-id");
@@ -28,7 +29,7 @@ test("GET /api/v1/me/dashboard accepts Bearer tokens, raw tokens, and session co
     "User-Agent": "RateStack-Android/1.0",
   });
   const reqAndroidRaw = new Request("http://localhost:3000/api/v1/me/dashboard", { headers: androidRawHeaders });
-  const authAndroidRaw = await authenticateSchemeUserFromRequest(reqAndroidRaw);
+  const authAndroidRaw = await authenticateSchemeUserFromRequest(reqAndroidRaw, activeCustomer);
   assert.ok(authAndroidRaw, "Android raw token must be authenticated successfully");
 
   // 3. Website Cookie header
@@ -38,7 +39,7 @@ test("GET /api/v1/me/dashboard accepts Bearer tokens, raw tokens, and session co
     "User-Agent": "Mozilla/5.0 (Linux; Android 14)",
   });
   const reqWebsite = new Request("http://localhost:3000/api/v1/me/dashboard", { headers: websiteHeaders });
-  const authWebsite = await authenticateSchemeUserFromRequest(reqWebsite);
+  const authWebsite = await authenticateSchemeUserFromRequest(reqWebsite, activeCustomer);
   assert.ok(authWebsite, "Website Cookie token must be authenticated successfully");
 
   console.log("--------------------------------------------------");

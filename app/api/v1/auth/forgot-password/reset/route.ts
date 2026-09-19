@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       where: { resetTokenHash: tokenHash },
     });
 
-    if (!otpRecord || otpRecord.consumedAt) {
+    if (!otpRecord || !otpRecord.userId || otpRecord.consumedAt) {
       return NextResponse.json(
         { success: false, error: { message: 'Invalid or expired reset token. Please restart the password reset process.' } },
         { status: 400 }
@@ -71,6 +71,7 @@ export async function POST(request: Request) {
     // Find target customer
     const user = await prisma.schemeUser.findFirst({
       where: {
+        id: otpRecord.userId,
         phone: otpRecord.mobileNumber,
         isActive: true,
       },

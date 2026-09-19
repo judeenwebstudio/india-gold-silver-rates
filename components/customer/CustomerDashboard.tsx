@@ -350,6 +350,7 @@ export function CustomerDashboard() {
             >
               Request an account update →
             </Link>
+            <p><Link href="/account-deletion" className="text-xs text-stone-400 underline hover:text-stone-200">Account deletion</Link></p>
           </DashboardCard>
         </section>
 

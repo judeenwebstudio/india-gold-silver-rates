@@ -82,6 +82,7 @@ export async function POST(request: Request) {
       data: {
         mobileNumber: normalizedMobile,
         otpHash,
+        userId: user.id,
         expiresAt,
         resendAvailableAt,
         attemptCount: 0,

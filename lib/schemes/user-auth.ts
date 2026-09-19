@@ -45,10 +45,12 @@ export function verifySchemeToken(token: string): SchemeAuthTokenPayload | null 
       .update(`${header}.${payload}`)
       .digest('base64url');
 
-    if (signature !== expectedSig) return null;
+    const supplied = Buffer.from(signature);
+    const expected = Buffer.from(expectedSig);
+    if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return null;
 
     const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as SchemeAuthTokenPayload;
-    if (decoded.exp < Math.floor(Date.now() / 1000)) {
+    if (typeof decoded.userId !== 'string' || !decoded.userId || !Number.isFinite(decoded.exp) || decoded.exp <= Math.floor(Date.now() / 1000)) {
       return null; // Expired
     }
 
@@ -58,7 +60,14 @@ export function verifySchemeToken(token: string): SchemeAuthTokenPayload | null 
   }
 }
 
-export async function authenticateSchemeUserFromRequest(request: Request): Promise<SchemeAuthTokenPayload | null> {
+export type CustomerSessionLookup = (id: string) => Promise<{ isActive: boolean; accountStatus: string; deletedAt: Date | null } | null>;
+
+async function lookupCustomerSession(id: string) {
+  const { prisma } = await import('@/lib/prisma');
+  return prisma.schemeUser.findUnique({ where: { id }, select: { isActive: true, accountStatus: true, deletedAt: true } });
+}
+
+export async function authenticateSchemeUserFromRequest(request: Request, lookup: CustomerSessionLookup = lookupCustomerSession): Promise<SchemeAuthTokenPayload | null> {
   const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
   let bearer = '';
   if (authHeader) {
@@ -76,9 +85,19 @@ export async function authenticateSchemeUserFromRequest(request: Request): Promi
     .find((part) => part.startsWith('ratestack_scheme_session='))
     ?.slice('ratestack_scheme_session='.length);
 
-  const rawToken = bearer || (cookieToken ? decodeURIComponent(cookieToken) : '');
-  if (!rawToken) return null;
-  return verifySchemeToken(rawToken);
+  try {
+    const rawToken = bearer || (cookieToken ? decodeURIComponent(cookieToken) : '');
+    if (!rawToken) return null;
+    const payload = verifySchemeToken(rawToken);
+    if (!payload) return null;
+    // No cache: legacy JWTs and the session-refresh endpoint must be revoked at
+    // the same commit that anonymizes the customer, on every app instance.
+    const user = await lookup(payload.userId);
+    return user?.isActive && user.accountStatus === 'ACTIVE' && !user.deletedAt ? payload : null;
+  } catch {
+    // A failed revocation lookup must never fall back to signature-only auth.
+    return null;
+  }
 }
 
 export async function hashPassword(password: string): Promise<string> {

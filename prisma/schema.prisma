@@ -3,6 +3,34 @@ generator client {
   output   = "../generated/prisma"
 }
 
+// Public intake only. No relation/cascade to customer or financial records.
+model AccountDeletionRequest {
+  id          String   @id @default(cuid())
+  identifier  String?
+  contactHash String?
+  ipHash      String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  verifiedAt  DateTime?
+  closedAt    DateTime?
+  reviewedBy  String?
+  customerId  String?
+  verificationMethod String?
+  approvedAt  DateTime?
+  approvedBy  String?
+  completedAt DateTime?
+  policyVersion String?
+  retainKyc Boolean @default(false)
+  retainEvidence Boolean @default(false)
+  retainedEvidenceJson Json?
+  retentionReviewAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([contactHash, status])
+  @@index([ipHash, createdAt])
+  @@index([customerId, status])
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -541,6 +569,7 @@ model SchemeUser {
   emailVerifiedAt    DateTime?
   preferredLoginMethod String            @default("MOBILE")
   accountStatus      String              @default("ACTIVE")
+  deletedAt          DateTime?
   lastLoginAt        DateTime?
   passwordHash       String?
   profileImageUrl    String?
@@ -1451,6 +1480,7 @@ model AuditLog {
 model PasswordResetOtp {
   id                  String    @id @default(cuid())
   mobileNumber        String
+  userId              String?
   otpHash             String
   resetTokenHash      String?   @unique
   expiresAt           DateTime
@@ -1464,4 +1494,5 @@ model PasswordResetOtp {
 
   @@index([mobileNumber, createdAt])
   @@index([resetTokenHash])
+  @@index([userId])
 }

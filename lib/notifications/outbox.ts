@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { NotificationChannel, Prisma } from "@/generated/prisma/client";
+import { withActiveCustomer } from "@/lib/customer-delivery";
 
 export type NotificationEvent={customerId?:string;shopOrderId?:string;eventType:string;title:string;body:string;payload?:Record<string,unknown>;channels?:NotificationChannel[];deduplicationKey?:string;scheduledAt?:Date};
 const hash=(value:string)=>createHash("sha256").update(value).digest("hex").slice(0,32);
@@ -9,7 +10,10 @@ export function safeDeepLink(value:unknown){if(typeof value!=="string")return "/
 
 export async function enqueueNotification(event:NotificationEvent){
   const channels=event.channels||["PUSH","EMAIL"],base=event.deduplicationKey||hash(`${event.eventType}:${event.customerId||""}:${event.shopOrderId||""}:${JSON.stringify(event.payload||{})}`);
-  return Promise.all(channels.map(channel=>prisma.notificationOutbox.upsert({where:{deduplicationKey:`${base}:${channel}`},update:{},create:{customerId:event.customerId,shopOrderId:event.shopOrderId,eventType:event.eventType,title:event.title,body:event.body,payloadJson:{...(event.payload||{}),deepLink:safeDeepLink(event.payload?.deepLink)} as Prisma.InputJsonValue,channel,deduplicationKey:`${base}:${channel}`,scheduledAt:event.scheduledAt||new Date()}})));
+  const order = event.shopOrderId ? await prisma.shopOrder.findUnique({ where: { id: event.shopOrderId }, select: { userId: true } }) : null;
+  const customerId = order?.userId || event.customerId;
+  if (!customerId || (order && event.customerId && order.userId !== event.customerId)) return [];
+  return await withActiveCustomer(prisma, customerId, tx => Promise.all(channels.map(channel=>tx.notificationOutbox.upsert({where:{deduplicationKey:`${base}:${channel}`},update:{},create:{customerId,shopOrderId:event.shopOrderId,eventType:event.eventType,title:event.title,body:event.body,payloadJson:{...(event.payload||{}),deepLink:safeDeepLink(event.payload?.deepLink)} as Prisma.InputJsonValue,channel,deduplicationKey:`${base}:${channel}`,scheduledAt:event.scheduledAt||new Date()}})))) || [];
 }
 
 const orderCopy:Record<string,[string,string]>={

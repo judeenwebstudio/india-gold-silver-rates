@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
     });
     clearOAuthCookies(response);
     return response;
-  } catch {
-    return failure();
-  }
+  } catch (error) {
+  console.error('[Google OAuth callback failed]', error);
+  return failure();
+}
 }
